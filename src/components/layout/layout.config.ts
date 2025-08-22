@@ -1,6 +1,12 @@
-import { Config } from "../config";
-import { Vector } from "../geometry";
-import { LayoutTypes } from "./layout";
+import { 
+    Config 
+} from "../config";
+import { 
+    Vector 
+} from "../geometry";
+import { 
+    LayoutTypes 
+} from "./layout.enum";
 
 export type LayoutConfigOptions = 
 {

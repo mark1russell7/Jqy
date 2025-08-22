@@ -1,35 +1,39 @@
-import { Vector } from "../geometry";
-import { NodeConfig } from "../graph";
+import { 
+    Vector 
+} from "../geometry";
+import { 
+    NodeConfig 
+} from "../graph";
+import { 
+    LayoutChildrenMode 
+} from "./layout.enum";
+import { MappedGrid } from "./strategies/grid.mapped";
 
-export enum LayoutTypes {
-    Grid   = "grid",
-    Radial = "radial"
-}
-export enum LayoutChildrenMode 
+export type AutosizeParentParam = 
 {
-    GRAPH     = "graph",
-    NESTED    = "nested"
+    count   : number;
+    nodeSize: Vector;
+    spacing : number;
+    min     : Vector;
 }
+export type AutosizeParentReturn = Vector;
 
-export abstract class Layout 
-{
-    abstract nestedFrames   (args: NestedFrameParam): any;
-    abstract placeChildren(args: PlaceChildrenParam): PlaceChildrenReturn;
-    abstract autosizeParent(args: any): any;
-}
-
-/* =========================================================
- * NESTED GRID
- *  - Outer grid cells perfectly tessellate inner content
- *  - Each child renders inside a "cellInner" = (cell − 2*itemPad)
- * ========================================================= */
 export type NestedFrameParam = 
 {
     children      : NodeConfig[];
     parentSize    : Vector;
     spacing       : number;
 };
-export type PlaceChildrenParam = {
+export type NestedFramesReturn = 
+{
+    pad     : number;
+    ip      : number;
+    content : Vector;
+    grid    : MappedGrid;
+};
+
+export type PlaceChildrenParam = 
+{
     mode          : LayoutChildrenMode;
     children      : NodeConfig[];
     parent        : NodeConfig;
@@ -40,6 +44,19 @@ export type PlaceChildrenParam = {
     parentSize    : Vector;
 };
 export type PlaceChildrenReturn = Record<string, Vector>;
+export abstract class Layout 
+{
+    abstract nestedFrames   (args   : NestedFrameParam      )   : NestedFramesReturn;
+    abstract placeChildren  (args   : PlaceChildrenParam    )   : PlaceChildrenReturn;
+    abstract autosizeParent (args   : AutosizeParentParam   )   : AutosizeParentReturn;
+}
+
+/* =========================================================
+ * NESTED GRID
+ *  - Outer grid cells perfectly tessellate inner content
+ *  - Each child renders inside a "cellInner" = (cell − 2*itemPad)
+ * ========================================================= */
+
 
 /* ---------- Tunables (pure) ---------- */
 

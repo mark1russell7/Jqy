@@ -1,17 +1,31 @@
-import { add, divide, multiply, subtract } from "./math";
+import { 
+    add, 
+    divide, 
+    multiply, 
+    subtract 
+} from "./math";
 
 export enum Dimension 
 {
     X = "x",
     Y = "y"
 }
-export type Fold        = (value: number) => number;
-export type NestFold    = (vector: Vector) => number;
-export type FoldWith    = (value1: number, value2: number) => number;
-export type Reduce      = (x: number, y: number) => number;
+export type Fold        =   (value  : number) => number;
+export type NestFold    =   (vector : Vector) => number;
+export type FoldWith    =   (
+                                value1 : number, 
+                                value2 : number
+                            ) => number;
+export type Reduce      =   (
+                                x : number, 
+                                y : number
+                            ) => number;
 export class Vector 
 {
-    constructor(public readonly x: number, public readonly y: number) 
+    constructor (
+                    public readonly x : number, 
+                    public readonly y : number
+                ) 
     {
 
     }
@@ -20,14 +34,15 @@ export class Vector
                                                                     : new Vector(-this.x,  this.y);
     public  scale           =   (factor     : number    )   =>  this.multiply   (Vector.scalar(factor));
     public  sum             =   (                       )   =>  this.reduce     (add);
-    public  crossProduct    =   (vector     : Vector    )   =>  this.reflect    (Dimension.X).dotProduct(vector.swap());
+    public  crossProduct    =   (vector     : Vector    )   =>  this.reflect    (Dimension.X)
+                                                                    .dotProduct (vector.swap());
     public  normalize       =   (                       )   =>  this.scale      (1 / this.length());
     public  length          =   (                       )   =>  Math.sqrt       (this.dotProduct(this)); // Math.hypot(this.x, this.y); is more numerically stable
     public  round           =   (                       )   =>  this.map        (Math.round);
     public  map             =   (f          : Fold      )   =>  this.fold       (f,f);
     public  reduce          =   (f          : Reduce    )   =>  f               (this.x, this.y);
     static  scalar          =   (scalar     : number    )   =>  new Vector      (scalar, scalar);
-    public  trig            =   (                       )   =>  this.fold(Math.cos, Math.sin);
+    public  trig            =   (                       )   =>  this.fold       (Math.cos, Math.sin);
     public  swap            =   (                       )   =>  new Vector      (this.y, this.x);
     public  area            =   (                       )   =>  this.reduce     (multiply);
     public  aspectRatio     =   (                       )   =>  this.reduce     (divide);
@@ -39,40 +54,63 @@ export class Vector
     public  negate          =   (                       )   =>  this.scale      (-1);
     public  halve           =   (                       )   =>  this.scale      (1 / 2);
     public  dotProduct      =   (vector     :   Vector  )   =>  this.multiply   (vector)
-                                                                    .sum();
+                                                                    .sum        ();
     public  rotate          =   (radians    :   number  )   =>  Vector
                                                                     .scalar     (radians)
-                                                                    .trig()
+                                                                    .trig       ()
                                                                     .nestFold   (
-                                                                                    v =>    v.reflect(Dimension.X)
-                                                                                                .multiply(this)
-                                                                                                .sum(),
-                                                                                    v =>    v
-                                                                                                .swap()
-                                                                                                .multiply(this)
-                                                                                                .sum()
-                                                                    );
+                                                                                    (v : Vector) => v
+                                                                                                        .reflect(Dimension.X)
+                                                                                                        .multiply(this)
+                                                                                                        .sum(),
+                                                                                    (v : Vector) => v
+                                                                                                        .swap()
+                                                                                                        .multiply(this)
+                                                                                                        .sum()
+                                                                                );
     public  clamp           =   (
                                     min     : number = -Infinity, 
                                     max     : number =  Infinity
-                                ) => this.map(x => Math.min(Math.max(x, min), max));
+                                ) => this.map   (
+                                                    (x : number) => 
+                                                                    Math.min(
+                                                                                Math.max(
+                                                                                            x, 
+                                                                                            min
+                                                                                        ), 
+                                                                                max
+                                                                            )
+                                                );
     public  nestFold        =   (   
                                     left    : NestFold, 
                                     right   : NestFold
-                                ) => new Vector(left(this), right(this));
+                                ) => new Vector (
+                                                    left(this), 
+                                                    right(this)
+                                                );
     public  mapWith         =   (
                                     f       : FoldWith, 
                                     vector  : Vector
-                                ) => this.foldWith(f, f, vector);
+                                ) => this.foldWith  (
+                                                        f, 
+                                                        f, 
+                                                        vector
+                                                    );
     public  foldWith        =   (   
                                     left    : FoldWith, 
                                     right   : FoldWith, 
                                     vector  : Vector
-                                ) => new Vector(left(this.x, vector.x), right(this.y, vector.y));
+                                ) => new Vector (
+                                                    left (this.x, vector.x), 
+                                                    right(this.y, vector.y)
+                                                );
     public  fold            =   (
                                     left    : Fold, 
                                     right   : Fold
-                                ) => new Vector(left(this.x), right(this.y));
+                                ) => new Vector (
+                                                    left(this.x), 
+                                                    right(this.y)
+                                                );
 }
 
 export namespace Shapes 
@@ -86,11 +124,11 @@ export namespace Shapes
         {
 
         }
-        getPosition(): Vector 
+        getPosition() : Vector 
         {
             return this.position;
         }
-        getSize(): Vector 
+        getSize() : Vector 
         {
             return this.size;
         }
