@@ -1,4 +1,1 @@
-// object.utils.js
-export function cloneDeep(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
+export const cloneDeep = <T extends Record<string, any>>(object: T): T => JSON.parse(JSON.stringify(object));

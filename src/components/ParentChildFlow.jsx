@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
 import "reactflow/dist/style.css";
-import { LAYOUTS, resolveLayoutName } from "./layout.strategy";
+import { resolveLayoutName } from "./layout/layout.values";
+import { LayoutConfigs } from "./layout/layout.values";
 import { cloneDeep } from "./object.utils";
 import { buildGraph } from "./graph";
+import { Vector } from "./geometry";
 
 /** ----------------------------
  * Nested projection renderer
@@ -11,7 +13,7 @@ import { buildGraph } from "./graph";
 function NestedBox({ node, layoutName, nodeSize, spacing, level = 0 }) {
   const children = node.children ?? [];
   const chosen   = resolveLayoutName(node, layoutName);
-  const strategy = LAYOUTS[chosen];
+  const strategy = LayoutConfigs[chosen];
 
   // Size parent (if not specified)
   const minSize = { w: nodeSize.w * 2, h: nodeSize.h * 2 };
@@ -19,30 +21,31 @@ function NestedBox({ node, layoutName, nodeSize, spacing, level = 0 }) {
 
   // Parent container
   const pad     = Math.max(12, spacing * 1.0); // keep in sync with outerPad
-  const innerW  = Math.max(1, size.w - 2 * pad);
-  const innerH  = Math.max(1, size.h - 2 * pad);
+  const inner   = size.subtract(Vector.scalar(2 * pad)).clamp(-Infinity, 1)
+  // const innerW  = Math.max(1, size.w - 2 * pad);
+  // const innerH  = Math.max(1, size.h - 2 * pad);
 
   // For nested GRID we want tight cells; for RADIAL we use centers
-  const origin = { x: innerW / 2, y: innerH / 2 }; // local origin of INNER container
-  const nestedArgs = { mode: "nested", children, parent: node, origin, level, nodeSize, spacing, parentSize: { w: innerW, h: innerH } };
+  const origin = inner.scale(1/2); // local origin of INNER container
+  const nestedArgs = { mode: "nested", children, parent: node, origin, level, nodeSize, spacing, parentSize : inner };
 
   const gridFrames = chosen === "grid" ? strategy.nestedFrames(nestedArgs) : null;
   const centers    = strategy.placeChildren(nestedArgs); // used by radial; grid still OK
 
   return (
-    <div style={{ position: "relative", width: size.w, height: size.h, border: "1px solid #d0d7de", borderRadius: 10, background: "#fff", boxSizing: "border-box" }}>
+    <div style={{ position: "relative", width: size.x, height: size.y, border: "1px solid #d0d7de", borderRadius: 10, background: "#fff", boxSizing: "border-box" }}>
       {/* label */}
       <div style={{ position: "absolute", left: 6, top: 4, fontSize: 11, color: "#475569", userSelect: "none" }}>
         {node.label ?? node.id}
       </div>
 
       {/* INNER CONTENT area (parent − padding) */}
-      <div style={{ position: "absolute", left: pad, top: pad, width: innerW, height: innerH }}>
+      <div style={{ position: "absolute", left: pad, top: pad, width: inner.x, height: inner.y }}>
         {children.map((c) => {
           if (chosen === "grid" && gridFrames) {
             // Tight cell rect
             const frame = gridFrames.frames[c.id];
-            const childNode = { ...c, size: { w: frame.w, h: frame.h } };
+            const childNode = { ...c, size: frame };
             return (
               <div key={c.id} style={{ position: "absolute", left: frame.left, top: frame.top, width: frame.w, height: frame.h }}>
                 <NestedBox node={childNode} layoutName={layoutName} nodeSize={nodeSize} spacing={spacing} level={level + 1} />
@@ -113,7 +116,8 @@ export default function ParentChildLayoutsDemo({ config = DEMO }) {
   const [spacing, setSpacing] = useState(24);
   const [nodeW, setNodeW] = useState(110);
   const [nodeH, setNodeH] = useState(54);
-  const nodeSize = useMemo(() => ({ w: nodeW, h: nodeH }), [nodeW, nodeH]);
+
+  const nodeSize = useMemo(() => new Vector(nodeW, nodeH), [nodeW, nodeH]);
 
   const graphData = useMemo(() => {
     const c = cloneDeep(config);
