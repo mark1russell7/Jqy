@@ -1,1 +1,0 @@
-export const cloneDeep = <T extends Record<string, any>>(object: T) : T => JSON.parse(JSON.stringify(object));

@@ -12,9 +12,6 @@ import {
     LayoutConfigs 
 } from "./layout/layout.values";
 import { 
-    cloneDeep 
-} from "./object.utils";
-import { 
     buildGraph, 
     NodeConfig
 } from "./graph";
@@ -140,6 +137,7 @@ const NestedBox =   (
                                         if (chosen === LayoutTypes.Grid && gridFrames) 
                                         {
                                             return <GridChild 
+                                                        key         = {c.id}
                                                         nodeConfig  = {c} 
                                                         layoutName  = {layoutName} 
                                                         nodeSize    = {nodeSize} 
@@ -286,11 +284,38 @@ const RadialChild = (
 
 
 
-
-function NestedProjection({ config, layoutName, nodeSize, spacing }) {
+export type NestedProjectionProps = 
+{
+    config     : NodeConfig;
+    layoutName : LayoutTypes;
+    nodeSize   : Vector;
+    spacing    : number;
+}
+const NestedProjection =    (
+                                { 
+                                    config, 
+                                    layoutName, 
+                                    nodeSize, 
+                                    spacing 
+                                } : NestedProjectionProps
+                            ) 
+                            : React.JSX.Element =>
+{
     return (
-        <div style={{ position: "absolute", left: 12, top: 12 }}>
-            <NestedBox node={config} layoutName={layoutName} nodeSize={nodeSize} spacing={spacing} />
+        <div style =    {
+                            { 
+                                position    : "absolute", 
+                                left        : 12, 
+                                top         : 12 
+                            }
+                        }
+        >
+            <NestedBox 
+                node        =   {config     } 
+                layoutName  =   {layoutName } 
+                nodeSize    =   {nodeSize   } 
+                spacing     =   {spacing    } 
+            />
         </div>
     );
 }
@@ -300,127 +325,292 @@ function NestedProjection({ config, layoutName, nodeSize, spacing }) {
  * ---------------------------- */
 
 const DEMO = {
-    id: "root",
-    label: "Root",
-    position: new Vector(400, 60),
-    layout: LayoutTypes.Grid, // try "radial" too
-    children: [
+    id          : "root",
+    label       : "Root",
+    position    : new Vector(400, 60),
+    layout      : LayoutTypes.Grid, // try "radial" too
+    children    : [
         {
-            id: "A",
-            label: "A",
-            layout: LayoutTypes.Radial,
-            children: [{ id: "A1", label: "A1" }, { id: "A2", label: "A2" }, { id: "A3", label: "A3" }],
+            id          :   "A",
+            label       :   "A",
+            layout      :   LayoutTypes.Radial,
+            children    :   [
+                                { 
+                                    id      : "A1", 
+                                    label   : "A1" 
+                                }, 
+                                { 
+                                    id      : "A2", 
+                                    label   : "A2" 
+                                }, 
+                                { 
+                                    id      : "A3", 
+                                    label   : "A3" 
+                                }
+                            ]
         },
         {
-            id: "B",
-            label: "B",
-            layout: LayoutTypes.Grid,
-            children: [{ id: "B1", label: "B1" }, { id: "B2", label: "B2" }, { id: "B3", label: "B3" }, { id: "B4", label: "B4" }],
+            id          :   "B",
+            label       :   "B",
+            layout      :   LayoutTypes.Grid,
+            children    :   [
+                                { 
+                                    id      : "B1", 
+                                    label   : "B1" 
+                                }, 
+                                { 
+                                    id      : "B2", 
+                                    label   : "B2" 
+                                }, 
+                                { 
+                                    id      : "B3", 
+                                    label   : "B3" 
+                                }, 
+                                { 
+                                    id      : "B4", 
+                                    label   : "B4" 
+                                }
+                            ]
         },
         {
-            id: "C",
-            label: "C",
-            layout: LayoutTypes.Radial,
-            children: [{ id: "C1", label: "C1" }, { id: "C2", label: "C2" }, { id: "C3", label: "C3" }, { id: "C4", label: "C4" }],
-        },
-    ],
+            id          : "C",
+            label       : "C",
+            layout      : LayoutTypes.Radial,
+            children    :   [
+                                { 
+                                    id      : "C1", 
+                                    label   : "C1" 
+                                }, 
+                                { 
+                                    id      : "C2", 
+                                    label   : "C2" 
+                                }, 
+                                { 
+                                    id      : "C3", 
+                                    label   : "C3" 
+                                }, 
+                                { 
+                                    id      : "C4", 
+                                    label   : "C4" 
+                                }
+                            ]
+        }
+    ]
 };
+Object.freeze(DEMO);
+
+
+const BAR_H = 72;
+
+const OuterStyle : React.CSSProperties = 
+{
+    position    : "relative", 
+    width       : "100vw", 
+    height      : "100vh", 
+    overflow    : "hidden"
+}
+const ControlsStyle : React.CSSProperties =
+{
+    position    : "absolute",
+    left        : 0,
+    top         : 0,
+    width       : "100%",
+    height      : BAR_H,
+    background  : "#f6f8fa",
+    borderBottom: "1px solid #d0d7de",
+    zIndex      : 1000,
+    padding     : 8,
+    boxSizing   : "border-box"
+}
+
+const LeftGraphStyle : React.CSSProperties =
+{
+    position    : "absolute",
+    left        : 0,
+    top         : BAR_H,
+    bottom      : 0,
+    width       : "50%",
+    borderRight : "1px solid #e5e7eb",
+    boxSizing   : "border-box"
+}
+
+const LeftGraphTitleStyle : React.CSSProperties =
+{
+    position    : "absolute",
+    left        : 8,
+    top         : 8,
+    fontSize    : 11,
+    color       : "#64748b",
+    zIndex      : 1
+}
+
+const LeftGraphReactFlowContainerStyle : React.CSSProperties =
+{
+    position    : "absolute", 
+    left        : 0, 
+    right       : 0, 
+    top         : 0, 
+    bottom      : 0
+}
+
+const RightGraphStyle : React.CSSProperties =
+{
+    position    : "absolute",
+    left        : "50%",
+    right       : 0,
+    top         : BAR_H,
+    bottom      : 0,
+    overflow    : "auto",
+    boxSizing   : "border-box"
+}
+const RightGraphTitleStyle : React.CSSProperties =
+{
+    position    : "absolute",
+    left        : 8,
+    top         : 8,
+    fontSize    : 11,
+    color       : "#64748b",
+    zIndex      : 1
+}
+
+const makeConfiguratorSlider = ({label, value, min, max, onChange}) : JSX.Element => (
+    <div style={{ 
+                    display     : "flex", 
+                    alignItems  : "center", 
+                    margin      : "0 12px" 
+                }}
+    >
+        <label style=   {{ 
+                            marginRight : 8, 
+                            fontSize    : 12 
+                        }}
+        >
+            {label}
+        </label>
+        <input 
+            type        =   "range" 
+            min         =   {min        } 
+            max         =   {max        } 
+            value       =   {value      } 
+            onChange    =   {onChange   } 
+        />
+        <span style={{ 
+                        marginLeft  : 6, 
+                        fontSize    : 12 
+                    }}
+        >
+            {value}
+        </span>
+    </div>
+);
 
 /** ----------------------------
  * Main demo
  * ---------------------------- */
 
-export default function ParentChildLayoutsDemo({ config = DEMO }) {
-    const [layoutName, setLayoutName] = useState(LayoutTypes.Grid); 
-    const [spacing, setSpacing] = useState(24);
-    const [nodeW, setNodeW] = useState(110);
-    const [nodeH, setNodeH] = useState(54);
+export type ParentChildLayoutsDemoProps = 
+{
+    config? : NodeConfig;
+}
 
-    const nodeSize = useMemo(() => new Vector(nodeW, nodeH), [nodeW, nodeH]);
+export const ParentChildLayoutsDemo =   (
+                                            { 
+                                                config = DEMO 
+                                            } : ParentChildLayoutsDemoProps
+                                        ) 
+                                        : React.JSX.Element => 
+{
+    const [layoutName   , setLayoutName ] = useState(LayoutTypes.Grid); 
+    const [spacing      , setSpacing    ] = useState(24);
+    const [nodeW        , setNodeW      ] = useState(110);
+    const [nodeH        , setNodeH      ] = useState(54);
 
-    const graphData = useMemo(() => {
-        const c = cloneDeep(config);
-        return buildGraph({ config: c, layoutName, nodeSize, spacing });
-    }, [config, layoutName, nodeSize, spacing]);
-
-    const BAR_H = 72;
+    const nodeSize  = useMemo   (
+                                    () => new Vector(nodeW, nodeH), 
+                                    [
+                                        nodeW, 
+                                        nodeH
+                                    ]
+                                );
+    const graphData = useMemo   (      
+                                    () => 
+                                        buildGraph({ config, layoutName, nodeSize, spacing }), 
+                                    [
+                                        config, 
+                                        layoutName, 
+                                        nodeSize, 
+                                        spacing
+                                    ]
+                                );
+    
 
     return (
-        <div style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
+        <div style={OuterStyle}>
             {/* Controls */}
-            <div
-                style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    width: "100%",
-                    height: BAR_H,
-                    background: "#f6f8fa",
-                    borderBottom: "1px solid #d0d7de",
-                    zIndex: 1000,
-                    padding: 8,
-                    boxSizing: "border-box",
-                }}
-            >
+            <div style={ControlsStyle}>
                 <label style={{ marginRight: 8, fontSize: 12 }}>Layout</label>
-
-                <select name="layout" value={layoutName} onChange={(e) => setLayoutName(e.target.value as LayoutTypes)} style={{ marginRight: 12 }}>
-                    <option value={LayoutTypes.Grid}>Grid</option>
-                    <option value={LayoutTypes.Radial}>Radial</option>
+                <select 
+                    name        =   "layout" 
+                    value       =   {layoutName} 
+                    onChange    =   {(e) => setLayoutName(e.target.value as LayoutTypes)} 
+                    style       =   {{ marginRight: 12 }}
+                >
+                    <option value={LayoutTypes.Grid     }>Grid  </option>
+                    <option value={LayoutTypes.Radial   }>Radial</option>
                 </select>
 
-                <label style={{ marginLeft: 8, marginRight: 6, fontSize: 12 }}>Spacing</label>
-                <input type="range" min={8} max={80} value={spacing} onChange={(e) => setSpacing(parseInt(e.target.value, 10))} />
-                <span style={{ marginLeft: 6, fontSize: 12 }}>{spacing}</span>
+                {makeConfiguratorSlider({
+                    label   : "Spacing",
+                    value   : spacing,
+                    min     : 8,
+                    max     : 80,
+                    onChange: (e) => setSpacing(parseInt(e.target.value, 10))
+                })}
 
-                <label style={{ marginLeft: 12, marginRight: 6, fontSize: 12 }}>Node W</label>
-                <input type="range" min={80} max={220} value={nodeW} onChange={(e) => setNodeW(parseInt(e.target.value, 10))} />
-                <span style={{ marginLeft: 6, fontSize: 12 }}>{nodeW}px</span>
+                {makeConfiguratorSlider({
+                    label   : "Node W",
+                    value   : nodeW,
+                    min     : 80,
+                    max     : 220,
+                    onChange: (e) => setNodeW(parseInt(e.target.value, 10))
+                })}
 
-                <label style={{ marginLeft: 12, marginRight: 6, fontSize: 12 }}>Node H</label>
-                <input type="range" min={40} max={160} value={nodeH} onChange={(e) => setNodeH(parseInt(e.target.value, 10))} />
-                <span style={{ marginLeft: 6, fontSize: 12 }}>{nodeH}px</span>
+                {makeConfiguratorSlider({
+                    label   : "Node H",
+                    value   : nodeH,
+                    min     : 40,
+                    max     : 160,
+                    onChange: (e) => setNodeH(parseInt(e.target.value, 10))
+                })}
             </div>
 
             {/* Left: Graph (edges) */}
-            <div
-                style={{
-                    position: "absolute",
-                    left: 0,
-                    top: BAR_H,
-                    bottom: 0,
-                    width: "50%",
-                    borderRight: "1px solid #e5e7eb",
-                    boxSizing: "border-box",
-                }}
-            >
-                <div style={{ position: "absolute", left: 8, top: 8, fontSize: 11, color: "#64748b", zIndex: 2 }}>
+            <div style = {LeftGraphStyle}>
+                <div style = {LeftGraphTitleStyle}>
                     Graph (Edges)
                 </div>
-                <div style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}>
-                    <ReactFlow nodes={graphData.nodes} edges={graphData.edges} fitView>
+                <div style = {LeftGraphReactFlowContainerStyle}>
+                    <ReactFlow 
+                        nodes   =   {graphData.nodes} 
+                        edges   =   {graphData.edges} 
+                        fitView 
+                    >
                         <Background gap={16} />
                         <Controls />
                     </ReactFlow>
                 </div>
             </div>
-
             {/* Right: Nested projection (true nesting) */}
-            <div
-                style={{
-                    position: "absolute",
-                    left: "50%",
-                    right: 0,
-                    top: BAR_H,
-                    bottom: 0,
-                    overflow: "auto",
-                    boxSizing: "border-box",
-                }}
-            >
-                <div style={{ position: "absolute", left: 8, top: 8, fontSize: 11, color: "#64748b", zIndex: 1 }}>
+            <div style = {RightGraphStyle}>
+                <div style = {RightGraphTitleStyle}>
                     Nested Projection
                 </div>
-                <NestedProjection config={config} layoutName={layoutName} nodeSize={nodeSize} spacing={spacing} />
+                <NestedProjection 
+                    config      =   {config     } 
+                    layoutName  =   {layoutName } 
+                    nodeSize    =   {nodeSize   } 
+                    spacing     =   {spacing    } 
+                />
             </div>
         </div>
     );
