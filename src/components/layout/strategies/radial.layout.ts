@@ -21,7 +21,9 @@ import {
 import {
     NestedFramesReturn
 } from "../layout";
-import { MappedGrid } from "./grid.mapped";
+import { 
+    MappedGrid 
+} from "./grid.mapped";
 
 export  class   RadialLayout 
         extends Layout 

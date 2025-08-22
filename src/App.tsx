@@ -1,6 +1,9 @@
-import { ParentChildLayoutsDemo } from './components/ParentChildFlow';
+import { 
+  ParentChildLayoutsDemo 
+} from './components/ParentChildFlow';
 
-function App() {
+function App() 
+{
   return <ParentChildLayoutsDemo  />;
 }
 

@@ -7,7 +7,9 @@ import {
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";
-import { MappedGrid } from "./strategies/grid.mapped";
+import { 
+    MappedGrid 
+} from "./strategies/grid.mapped";
 
 export type AutosizeParentParam = 
 {

@@ -564,7 +564,7 @@ export const ParentChildLayoutsDemo =   (
                     value   : spacing,
                     min     : 8,
                     max     : 80,
-                    onChange: (e) => setSpacing(parseInt(e.target.value, 10))
+                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setSpacing(parseInt(e.target.value, 10))
                 })}
 
                 {makeConfiguratorSlider({
@@ -572,7 +572,7 @@ export const ParentChildLayoutsDemo =   (
                     value   : nodeW,
                     min     : 80,
                     max     : 220,
-                    onChange: (e) => setNodeW(parseInt(e.target.value, 10))
+                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeW(parseInt(e.target.value, 10))
                 })}
 
                 {makeConfiguratorSlider({
@@ -580,7 +580,7 @@ export const ParentChildLayoutsDemo =   (
                     value   : nodeH,
                     min     : 40,
                     max     : 160,
-                    onChange: (e) => setNodeH(parseInt(e.target.value, 10))
+                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeH(parseInt(e.target.value, 10))
                 })}
             </div>
 

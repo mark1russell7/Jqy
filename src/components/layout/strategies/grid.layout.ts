@@ -10,7 +10,10 @@ import {
     NestedFramesReturn,
     AutosizeParentReturn
 } from "../layout";
-import { MappedGrid, MappedGridItemData } from "./grid.mapped";
+import { 
+    MappedGrid, 
+    MappedGridItemData 
+} from "./grid.mapped";
 import { 
     LayoutChildrenMode 
 } from "../layout.enum";
