@@ -6,12 +6,6 @@ import {
     useState 
 } from "react";
 import { 
-    resolveLayoutName 
-} from "./layout/layout.values";
-import { 
-    LayoutConfigs 
-} from "./layout/layout.values";
-import { 
     buildGraph, 
     NodeConfig
 } from "./graph";
@@ -19,306 +13,10 @@ import {
     Vector 
 } from "./geometry";
 import { 
-    LayoutChildrenMode,
     LayoutTypes 
 } from "./layout/layout.enum";
-import { 
-    Layout, 
-    NestedFramesReturn, 
-    PlaceChildrenParam,
-    PlaceChildrenReturn
-} from "./layout/layout";
+import { NestedProjection } from "./nested-projection";
 
-/** ----------------------------
- * Nested projection renderer
- * ---------------------------- */
-
-export type NestedBoxProps = 
-{
-    node        : NodeConfig;
-    layoutName  : LayoutTypes;
-    nodeSize    : Vector;
-    spacing     : number;
-    level?      : number;
-};
-
-const NestedBox =   (
-                        { 
-                            node, 
-                            layoutName, 
-                            nodeSize, 
-                            spacing, 
-                            level = 0 
-                        } : NestedBoxProps
-                    ) 
-                    : JSX.Element =>
-{
-    const children : NodeConfig[] = node.children ?? [];
-    const chosen   : LayoutTypes  = resolveLayoutName(node, layoutName);
-    const strategy : Layout       = LayoutConfigs.get<LayoutTypes>(chosen);
-
-    // Size parent (if not specified)
-    const minSize : Vector = nodeSize.scale(2);
-    const size    : Vector = strategy
-                                .autosizeParent({ 
-                                                    count   : children.length,
-                                                    min     : minSize, 
-                                                    nodeSize, 
-                                                    spacing
-                                                });
-
-    // Parent container
-    const pad     : number = Math.max(12, spacing * 1.0); // keep in sync with outerPad
-    const inner   : Vector = size.subtract(Vector.scalar(2 * pad)).clamp(-Infinity, 1)
-    
-    // For nested GRID we want tight cells; for RADIAL we use centers
-    const origin     : Vector = inner.scale(1/2); // local origin of INNER container
-    const nestedArgs : PlaceChildrenParam = 
-    { 
-        mode       : LayoutChildrenMode.NESTED, 
-        parent     : node, 
-        parentSize : inner,
-        children, 
-        origin, 
-        level, 
-        nodeSize, 
-        spacing
-    };
-
-    const gridFrames = chosen === LayoutTypes.Grid 
-                            ? strategy.nestedFrames(nestedArgs) 
-                            : null;
-    const centers    = strategy.placeChildren(nestedArgs); // used by radial; grid still OK
-
-    const OuterStyle : React.CSSProperties = 
-    {
-        position        : "relative",
-        width           : size.x,
-        height          : size.y,
-        border          : "1px solid #d0d7de",
-        borderRadius    : 10,
-        background      : "#fff",
-        boxSizing       : "border-box"
-    };
-    const LabelStyle : React.CSSProperties = 
-    {
-        position    : "absolute",
-        left        : 6,
-        top         : 4,
-        fontSize    : 11,
-        color       : "#475569",
-        userSelect  : "none"
-    };
-
-    const InnerContentStyle : React.CSSProperties = 
-    {
-        position    : "absolute",
-        left        : pad,
-        top         : pad,
-        width       : inner.x,
-        height      : inner.y
-    };
-
-
-
-    return (
-        <div style={OuterStyle}>
-            {/* label */}
-            <div style={LabelStyle}>
-                {node.label ?? node.id}
-            </div>
-
-            {/* INNER CONTENT area (parent − padding) */}
-            <div style={InnerContentStyle}>
-                {
-                    children
-                        .map((c) => 
-                                    {
-                                        if (chosen === LayoutTypes.Grid && gridFrames) 
-                                        {
-                                            return <GridChild 
-                                                        key         = {c.id}
-                                                        nodeConfig  = {c} 
-                                                        layoutName  = {layoutName} 
-                                                        nodeSize    = {nodeSize} 
-                                                        spacing     = {spacing} 
-                                                        level       = {level} 
-                                                        gridFrames  = {gridFrames} 
-                                                    />;
-                                        } 
-                                        else 
-                                        {
-                                            // RADIAL (or any center-based nested): place by center, size stays nodeSize
-                                            return <RadialChild 
-                                                        nodeConfig  = {c} 
-                                                        layoutName  = {layoutName} 
-                                                        nodeSize    = {nodeSize} 
-                                                        spacing     = {spacing} 
-                                                        level       = {level} 
-                                                        centers     = {centers} 
-                                                        origin      = {origin} 
-                                                    />;
-                                        }
-                                    }
-                            )
-                }
-            </div>
-        </div>
-    );
-}
-
-
-export type GridChildProps = 
-{
-    nodeConfig  : NodeConfig;
-    layoutName  : LayoutTypes;
-    nodeSize    : Vector;
-    spacing     : number;
-    level       : number;
-    gridFrames  : NestedFramesReturn;
-}
-
-const GridChild =   (
-                        {
-                            nodeConfig,
-                            layoutName,
-                            nodeSize,
-                            spacing,
-                            level,
-                            gridFrames
-                        } : GridChildProps
-                    ) 
-                    : React.JSX.Element => 
-{
-    // Tight cell rect
-    const frame = gridFrames.grid.getItem(nodeConfig.id);
-    if(!frame)
-    {
-        return <>Error {nodeConfig.id}</>;
-    }
-    const position  = frame.dimensions.getPosition();
-    const size      = frame.dimensions.getSize();
-    const childNode =   { 
-                            ...nodeConfig, 
-                            size 
-                        };
-    const ChildStyle : React.CSSProperties = 
-    {
-        position    : "absolute",
-        left        : position.x,
-        top         : position.y,
-        width       : size.x,
-        height      : size.y
-    };
-    return (
-        <div 
-                key     =   {nodeConfig.id  } 
-                style   =   {ChildStyle     }
-        >
-            <NestedBox 
-                node        =   {childNode  } 
-                layoutName  =   {layoutName } 
-                nodeSize    =   {nodeSize   } 
-                spacing     =   {spacing    } 
-                level       =   {level + 1  } 
-            />
-        </div>
-    );
-}
-
-export type RadialChildProps = 
-{
-    nodeConfig  : NodeConfig;
-    layoutName  : LayoutTypes;
-    nodeSize    : Vector;
-    spacing     : number;
-    level       : number;
-    centers     : PlaceChildrenReturn;
-    origin      : Vector;
-}
-const RadialChild = (
-                        {
-                            nodeConfig,
-                            layoutName,
-                            nodeSize,
-                            spacing,
-                            level,
-                            centers,
-                            origin
-                        } : RadialChildProps
-                    ) 
-                    : React.JSX.Element => 
-{
-     // RADIAL (or any center-based nested): place by center, size stays nodeSize
-    const p = centers[nodeConfig.id] ?? { 
-                                            x : origin.x, 
-                                            y : origin.y 
-                                        };
-    const position  = p.subtract(nodeSize.halve());
-    const childNode =   { 
-                            ...nodeConfig, 
-                            size : nodeSize 
-                        };
-    const childStyle : React.CSSProperties = {
-        position    : "absolute",
-        left        : position.x,
-        top         : position.y,
-        width       : nodeSize.x,
-        height      : nodeSize.y
-    };
-    return (
-        <div
-                key     =   {nodeConfig.id  } 
-                style   =   {childStyle     }
-        >
-            <NestedBox 
-                node        =   {childNode  } 
-                layoutName  =   {layoutName } 
-                nodeSize    =   {nodeSize   } 
-                spacing     =   {spacing    } 
-                level       =   {level + 1  } 
-            />
-        </div>
-    );    
-}
-
-
-
-export type NestedProjectionProps = 
-{
-    config     : NodeConfig;
-    layoutName : LayoutTypes;
-    nodeSize   : Vector;
-    spacing    : number;
-}
-const NestedProjection =    (
-                                { 
-                                    config, 
-                                    layoutName, 
-                                    nodeSize, 
-                                    spacing 
-                                } : NestedProjectionProps
-                            ) 
-                            : React.JSX.Element =>
-{
-    return (
-        <div style =    {
-                            { 
-                                position    : "absolute", 
-                                left        : 12, 
-                                top         : 12 
-                            }
-                        }
-        >
-            <NestedBox 
-                node        =   {config     } 
-                layoutName  =   {layoutName } 
-                nodeSize    =   {nodeSize   } 
-                spacing     =   {spacing    } 
-            />
-        </div>
-    );
-}
 
 /** ----------------------------
  * Demo config
@@ -562,7 +260,7 @@ export const ParentChildLayoutsDemo =   (
                 {makeConfiguratorSlider({
                     label   : "Spacing",
                     value   : spacing,
-                    min     : 8,
+                    min     : 0,
                     max     : 80,
                     onChange: (e : React.ChangeEvent<HTMLInputElement>) => setSpacing(parseInt(e.target.value, 10))
                 })}
@@ -570,7 +268,7 @@ export const ParentChildLayoutsDemo =   (
                 {makeConfiguratorSlider({
                     label   : "Node W",
                     value   : nodeW,
-                    min     : 80,
+                    min     : 0,
                     max     : 220,
                     onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeW(parseInt(e.target.value, 10))
                 })}
@@ -578,7 +276,7 @@ export const ParentChildLayoutsDemo =   (
                 {makeConfiguratorSlider({
                     label   : "Node H",
                     value   : nodeH,
-                    min     : 40,
+                    min     : 0,
                     max     : 160,
                     onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeH(parseInt(e.target.value, 10))
                 })}

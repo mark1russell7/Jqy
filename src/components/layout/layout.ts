@@ -10,7 +10,19 @@ import {
 import { 
     MappedGrid 
 } from "./strategies/grid.mapped";
+export type PreferredSizeParam = {
+  /* number of direct children */
+  count   : number;
+  /* node box size used when graph-mode node is rendered (base unit) */
+  nodeSize: Vector;
+  /* visual spacing knob */
+  spacing : number;
+  /* where the node is being asked to measure for */
+  mode    : LayoutChildrenMode; // GRAPH | NESTED
+};
 
+/** formerly autosizeParent */
+export type PreferredSizeReturn = Vector;
 export type AutosizeParentParam = 
 {
     count   : number;
@@ -50,7 +62,9 @@ export abstract class Layout
 {
     abstract nestedFrames   (args   : NestedFrameParam      )   : NestedFramesReturn;
     abstract placeChildren  (args   : PlaceChildrenParam    )   : PlaceChildrenReturn;
-    abstract autosizeParent (args   : AutosizeParentParam   )   : AutosizeParentReturn;
+    
+    /** Return the layout’s preferred box size ONLY if the node has no externally-allocated size. */
+    abstract preferredSize  (args: PreferredSizeParam ) : PreferredSizeReturn;
 }
 
 /* =========================================================

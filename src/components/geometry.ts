@@ -49,6 +49,7 @@ export class Vector
     public  add             =   (vector     :   Vector  )   =>  this.mapWith    (add        , vector);
     public  multiply        =   (vector     :   Vector  )   =>  this.mapWith    (multiply   , vector);
     public  subtract        =   (vector     :   Vector  )   =>  this.mapWith    (subtract   , vector);
+    public  divide          =   (vector     :   Vector  )   =>  this.mapWith    (divide     , vector);
     public  max             =   (                       )   =>  this.reduce     (Math.max);
     public  min             =   (                       )   =>  this.reduce     (Math.min);
     public  negate          =   (                       )   =>  this.scale      (-1);

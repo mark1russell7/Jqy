@@ -1,33 +1,19 @@
-import { 
-    Vector 
-} from "../../geometry";
-import { 
-    AutosizeParentParam,
-    AutosizeParentReturn,
-    Layout, 
-    PlaceChildrenReturn 
-} from "../layout";
-import { 
-    LayoutChildrenMode 
-} from "../layout.enum";
-import { 
-    outerPad, 
-    itemPad, 
-    pcTreeBelow 
-} from "../layout";
-import { 
-    PlaceChildrenParam 
-} from "../layout";
+import { Vector } from "../../geometry";
 import {
-    NestedFramesReturn
+  PreferredSizeParam, PreferredSizeReturn,
+  Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
 } from "../layout";
-import { 
-    MappedGrid 
-} from "./grid.mapped";
+import { LayoutChildrenMode } from "../layout.enum";
+import { MappedGrid } from "./grid.mapped";
+import { Config } from "../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
 
 export  class   RadialLayout 
         extends Layout 
 {
+    constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) {
+        super();
+    }
     nestedFrames    =   () 
                         : NestedFramesReturn => (
                                                     {
@@ -42,17 +28,30 @@ export  class   RadialLayout
                         ) 
                         : PlaceChildrenReturn => 
                                                 args.mode === LayoutChildrenMode.NESTED
-                                                    ? nestedRadialCenters(args)
-                                                    : graphRadialCenters (args);
-    autosizeParent  =   (
-                            { 
-                                nodeSize, 
-                                spacing 
-                            } : AutosizeParentParam
-                        ) 
-                        : AutosizeParentReturn => 
-                                                    Vector
-                                                        .scalar(nodeSize.max() * 6 + 2 * outerPad(spacing));
+                                                    ? nestedRadialCenters(this.tuning, args)
+                                                    : graphRadialCenters (this.tuning, args);
+    preferredSize = (
+                        { 
+                            count, 
+                            nodeSize, 
+                            spacing, 
+                            mode 
+                        } : PreferredSizeParam
+                    ) 
+                    : PreferredSizeReturn => 
+                                                mode === LayoutChildrenMode.NESTED 
+                                                    /*  caller has no external size; 
+                                                        provide a pleasant default via tuning */
+                                                            ? this  .tuning
+                                                                    .get("nestedRadialPreferred")   (
+                                                                                                        count, 
+                                                                                                        nodeSize, 
+                                                                                                        spacing
+                                                                                                    )
+                                                            /*  graph node’s own box uses nodeSize (engine decides); 
+                                                                return nodeSize to be explicit */
+                                                            : nodeSize;
+                                            
 }
 /* =========================================================
  * NESTED RADIAL
@@ -60,6 +59,7 @@ export  class   RadialLayout
  * ========================================================= */
 
 export const nestedRadialCenters =  (
+                                        tuning: Config<LayoutTuning>, 
                                         { 
                                             children, 
                                             parentSize, 
@@ -68,27 +68,26 @@ export const nestedRadialCenters =  (
                                         } : PlaceChildrenParam
                                     ) : PlaceChildrenReturn => 
 {
-    const inner : Vector = parentSize
-                            .subtract(Vector.scalar(2 * outerPad(spacing)))
-                            .round   ()
-                            .clamp   (-Infinity, 1);
-    const c     : Vector = inner.scale(1/2);
-    // raw radius before fit
-    const baseR : number = inner.min() / 2 - nodeSize.max() / 2 - itemPad(spacing);
-    const r     : number = Math.max(8, baseR);
+    const inner : Vector    = parentSize
+                                .subtract(Vector.scalar(2 * tuning.get("outerPad")(spacing)))
+                                .round   ()
+                                .clamp   (1, Infinity);
+    const c     : Vector    = inner.scale(1/2);
+    const start : number    = tuning.get("startAngle")();
+    const cw    : boolean   = tuning.get("clockwise")();
+    const baseR : number    = inner.min() / 2 - nodeSize.max() / 2 - tuning.get("itemPad")(spacing);
+    const r     : number    = Math.max(tuning.get("minRadius")(), baseR);
     return Object
             .fromEntries(
-                            radialAngles(children.length)
-                                .map(
+                            mapIndex(children.length,
                                         (
-                                            t : number, 
                                             i : number
                                         ) 
                                         : [string, Vector] =>  
                                                                 [
                                                                     children[i].id, 
                                                                     Vector
-                                                                        .scalar(t)
+                                                                        .scalar(tuning.get("angleOf")(i, children.length, start, cw))
                                                                         .trig  ( )
                                                                         .scale (r)
                                                                         .add   (c)
@@ -96,18 +95,9 @@ export const nestedRadialCenters =  (
                                     )
                         );
 }
-/* ---------- UNIT placers (sibling-only) ---------- */
-export const radialAngles = (
-                                count : number
-                            ) 
-                            : number[] => 
-                                            mapIndex(
-                                                        count, 
-                                                        (i : number) => 
-                                                            (i / Math.max(1, count)) * Math.PI * 2
-                                                    );
 
 export const graphRadialCenters =   (
+                                        tuning: Config<LayoutTuning>,
                                         { 
                                             children,
                                             origin, 
@@ -119,20 +109,24 @@ export const graphRadialCenters =   (
                                     ) 
                                     : PlaceChildrenReturn => 
 {
-    const r : number = (nodeSize.max() + spacing * 3) * (1 + level * 0.6);
-    const c : Vector = origin.add(pcTreeBelow({ parentSize, spacing }));
+    const base  = tuning.get("radialBase")(nodeSize, spacing);
+    const r     = Math.max(tuning.get("minRadius")(), base * (1 + level * tuning.get("radialLevelScale")()));
+
+    const a     = tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
+    const c     = origin.add(a);
+
+    const start = tuning.get("startAngle")();
+    const cw    = tuning.get("clockwise")();
     return  Object
                 .fromEntries(
-                    radialAngles(children.length)
-                        .map(
-                                (
-                                    t : number, 
+                    mapIndex(children.length,
+                                ( 
                                     i : number
                                 ) =>  
                                         [
                                             children[i].id, 
                                             Vector
-                                                .scalar(t)
+                                                .scalar(tuning.get("angleOf")(i, children.length, start, cw))
                                                 .trig  ( )
                                                 .scale (r)
                                                 .add   (c)

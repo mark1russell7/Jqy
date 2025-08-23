@@ -1,0 +1,65 @@
+import { Config } from "../config";
+import { Vector } from "../geometry";
+import { LayoutChildrenMode } from "./layout.enum";
+
+export type LayoutTuning = {
+  /* paddings */
+  outerPad: (spacing: number) => number;     // nested parent content padding
+  itemPad : (spacing: number) => number;     // inner cell padding (grid-only)
+
+  /* grid row/col heuristic — return Vector(cols, rows) */
+  rowCol: (n: number) => Vector;
+
+  /* anchor for GRAPH placements (tree-below) */
+  anchor: (ctx: { mode: LayoutChildrenMode; parentSize: Vector; spacing: number }) => Vector;
+
+  /* RADIAL knobs */
+  startAngle: () => number;                  // radians (0 = 3 o’clock)
+  clockwise : () => boolean;                 // direction
+  angleOf   : (i: number, n: number, start: number, cw: boolean) => number;
+
+  /* GRAPH radial radius: r = base(nodeSize, spacing) * (1 + level * levelScale) */
+  radialBase     : (nodeSize: Vector, spacing: number) => number;
+  radialLevelScale: () => number;
+  minRadius      : () => number;
+
+  /* NESTED radial preferred size if no size is provided (root-only or free): */
+  nestedRadialPreferred: (count: number, nodeSize: Vector, spacing: number) => Vector;
+};
+
+export const defaultTuning: LayoutTuning = {
+  outerPad: (s) => Math.max(12, s * 1.0),
+  itemPad : (s) => Math.max(4,  s * 0.25),
+
+  rowCol: (n) => {
+    const rows = Math.ceil(Math.sqrt(Math.max(1, n)));
+    const cols = Math.ceil(n / rows);
+    return new Vector(cols, rows);
+  },
+
+  anchor: ({ mode, parentSize, spacing }) =>
+    mode === LayoutChildrenMode.GRAPH
+      ? new Vector(0, (parentSize?.y ?? 0) / 2 + spacing * 1.25)
+      : new Vector(0, 0),
+
+  startAngle: () => 0,
+  clockwise : () => true,
+  angleOf: (i, n, start, cw) => {
+    const tau = Math.PI * 2;
+    return start + (cw ? 1 : -1) * (i / Math.max(1, n)) * tau;
+  },
+
+  radialBase: (nodeSize, spacing) => nodeSize.max() + spacing * 3, // was “*3”
+  radialLevelScale: () => 0.6,                                      // was “0.6”
+  minRadius: () => 8,
+
+  // sensible default: grows gently with child count
+  nestedRadialPreferred: (count, nodeSize, spacing) => {
+    const ring = Math.max(1, count);
+    const r = Math.max(nodeSize.max() + spacing * 2, nodeSize.max() * (1 + 0.15 * ring));
+    const d = 2 * r + 2 * Math.max(12, spacing * 1.0);
+    return Vector.scalar(d);
+  },
+};
+
+export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);
