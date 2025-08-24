@@ -1,5 +1,6 @@
 import "reactflow/dist/style.css";
 import { 
+  useEffect,
     useMemo, 
     useState 
 } from "react";
@@ -10,11 +11,12 @@ import {
     Vector 
 } from "./geometry";
 import { 
+  LayoutChildrenMode,
     LayoutTypes 
 } from "./layout/layout.enum";
 import { LayoutView, ReactAdapterKind } from "./adapters/react-view.adapter";
 import { computeLayout, ModeMap } from "./engine/computeLayout";
-import { LabeledSlider, Select } from "./ui/controls";
+import { LabeledSlider, Select, Segmented } from "./ui/controls";
 import { Shell } from "./ui/styles";
 import { Configurator } from "./ui/Configurator";
 
@@ -78,6 +80,15 @@ function allSame<T>(arr: T[]): { same: boolean; value: T | undefined } {
   const v = arr[0];
   return { same: arr.every(x => x === v), value: v };
 }
+function idsInScope(root: NodeConfig, scope: "all" | string, applyToSubtree: boolean): string[] {
+  const all: string[] = [];
+  (function walk(n: NodeConfig){ all.push(n.id); (n.children ?? []).forEach(walk); })(root);
+  if (scope === "all") return all;
+  if (!applyToSubtree) return [scope];
+  const res: string[] = [];
+  (function walk(n: NodeConfig) { res.push(n.id); (n.children ?? []).forEach(walk); })(findNode(root, scope)!);
+  return res;
+}
 
 /* -------------------------------------------
  * Main demo
@@ -89,10 +100,11 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
   const [spacing, setSpacing] = useState(24);
   const [nodeW, setNodeW] = useState(110);
   const [nodeH, setNodeH] = useState(54);
+  const LIMITS = { spacing: { min: 0, max: 80 }, nodeW: { min: 40, max: 240 }, nodeH: { min: 30, max: 180 } };
 
   // NEW: layout scope + mode map
   const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
-  const [modes, setModes] = useState<ModeMap>({ root: "graph", A: "nested", B: "graph", C: "nested" });
+  const [modes, setModes] = useState<ModeMap>({ root: LayoutChildrenMode.GRAPH, A: LayoutChildrenMode.NESTED, B: LayoutChildrenMode.GRAPH, C: LayoutChildrenMode.NESTED });
   const [scope, setScope] = useState<"all" | string>("all");
   const [applyToSubtree, setApplyToSubtree] = useState(true);
 
@@ -112,12 +124,35 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
 
   const nodeSize = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
   const result   = useMemo(() => computeLayout(effectiveConfig, modes, nodeSize, spacing), [effectiveConfig, modes, nodeSize, spacing]);
+  const scopedIds = useMemo(() => idsInScope(config, scope, applyToSubtree), [config, scope, applyToSubtree]);
+  const nestedGridActive = useMemo(
+    () => layoutName === LayoutTypes.Grid && scopedIds.some(id => (modes[id] ?? "graph") === "nested"),
+    [layoutName, scopedIds, modes]
+  );
+  
+  // When "Nested + Grid" is active, snap to the stable setting:
+  // Spacing = MIN, NodeW = MAX, NodeH = MAX.
+  useEffect(() => {
+    if (nestedGridActive) {
+      setSpacing(LIMITS.spacing.min);
+      setNodeW(LIMITS.nodeW.max);
+      setNodeH(LIMITS.nodeH.max);
+    }
+  }, [nestedGridActive]);
 
   return (
     <div style={Shell.outer}>
       <div style={Shell.bar}>
-        <Select label="Right Pane" value={adapter} onChange={(v) => setAdapter(v as ReactAdapterKind)}
-                options={[{ label: "DOM", value: "dom" }, { label: "Canvas", value: "canvas" }, { label: "React Flow", value: "reactflow" }]} />
+        <Segmented
+            label="Right Pane"
+            value={adapter}
+            options={[
+              { label: "DOM",       value: "dom"       as ReactAdapterKind },
+              { label: "Canvas",    value: "canvas"    as ReactAdapterKind },
+              { label: "ReactFlow", value: "reactflow" as ReactAdapterKind },
+            ]}
+            onChange={(v) => setAdapter(v as ReactAdapterKind)}
+        />
         <Configurator
           root={config}
           modes={modes} setModes={setModes}
@@ -125,9 +160,11 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
           scope={scope} setScope={setScope}
           applyToSubtree={applyToSubtree} setApplyToSubtree={setApplyToSubtree}
         />
-        <LabeledSlider label="Spacing" value={spacing} min={0} max={80} onChange={setSpacing} />
-        <LabeledSlider label="Node W"  value={nodeW}   min={40} max={240} onChange={setNodeW} />
-        <LabeledSlider label="Node H"  value={nodeH}   min={30} max={180} onChange={setNodeH} />
+        
+        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
+        <LabeledSlider label="Node W"  value={nodeW}   min={LIMITS.nodeW.min}  max={LIMITS.nodeW.max}  onChange={setNodeW} disabled={nestedGridActive} />
+        <LabeledSlider label="Node H"  value={nodeH}   min={LIMITS.nodeH.min}  max={LIMITS.nodeH.max}  onChange={setNodeH} disabled={nestedGridActive} />
+
       </div>
 
       <div style={Shell.left}>

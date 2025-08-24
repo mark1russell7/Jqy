@@ -26,11 +26,13 @@ export type LayoutTuning = {
   /* NESTED radial preferred size if no size is provided (root-only or free): */
   nestedRadialPreferred: (count: number, nodeSize: Vector, spacing: number) => Vector;
   nestedNodeScale: (level: number) => number;  // NEW
+  nestedContainerScale: (level: number) => number;   // NEW
+  nestedChildMaxFraction: () => number;        // NEW: cap child box vs parent inner (radial nested)
 };
 
 export const defaultTuning: LayoutTuning = {
-  outerPad: (s) => Math.max(12, s * 1.0),
-  itemPad : (s) => Math.max(4,  s * 0.25),
+  outerPad: (s) => Math.max(0, Math.round(s * 1.0)),
+  itemPad : (s) => Math.max(0, Math.round(s * 0.25)),
 
   rowCol: (n) => {
     const rows = Math.ceil(Math.sqrt(Math.max(1, n)));
@@ -55,6 +57,7 @@ export const defaultTuning: LayoutTuning = {
   minRadius: () => 8,
 
   nestedNodeScale: (level) => Math.pow(0.85, level + 1), // NEW: ~15% smaller per depth
+  nestedContainerScale: (level) => Math.pow(0.85, level + 1),
   // sensible default: grows gently with child count
   nestedRadialPreferred: (count, nodeSize, spacing) => {
     const ring = Math.max(1, count);
@@ -62,6 +65,7 @@ export const defaultTuning: LayoutTuning = {
     const d = 2 * r + 2 * Math.max(12, spacing * 1.0);
     return Vector.scalar(d);
   },
+  nestedChildMaxFraction: () => 0.45,                    // child’s longest side <= 45% of parent
 };
 
 export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);

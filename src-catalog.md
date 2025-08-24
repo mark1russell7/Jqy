@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-24T03:21:37.768Z
+Generated on 2025-08-24T04:38:50.864Z
 
 ## Directory structure (src)
 
@@ -128,19 +128,26 @@ export function Canvas2D({ result, theme = defaultTheme }: { result: LayoutResul
 import { LayoutResult } from "../engine/computeLayout";
 import { Theme, defaultTheme } from "./theme";
 
+function depthOf(id: string, boxes: LayoutResult["boxes"]): number {
+  let d = 0, p = boxes[id]?.parentId;
+  while (p) { d++; p = boxes[p]?.parentId; }
+  return d;
+}
+
 export function drawLayoutToCanvas(
   ctx: CanvasRenderingContext2D,
   result: LayoutResult,
   theme: Theme = defaultTheme
 ) {
   const { width, height } = ctx.canvas;
+
   // background
   ctx.save();
   ctx.fillStyle = theme.canvas.bg;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
 
-  // wires
+  // wires first (under boxes)
   ctx.save();
   ctx.strokeStyle = theme.wire.stroke;
   ctx.lineWidth = theme.wire.width;
@@ -154,13 +161,16 @@ export function drawLayoutToCanvas(
   }
   ctx.restore();
 
-  // nodes
+  // draw boxes sorted by depth (parents under children)
+  const sorted = Object.values(result.boxes).sort((A, B) =>
+    depthOf(A.id, result.boxes) - depthOf(B.id, result.boxes)
+  );
+
   ctx.save();
   ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  for (const b of Object.values(result.boxes)) {
-    // box
+  for (const b of sorted) {
     const r = theme.node.radius;
     const x = b.tl.x, y = b.tl.y, w = b.size.x, h = b.size.y;
 
@@ -172,7 +182,6 @@ export function drawLayoutToCanvas(
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // label
     ctx.fillStyle = theme.node.text;
     ctx.fillText(b.id, x + w / 2, y + h / 2);
   }
@@ -682,7 +691,6 @@ export type Box = {
 export type Wire = { source: string; target: string };
 
 export type LayoutResult = { boxes: Record<string, Box>; wires: Wire[] };
-
 export function computeLayout(
   root: NodeConfig,
   modes: ModeMap,
@@ -692,23 +700,28 @@ export function computeLayout(
   const boxes: Record<string, Box> = {};
   const wires: Wire[] = [];
 
-  function place(node: NodeConfig, level: number, assigned?: Box): void {
+  function place(
+    node: NodeConfig,
+    level: number,
+    assigned?: Box,
+    currentNodeSize: Vector = nodeSize
+  ): void {
     const id = node.id;
     const mode: Mode = modes[id] ?? "graph";
     const chosen = resolveLayoutName(node, node.layout ?? LayoutTypes.Grid);
     const strat: Layout = LayoutConfigs.get<LayoutTypes>(chosen);
 
-    // If we were given a concrete frame for this node, use it as-is.
+    // Resolve this node's box
     let box: Box;
     if (assigned) {
       box = assigned;
     } else {
       const size =
         mode === "graph"
-          ? nodeSize
+          ? currentNodeSize
           : strat.preferredSize({
               count: (node.children ?? []).length,
-              nodeSize,
+              nodeSize: currentNodeSize,
               spacing,
               mode: LayoutChildrenMode.NESTED,
             });
@@ -722,84 +735,94 @@ export function computeLayout(
     if (!children.length) return;
 
     if (mode === "nested") {
-      // Nested children are placed INSIDE this node’s box
+      // children placed INSIDE this node’s box
       const pad = LayoutTuningConfig.get("outerPad")(spacing);
       const inner = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
       const innerTL = box.tl.add(Vector.scalar(pad));
+      const nextNodeSize = currentNodeSize.scale(
+        LayoutTuningConfig.get("nestedNodeScale")(level)
+      );
 
       if (chosen === LayoutTypes.Grid) {
+        // Grid nested: cells hard-size children (independent of sliders)
         const frames = strat.nestedFrames({ children, parentSize: inner, spacing });
         for (const c of children) {
           const item = frames.grid.getItem(c.id)!;
           const pos = item.dimensions.getPosition();
-          const sz = item.dimensions.getSize().subtract(Vector.scalar(2 * frames.ip)).clamp(1, Infinity);
+          const sz  = item.dimensions.getSize()
+                        .subtract(Vector.scalar(2 * frames.ip))
+                        .clamp(1, Infinity);
           const childBox: Box = {
             id: c.id,
             parentId: id,
             tl: innerTL.add(pos).add(Vector.scalar(frames.ip)),
             size: sz,
           };
-          place(c, level + 1, childBox);
+          place(c, level + 1, childBox, nextNodeSize); // pass scaled base
         }
       } else {
-        // RADIAL nested → we place children by centers; if a child is itself "nested",
-        // give it a preferred container size; otherwise use nodeSize.
+        // Radial (or any center-based) nested: centers computed once, per-level size scales down
+        const centers = strat.placeChildren({
+          mode: LayoutChildrenMode.NESTED,
+          children, parent: node,
+          origin: inner.scale(1 / 2),
+          level, nodeSize: nextNodeSize, spacing, parentSize: inner,
+        });
+
         for (const c of children) {
-          const centers = strat.placeChildren({
-            mode: LayoutChildrenMode.NESTED,
-            children,
-            parent: node,
-            origin: inner.scale(1 / 2),
-            level,
-            nodeSize,
-            spacing,
-            parentSize: inner,
-          });
           const p = centers[c.id] ?? inner.scale(1 / 2);
 
           const childMode: Mode = modes[c.id] ?? "graph";
-          const childChosen = resolveLayoutName(c, c.layout ?? LayoutTypes.Grid);
-          const childStrat = LayoutConfigs.get<LayoutTypes>(childChosen);
+          const childChosen     = resolveLayoutName(c, c.layout ?? LayoutTypes.Grid);
+          const childStrat      = LayoutConfigs.get<LayoutTypes>(childChosen);
 
-          const desiredSize =
-            childMode === "nested"
-              ? childStrat.preferredSize({
-                  count: (c.children ?? []).length,
-                  nodeSize,
-                  spacing,
-                  mode: LayoutChildrenMode.NESTED,
-                })
-              : nodeSize;
+          let desiredSize: Vector;
+          if (childMode === "nested") {
+            // Measure, then shrink the container explicitly so rings never explode.
+            desiredSize = childStrat.preferredSize({
+              count: (c.children ?? []).length,
+              nodeSize: nextNodeSize,
+              spacing,
+              mode: LayoutChildrenMode.NESTED,
+            }).scale(LayoutTuningConfig.get("nestedContainerScale")(level));
+          } else {
+            desiredSize = nextNodeSize;
+          }
+          // Hard cap: don’t let a nested child exceed a fraction of the parent’s inner square.
+          // Preserve aspect ratio when shrinking.
+          const maxSide = Math.min(inner.x, inner.y) * LayoutTuningConfig.get("nestedChildMaxFraction")();
+          const scale = Math.min(1, maxSide / Math.max(desiredSize.x, desiredSize.y));
+          desiredSize = desiredSize.scale(scale).clamp(1, Infinity);
 
           const tlChild = innerTL.add(p.subtract(desiredSize.halve()));
           const childBox: Box = { id: c.id, parentId: id, tl: tlChild, size: desiredSize };
-          place(c, level + 1, childBox);
+          place(c, level + 1, childBox, nextNodeSize);
         }
       }
     } else {
-      // GRAPH mode: children live outside, connected by edges, no parentId
+      // GRAPH mode: children outside; constant base node size from current level
       const centers = strat.placeChildren({
         mode: LayoutChildrenMode.GRAPH,
         children,
         parent: node,
         origin: box.tl.add(box.size.scale(1 / 2)),
         level,
-        nodeSize,
+        nodeSize: currentNodeSize,
         spacing,
         parentSize: box.size,
       });
 
       for (const c of children) {
         const cc = centers[c.id];
-        const tlChild = cc.subtract(nodeSize.halve());
-        const childBox: Box = { id: c.id, tl: tlChild, size: nodeSize };
+        const tlChild = cc.subtract(currentNodeSize.halve());
+        const childBox: Box = { id: c.id, tl: tlChild, size: currentNodeSize };
         wires.push({ source: id, target: c.id });
-        place(c, level + 1, childBox);
+        place(c, level + 1, childBox, currentNodeSize);
       }
     }
   }
 
-  place(root, 0);
+  place(root, 0, undefined, nodeSize);
   return { boxes, wires };
 }
 ```
@@ -1288,11 +1311,13 @@ export type LayoutTuning = {
   /* NESTED radial preferred size if no size is provided (root-only or free): */
   nestedRadialPreferred: (count: number, nodeSize: Vector, spacing: number) => Vector;
   nestedNodeScale: (level: number) => number;  // NEW
+  nestedContainerScale: (level: number) => number;   // NEW
+  nestedChildMaxFraction: () => number;        // NEW: cap child box vs parent inner (radial nested)
 };
 
 export const defaultTuning: LayoutTuning = {
-  outerPad: (s) => Math.max(12, s * 1.0),
-  itemPad : (s) => Math.max(4,  s * 0.25),
+  outerPad: (s) => Math.max(0, Math.round(s * 1.0)),
+  itemPad : (s) => Math.max(0, Math.round(s * 0.25)),
 
   rowCol: (n) => {
     const rows = Math.ceil(Math.sqrt(Math.max(1, n)));
@@ -1317,6 +1342,7 @@ export const defaultTuning: LayoutTuning = {
   minRadius: () => 8,
 
   nestedNodeScale: (level) => Math.pow(0.85, level + 1), // NEW: ~15% smaller per depth
+  nestedContainerScale: (level) => Math.pow(0.85, level + 1),
   // sensible default: grows gently with child count
   nestedRadialPreferred: (count, nodeSize, spacing) => {
     const ring = Math.max(1, count);
@@ -1324,6 +1350,7 @@ export const defaultTuning: LayoutTuning = {
     const d = 2 * r + 2 * Math.max(12, spacing * 1.0);
     return Vector.scalar(d);
   },
+  nestedChildMaxFraction: () => 0.45,                    // child’s longest side <= 45% of parent
 };
 
 export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);
@@ -1820,6 +1847,7 @@ export const divide     = (a : number, b : number) : number => a / b;
 ``` tsx
 import "reactflow/dist/style.css";
 import { 
+  useEffect,
     useMemo, 
     useState 
 } from "react";
@@ -1834,7 +1862,7 @@ import {
 } from "./layout/layout.enum";
 import { LayoutView, ReactAdapterKind } from "./adapters/react-view.adapter";
 import { computeLayout, ModeMap } from "./engine/computeLayout";
-import { LabeledSlider, Select } from "./ui/controls";
+import { LabeledSlider, Select, Segmented } from "./ui/controls";
 import { Shell } from "./ui/styles";
 import { Configurator } from "./ui/Configurator";
 
@@ -1898,6 +1926,15 @@ function allSame<T>(arr: T[]): { same: boolean; value: T | undefined } {
   const v = arr[0];
   return { same: arr.every(x => x === v), value: v };
 }
+function idsInScope(root: NodeConfig, scope: "all" | string, applyToSubtree: boolean): string[] {
+  const all: string[] = [];
+  (function walk(n: NodeConfig){ all.push(n.id); (n.children ?? []).forEach(walk); })(root);
+  if (scope === "all") return all;
+  if (!applyToSubtree) return [scope];
+  const res: string[] = [];
+  (function walk(n: NodeConfig) { res.push(n.id); (n.children ?? []).forEach(walk); })(findNode(root, scope)!);
+  return res;
+}
 
 /* -------------------------------------------
  * Main demo
@@ -1909,6 +1946,7 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
   const [spacing, setSpacing] = useState(24);
   const [nodeW, setNodeW] = useState(110);
   const [nodeH, setNodeH] = useState(54);
+  const LIMITS = { spacing: { min: 0, max: 80 }, nodeW: { min: 40, max: 240 }, nodeH: { min: 30, max: 180 } };
 
   // NEW: layout scope + mode map
   const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
@@ -1932,12 +1970,35 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
 
   const nodeSize = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
   const result   = useMemo(() => computeLayout(effectiveConfig, modes, nodeSize, spacing), [effectiveConfig, modes, nodeSize, spacing]);
+  const scopedIds = useMemo(() => idsInScope(config, scope, applyToSubtree), [config, scope, applyToSubtree]);
+  const nestedGridActive = useMemo(
+    () => layoutName === LayoutTypes.Grid && scopedIds.some(id => (modes[id] ?? "graph") === "nested"),
+    [layoutName, scopedIds, modes]
+  );
+  
+  // When "Nested + Grid" is active, snap to the stable setting:
+  // Spacing = MIN, NodeW = MAX, NodeH = MAX.
+  useEffect(() => {
+    if (nestedGridActive) {
+      setSpacing(LIMITS.spacing.min);
+      setNodeW(LIMITS.nodeW.max);
+      setNodeH(LIMITS.nodeH.max);
+    }
+  }, [nestedGridActive]);
 
   return (
     <div style={Shell.outer}>
       <div style={Shell.bar}>
-        <Select label="Right Pane" value={adapter} onChange={(v) => setAdapter(v as ReactAdapterKind)}
-                options={[{ label: "DOM", value: "dom" }, { label: "Canvas", value: "canvas" }, { label: "React Flow", value: "reactflow" }]} />
+        <Segmented
+            label="Right Pane"
+            value={adapter}
+            options={[
+              { label: "DOM",       value: "dom"       as ReactAdapterKind },
+              { label: "Canvas",    value: "canvas"    as ReactAdapterKind },
+              { label: "ReactFlow", value: "reactflow" as ReactAdapterKind },
+            ]}
+            onChange={(v) => setAdapter(v)}
+        />
         <Configurator
           root={config}
           modes={modes} setModes={setModes}
@@ -1945,9 +2006,11 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
           scope={scope} setScope={setScope}
           applyToSubtree={applyToSubtree} setApplyToSubtree={setApplyToSubtree}
         />
-        <LabeledSlider label="Spacing" value={spacing} min={0} max={80} onChange={setSpacing} />
-        <LabeledSlider label="Node W"  value={nodeW}   min={40} max={240} onChange={setNodeW} />
-        <LabeledSlider label="Node H"  value={nodeH}   min={30} max={180} onChange={setNodeH} />
+        
+        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
+        <LabeledSlider label="Node W"  value={nodeW}   min={LIMITS.nodeW.min}  max={LIMITS.nodeW.max}  onChange={setNodeW} disabled={nestedGridActive} />
+        <LabeledSlider label="Node H"  value={nodeH}   min={LIMITS.nodeH.min}  max={LIMITS.nodeH.max}  onChange={setNodeH} disabled={nestedGridActive} />
+
       </div>
 
       <div style={Shell.left}>
@@ -1971,26 +2034,35 @@ export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayou
 ### src/components/ui/Configurator.tsx
 
 ``` tsx
-// src/components/ui/Configurator.tsx
 import { JSX, useMemo } from "react";
-import { Select } from "./controls";
+import { Segmented, Select } from "./controls";
 import { NodeConfig } from "../graph";
 import { LayoutTypes } from "../layout/layout.enum";
 import { Mode, ModeMap } from "../engine/computeLayout";
 
-type Scope = "all" | string; // "all" or a node id
+type Scope = "all" | string;
 
-function collectIds(root: NodeConfig): string[] {
+function collect(root: NodeConfig): { ids: string[]; byId: Record<string, NodeConfig> } {
   const ids: string[] = [];
+  const byId: Record<string, NodeConfig> = {};
   (function walk(n: NodeConfig) {
-    ids.push(n.id);
+    ids.push(n.id); byId[n.id] = n;
     (n.children ?? []).forEach(walk);
   })(root);
-  return ids;
+  return { ids, byId };
+}
+function subtreeIds(byId: Record<string, NodeConfig>, start: string): string[] {
+  const res: string[] = [];
+  (function walk(n: NodeConfig) {
+    res.push(n.id);
+    (n.children ?? []).forEach(walk);
+  })(byId[start]);
+  return res;
 }
 
 export function Configurator({
-  root, modes, setModes, layout, setLayout, scope, setScope, applyToSubtree, setApplyToSubtree,
+  root, modes, setModes, layout, setLayout, scope, setScope,
+  applyToSubtree, setApplyToSubtree,
 }: {
   root: NodeConfig;
   modes: ModeMap;
@@ -2002,9 +2074,14 @@ export function Configurator({
   applyToSubtree: boolean;
   setApplyToSubtree: (v: boolean) => void;
 }): JSX.Element {
-  const ids = useMemo(() => collectIds(root), [root]);
+  const { ids, byId } = useMemo(() => collect(root), [root]);
 
-  const modeOptions = [
+  const targetIds = useMemo(() => {
+    if (scope === "all") return ids;
+    return applyToSubtree ? subtreeIds(byId, scope) : [scope];
+  }, [ids, byId, scope, applyToSubtree]);
+
+  const modeOptions: { label: string; value: Mode }[] = [
     { label: "Graph",  value: "graph"  },
     { label: "Nested", value: "nested" },
   ];
@@ -2013,23 +2090,9 @@ export function Configurator({
     { label: "Radial", value: LayoutTypes.Radial },
   ];
 
-  function idsInScope(): string[] {
-    if (scope === "all") return ids;
-    if (!applyToSubtree) return [scope];
-    const res: string[] = [];
-    (function walk(n: NodeConfig) {
-      res.push(n.id);
-      (n.children ?? []).forEach(walk);
-    })((function find(n: NodeConfig, id: string): NodeConfig {
-      if (n.id === id) return n;
-      for (const c of n.children ?? []) {
-        const r = find(c, id);
-        if (r) return r;
-      }
-      return n; // should not get here
-    })(root, scope as string));
-    return res;
-  }
+  const currentModes = targetIds.map(id => modes[id] ?? "graph");
+  const allSame = currentModes.every(m => m === currentModes[0]);
+  const activeMode = allSame ? currentModes[0] : undefined;
 
   return (
     <div style={{ display: "inline-flex", gap: 12, alignItems: "center" }}>
@@ -2042,35 +2105,28 @@ export function Configurator({
       <label style={{ fontSize: 12 }}>
         <input type="checkbox" checked={applyToSubtree} onChange={(e) => setApplyToSubtree(e.target.checked)} /> Apply to subtree
       </label>
-      <Select
-        label="Layout"
-        value={layout}
-        onChange={(v) => setLayout(v as LayoutTypes)}
-        options={layoutOptions}
-      />
-      <Select
-        label="Mode"
-        value={"graph"} // display-only; we set by click below
-        onChange={() => {}}
-        options={modeOptions}
-      />
-      <div style={{ display: "inline-flex", gap: 8 }}>
-        {modeOptions.map(m => (
-          <button
-            key={m.value}
-            onClick={() => {
-              const targetIds = idsInScope();
-              setModes(prev => {
-                const next = { ...prev };
-                for (const id of targetIds) next[id] = m.value as Mode;
-                return next;
-              });
-            }}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+
+
+      {/* Segmented control for mode */}
+       <Segmented
+         label="Layout"
+         value={layout}
+         options={layoutOptions}
+         onChange={(v) => setLayout(v as LayoutTypes)}
+       />
+ 
+       <Segmented
+         label="Mode"
+         value={allSame ? (activeMode as string | undefined) : undefined}
+         options={modeOptions}
+         onChange={(v) => {
+           setModes(prev => {
+             const next = { ...prev };
+             for (const id of targetIds) next[id] = v as Mode;
+             return next;
+           });
+         }}
+       />
     </div>
   );
 }
@@ -2081,6 +2137,61 @@ export function Configurator({
 
 ``` tsx
 import { JSX } from "react";
+
+/* ---------- Segmented (general) ---------- */
+export function Segmented({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value?: string; // may be undefined for "mixed"
+  options: { label: string; value: string; disabled?: boolean }[];
+  onChange: (v: string) => void;
+}): JSX.Element {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginRight: 12 }}>
+      <span style={{ fontSize: 12 }}>{label}</span>
+      <div
+        role="tablist"
+        aria-label={label}
+        style={{
+          display: "inline-flex",
+          border: "1px solid #d0d7de",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        {options.map((o) => {
+          const selected = value === o.value;
+          return (
+            <button
+              key={o.value}
+              role="tab"
+              aria-selected={selected}
+              disabled={o.disabled}
+              onClick={() => onChange(o.value)}
+              style={{
+                padding: "6px 10px",
+                fontSize: 12,
+                border: "none",
+                background: selected ? "#111827" : "#fff",
+                color: selected ? "#fff" : "#111827",
+                cursor: o.disabled ? "not-allowed" : "pointer",
+                opacity: o.disabled ? 0.5 : 1,
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Select (keep for node scope) ---------- */
 export function Select({
   label, value, onChange, options
 }: {
@@ -2089,10 +2200,8 @@ export function Select({
   onChange: (v: string) => void;
   options: { label: string; value: string; disabled?: boolean }[];
 }): JSX.Element {
-  // If current value is not in options, fall back to first enabled option
   const values = new Set(options.map(o => o.value));
   const safeValue = values.has(value) ? value : (options.find(o => !o.disabled)?.value ?? "");
-
   return (
     <div style={{ display: "inline-flex", alignItems: "center", marginRight: 12 }}>
       <label style={{ marginRight: 8, fontSize: 12 }}>{label}</label>
@@ -2105,18 +2214,20 @@ export function Select({
   );
 }
 
-
+/* ---------- Slider ---------- */
 export function LabeledSlider({
-  label, value, min, max, step = 1, onChange
+  label, value, min, max, step = 1, onChange, disabled = false
 }: {
   label: string; value: number; min: number; max: number; step?: number;
-  onChange: (v: number) => void;
+  onChange: (v: number) => void; disabled?: boolean;
 }): JSX.Element {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", margin: "0 12px" }}>
+    <div style={{ display: "inline-flex", alignItems: "center", margin: "0 12px", opacity: disabled ? 0.5 : 1 }}>
       <label style={{ marginRight: 8, fontSize: 12 }}>{label}</label>
-      <input type="range" min={min} max={max} step={step} value={value}
-             onChange={(e) => onChange(parseInt(e.target.value, 10))} />
+      <input
+        type="range" min={min} max={max} step={step} value={value} disabled={disabled}
+        onChange={(e) => onChange(parseInt(e.target.value, 10))}
+      />
       <span style={{ marginLeft: 6, fontSize: 12 }}>{value}</span>
     </div>
   );

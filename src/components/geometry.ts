@@ -134,6 +134,18 @@ export namespace Shapes
             return this.size;
         }
     }
+
+    export class Box extends Rectangle 
+    {
+        constructor(
+            public  id        : string,
+                    position  : Vector,
+                    size      : Vector,
+            public  parentId? : string,
+        ) {
+            super(size, position);
+        }
+    }
 }
 console.log(new Vector(3,4).length());                 // 5
 console.log(new Vector(1,0).rotate(Math.PI/2));        // ~ (0,1)

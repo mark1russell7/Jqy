@@ -1,35 +1,83 @@
-import type { CSSProperties } from "react";
-import type { Node, Edge } from "reactflow";
-import { LayoutResult } from "../engine/computeLayout";
+import type { 
+    CSSProperties 
+} from "react";
+import type { 
+    Node, 
+    Edge 
+} from "reactflow";
+import { 
+    LayoutResult 
+} from "../engine/computeLayout";
+import { 
+    Vector 
+} from "../geometry";
 
-const nodeStyle = (w: number, h: number): CSSProperties => ({
-  width: w,
-  height: h,
-  border: "1px solid #cbd5e1",
-  borderRadius: 10,
-  background: "#fff",
-  fontSize: 12,
-  boxSizing: "border-box" as const,
-});
-export function toReactFlow({ boxes, wires }: LayoutResult): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = Object.values(boxes).map((b) => {
-    const rel = b.parentId ? {
-      x: b.tl.x - boxes[b.parentId].tl.x,
-      y: b.tl.y - boxes[b.parentId].tl.y,
-    } : { x: b.tl.x, y: b.tl.y };
+const nodeStyle =   (
+                        v : Vector
+                    ) : CSSProperties => 
+                    ({
+                        width           : v.x,
+                        height          : v.y,
+                        border          : "1px solid #cbd5e1",
+                        borderRadius    : 10,
+                        background      : "#fff",
+                        fontSize        : 12,
+                        boxSizing       : "border-box" as const,
+                    });
+export type toReactFlowReturn = 
+{
+    nodes   : Node[]; 
+    edges   : Edge[];
+};
+export function toReactFlow (
+                                { 
+                                    boxes, 
+                                    wires 
+                                }: LayoutResult
+                            ) : toReactFlowReturn 
+                            {
+                                const nodes : Node[] = Object
+                                                            .values (boxes)
+                                                            .map    (
+                                                                        (b) => 
+                                                                        {
+                                                                            const rel   : Vector    =   b.parentId
+                                                                                                            ?   b.getPosition().subtract(boxes[b.parentId].getPosition())
+                                                                                                            :   b.getPosition();
 
-    const base: Node = {
-      id: b.id,
-      position: rel,
-      data: { label: b.id },
-      style: nodeStyle(b.size.x, b.size.y),
-    };
+                                                                            const base  : Node  = 
+                                                                            {
+                                                                                id          :   b.id,
+                                                                                position    :   rel,
+                                                                                data        :   { 
+                                                                                                    label   : b.id 
+                                                                                                },
+                                                                                style       :   nodeStyle   (
+                                                                                                                b.size
+                                                                                                            ),
+                                                                            };
 
-    return b.parentId
-      ? { ...base, parentNode: b.parentId, extent: "parent" as const }
-      : base;
-  });
+                                                                            return  b.parentId
+                                                                                        ?   { 
+                                                                                                ...base, 
+                                                                                                parentNode  : b.parentId, 
+                                                                                                extent      : "parent"
+                                                                                            }
+                                                                                        :   base;
+                                                                        }
+                                                                    );
 
-  const edges: Edge[] = wires.map((w) => ({ id: `${w.source}-${w.target}`, source: w.source, target: w.target }));
-  return { nodes, edges };
-}
+                                const edges :   Edge[]  =   wires
+                                                                .map(
+                                                                        (w) => 
+                                                                        ({ 
+                                                                            id      : `${w.source}-${w.target}`, 
+                                                                            source  : w.source, 
+                                                                            target  : w.target 
+                                                                        })
+                                                                    );
+                                return  { 
+                                            nodes, 
+                                            edges 
+                                        };
+                            }

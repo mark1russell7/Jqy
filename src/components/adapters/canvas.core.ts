@@ -1,66 +1,213 @@
-import { LayoutResult } from "../engine/computeLayout";
-import { Theme, defaultTheme } from "./theme";
+import { 
+    LayoutResult 
+} from "../engine/computeLayout";
+import { 
+    Shapes, 
+    Vector 
+} from "../geometry";
+import { 
+    Theme, 
+    defaultTheme 
+} from "./theme";
 
-export function drawLayoutToCanvas(
-  ctx: CanvasRenderingContext2D,
-  result: LayoutResult,
-  theme: Theme = defaultTheme
-) {
-  const { width, height } = ctx.canvas;
-  // background
-  ctx.save();
-  ctx.fillStyle = theme.canvas.bg;
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+export const MAX_DEPTH      = 1_000;
+export const finite_loop    =   (
+                                    f : () => boolean
+                                ) : void => 
+                                {
+                                    let i : number = 1;
+                                    for (
+                                            let keepGoing : boolean = true; 
+                                            i <= MAX_DEPTH && keepGoing; 
+                                            i++, keepGoing = f()
+                                        );
+                                    if(i === MAX_DEPTH)
+                                    {
+                                        throw new Error("Maximum depth exceeded");
+                                    }
+                                        
+                                }
 
-  // wires
-  ctx.save();
-  ctx.strokeStyle = theme.wire.stroke;
-  ctx.lineWidth = theme.wire.width;
-  for (const w of result.wires) {
-    const a = result.boxes[w.source];
-    const b = result.boxes[w.target];
-    if (!a || !b) continue;
-    const ax = a.tl.x + a.size.x / 2, ay = a.tl.y + a.size.y / 2;
-    const bx = b.tl.x + b.size.x / 2, by = b.tl.y + b.size.y / 2;
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-  }
-  ctx.restore();
+export const depthOf =  (
+                            box     : Shapes.Box, 
+                            boxes   : LayoutResult["boxes"]
+                        ) : number => 
+                        {
+                            let     d           : number     = 0
+                            const   boxesBox    : Shapes.Box = boxes[box.id];
+                            if(boxesBox.parentId === undefined)
+                            {
+                                return d;
+                            }
+                            let p : string = boxesBox.parentId;
+                            finite_loop(
+                                            () => 
+                                            {
+                                                d++;
+                                                if(boxes[p]?.parentId! === undefined)
+                                                {
+                                                    return false;
+                                                }
+                                                p = boxes[p]?.parentId!;
+                                                return true;
+                                            }
+                                        );
+                            return d;
+                        }
 
-  // nodes
-  ctx.save();
-  ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  for (const b of Object.values(result.boxes)) {
-    // box
-    const r = theme.node.radius;
-    const x = b.tl.x, y = b.tl.y, w = b.size.x, h = b.size.y;
+export const drawLayoutToCanvas =   (
+                                        ctx     : CanvasRenderingContext2D,
+                                        result  : LayoutResult,
+                                        theme   : Theme = defaultTheme
+                                    ) : void => 
+                                    {
+                                        const   { 
+                                                    width, 
+                                                    height 
+                                                } 
+                                                : 
+                                                { 
+                                                    width   : number, 
+                                                    height  : number 
+                                                } = ctx.canvas;
 
-    ctx.beginPath();
-    roundedRect(ctx, x, y, w, h, r);
-    ctx.fillStyle = theme.node.bg;
-    ctx.fill();
-    ctx.strokeStyle = theme.node.border;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+                                        // background
+                                        ctx.save();
+                                        ctx.fillStyle   = theme.canvas.bg;
+                                        ctx.fillRect(
+                                                        0, 
+                                                        0, 
+                                                        width, 
+                                                        height
+                                                    );
+                                        ctx.restore();
 
-    // label
-    ctx.fillStyle = theme.node.text;
-    ctx.fillText(b.id, x + w / 2, y + h / 2);
-  }
-  ctx.restore();
-}
+                                        // wires first (under boxes)
+                                        ctx.save();
+                                        ctx.strokeStyle = theme.wire.stroke;
+                                        ctx.lineWidth   = theme.wire.width;
+                                        for (const w of result.wires) 
+                                        {
+                                            const a : Shapes.Box = result.boxes[w.source];
+                                            const b : Shapes.Box = result.boxes[w.target];
+                                            if (!a || !b) 
+                                            {
+                                                continue;
+                                            }
+                                            const va : Vector = a
+                                                                    .size
+                                                                    .halve()
+                                                                    .add(a.getPosition());
+                                            const vb : Vector = b
+                                                                    .size
+                                                                    .halve()
+                                                                    .add(b.getPosition());
+                                            ctx.beginPath   ();
+                                            ctx.moveTo      (
+                                                                va.x, 
+                                                                va.y
+                                                            );
+                                            ctx.lineTo      (
+                                                                vb.x, 
+                                                                vb.y
+                                                            );
+                                            ctx.stroke      ();
+                                        }
+                                        ctx.restore();
 
-function roundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number
-) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
+                                        // draw boxes sorted by depth (parents under children)
+                                        const sorted = Object
+                                                        .values (result.boxes)
+                                                        .sort   (
+                                                                    (
+                                                                        A : Shapes.Box, 
+                                                                        B : Shapes.Box
+                                                                    ) : number =>
+                                                                        depthOf(A, result.boxes) 
+                                                                    -   depthOf(B, result.boxes)
+                                                                );
+
+                                        ctx.save();
+                                        ctx.font            = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+                                        ctx.textAlign       = "center";
+                                        ctx.textBaseline    = "middle";
+                                        for (const b of sorted) 
+                                        {
+                                            const r         : number            = theme.node.radius;
+                                            const rectangle : Shapes.Rectangle  = new Shapes.Rectangle  (
+                                                                                                            b.getPosition(), 
+                                                                                                            b.getSize()
+                                                                                                        );
+                                            const center    : Vector            = b.getPosition().add(b.getSize().halve());
+
+                                            ctx.beginPath();
+                                            roundedRect (
+                                                            ctx, 
+                                                            rectangle, 
+                                                            r
+                                                        );
+                                            ctx.fillStyle   = theme.node.bg;
+                                            ctx.fill();
+                                            ctx.strokeStyle = theme.node.border;
+                                            ctx.lineWidth = 1;
+                                            ctx.stroke();
+
+                                            ctx.fillStyle = theme.node.text;
+                                            ctx.fillText(
+                                                            b.id, 
+                                                            center.x, 
+                                                            center.y
+                                                        );
+                                        }
+                                        ctx.restore();
+                                    }
+
+const roundedRect = (
+                                        ctx         : CanvasRenderingContext2D,
+                                        rectangle   : Shapes.Rectangle, 
+                                        r           : number
+                    ) : void => 
+                    {
+                        const size              : Vector    = rectangle.getSize();
+                        const position          : Vector    = rectangle.getPosition();
+                        const rr                : number    = Math.min  (
+                                                                            r, 
+                                                                            size
+                                                                                .halve()
+                                                                                .min()
+                                                                        );
+                        const sizeAndPosition   : Vector    = size.add(position);
+                        ctx.moveTo  (
+                                        position.x + rr, 
+                                        position.y
+                                    );
+                        ctx.arcTo   (
+                                        sizeAndPosition.x, 
+                                        position.y, 
+                                        sizeAndPosition.x, 
+                                        sizeAndPosition.y, 
+                                        rr
+                                    );
+                        ctx.arcTo   (
+                                        sizeAndPosition.x, 
+                                        sizeAndPosition.y, 
+                                        position.x, 
+                                        sizeAndPosition.y, 
+                                        rr
+                                    );
+                        ctx.arcTo   (
+                                        position.x, 
+                                        sizeAndPosition.y, 
+                                        position.x, 
+                                        position.y, 
+                                        rr
+                                    );
+                        ctx.arcTo   (
+                                        position.x, 
+                                        position.y, 
+                                        sizeAndPosition.x, 
+                                        position.y, 
+                                        rr
+                                    );
+                        ctx.closePath();
+                    }

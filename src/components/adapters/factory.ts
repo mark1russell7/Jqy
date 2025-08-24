@@ -1,29 +1,72 @@
-import React from "react";
-import { AdapterConfig, Framework, Target } from "./env";
-import { runLayoutAPI } from "./api.adapter";
-import { Canvas2D } from "./canvas.adapter";
-import { AbsoluteDOM } from "./react-dom.adapter";
-import { LayoutView } from "./react-view.adapter";
-import { mountCanvas2D } from "./canvas.vanilla";
-import { mountAbsoluteDOM } from "./vanilla-dom.adapter";
+import React, { JSX, ReactElement } from "react";
+import { 
+    AdapterConfig, 
+    Framework, 
+    Target 
+} from "./env";
+import { 
+    runLayoutAPI, 
+    RunLayoutApiInput
+} from "./api.adapter";
+import { 
+    Canvas2D, 
+    Canvas2DProps
+} from "./canvas.adapter";
+import { 
+    AbsoluteDOM, 
+    AbsoluteDOMProps
+} from "./react-dom.adapter";
+import { 
+    LayoutView, 
+    ReactAdapterProps
+} from "./react-view.adapter";
+import { 
+    CanvasMount,
+    mountCanvas2D 
+} from "./canvas.vanilla";
+import { 
+    DOMMount,
+    mountAbsoluteDOM 
+} from "./vanilla-dom.adapter";
+import { 
+    LayoutResult 
+} from "../engine/computeLayout";
 // factory.ts
-export type Renderer =
-  | { kind: "api" }
-  | { kind: "dom" }
-  | { kind: "canvas" }
-  | { kind: "react", Component: React.ComponentType<any> }
-  | { kind: "reactflow", Component: React.ComponentType<any> };
 
-export function makeRenderer(target: Target): Renderer {
-  switch (target) {
-    case Target.API:    return { kind: "api" };
-    case Target.DOM:    return { kind: "dom" };
-    case Target.Canvas: return { kind: "canvas" };
-    case Target.ReactFlow:
-    case Target.ThreeJS:
-    default:            return { kind: "react", Component: LayoutView }; // imported from a .tsx file
-  }
-}
+export type Renderer =
+    | { kind : Target.API                                              }
+    | { kind : Target.DOM                                              }
+    | { kind : Target.Canvas                                           }
+    | { kind : Framework.React   , Component : React.ComponentType<any>}
+    | { kind : Target.ReactFlow  , Component : React.ComponentType<any>};
+
+export const makeRenderer = (
+                                target : Target
+                            ) : Renderer => 
+                            {
+                                switch (target) 
+                                {
+                                    case Target.API:    return  { 
+                                                                    kind       : Target.API 
+                                                                };
+                                    case Target.DOM:    return  { 
+                                                                    kind        : Target.DOM 
+                                                                };
+                                    case Target.Canvas      : return  { 
+                                                                    kind        : Target.Canvas 
+                                                                };
+                                    case Target.ReactFlow   : return   { 
+                                                                        kind        : Target.ReactFlow, 
+                                                                        Component   : LayoutView 
+                                                                    };
+                                    case Target.ThreeJS:
+                                    default:            return  { 
+                                                                    kind        : Framework.React, 
+                                                                    Component   : LayoutView 
+                                                                };
+                                }
+                            }
+
 
 /**
  * getAdapter(cfg)
@@ -31,36 +74,127 @@ export function makeRenderer(target: Target): Renderer {
  * - For Vanilla: returns { kind: 'vanilla', mount(container, initial) => { update, destroy } }
  * - For API: returns { kind: 'api', run(root, modes, nodeSize, spacing) => LayoutResult }
  */
-export function getAdapter(cfg: AdapterConfig) {
-  switch (cfg.target) {
-    case Target.API:
-      return { kind: "api" as const, run: runLayoutAPI };
-
-    case Target.Canvas:
-      if (cfg.framework === Framework.React) {
-        return { kind: "react" as const, render: (props: any) => React.createElement(Canvas2D, props) };
-      } else {
-        return { kind: "vanilla" as const, mount: mountCanvas2D };
-      }
-
-    case Target.DOM:
-      if (cfg.framework === Framework.React) {
-        return { kind: "react" as const, render: (props: any) => React.createElement(AbsoluteDOM, props) };
-      } else {
-        return { kind: "vanilla" as const, mount: mountAbsoluteDOM };
-      }
-
-    case Target.ReactFlow:
-      // React only – reuse <LayoutView kind="reactflow" />
-      return {
-        kind: "react" as const,
-        render: (props: any) => React.createElement(LayoutView as any, { ...props, kind: "reactflow" }),
-      };
-
-    case Target.ThreeJS:
-      throw new Error("ThreeJS adapter not implemented yet.");
-
-    default:
-      throw new Error(`Unsupported target: ${cfg.target}`);
-  }
+export type GetAdapterReturnRunLayoutAPI = 
+{
+    kind            :   Target.API,
+    run             :   (
+                            input   : RunLayoutApiInput
+                        ) => LayoutResult
 }
+
+export type GetAdapterReturnReact = 
+{
+    kind   :    Framework.React,
+    render :    (
+                    props   : Canvas2DProps
+                ) => ReactElement
+}
+
+export type GetAdapterReturnVanillaCanvas = 
+{
+    kind   :    Target.Canvas,
+    mount  :    (
+                    container   : HTMLElement,
+                    initial     : LayoutResult
+                ) => CanvasMount
+}
+
+export type GetAdapterReturnVanillaDOM = 
+{
+    kind   :    Target.DOM,
+    mount  :    (
+                    container   : HTMLElement,
+                    initial     : LayoutResult
+                ) => DOMMount
+}
+
+export type GetAdapterReturnReactFlow = 
+{
+    kind   :    Target.ReactFlow,
+    render :    (
+                    props   : ReactAdapterProps
+                ) => ReactElement
+}
+
+export type GetAdapterReturn =      GetAdapterReturnRunLayoutAPI 
+                                |   GetAdapterReturnReact
+                                |   GetAdapterReturnVanillaCanvas
+                                |   GetAdapterReturnVanillaDOM
+                                |   GetAdapterReturnReactFlow
+export const getAdapter =   (
+                                cfg : AdapterConfig
+                            ) : GetAdapterReturn => 
+                            {
+                                switch (cfg.target) 
+                                {
+                                    case Target.API:
+                                        return  { 
+                                                    kind    : Target.API, 
+                                                    run     : runLayoutAPI 
+                                                };
+
+                                    case Target.Canvas:
+                                        if (cfg.framework === Framework.React) 
+                                        {
+                                            return  { 
+                                                        kind    :   Framework.React, 
+                                                        render  :   (props : Canvas2DProps) : ReactElement => 
+                                                                        React.createElement (
+                                                                                                Canvas2D, 
+                                                                                                props
+                                                                                            ) 
+                                                    };
+                                        } 
+                                        else 
+                                        {
+                                            return  { 
+                                                        kind    : Target.Canvas, 
+                                                        mount   : mountCanvas2D 
+                                                    };
+                                        }
+
+                                case Target.DOM:
+                                    if (cfg.framework === Framework.React) 
+                                    {
+                                        return  { 
+                                                    kind    : Framework.React, 
+                                                    render  :   (
+                                                                    props   : AbsoluteDOMProps
+                                                                ) : JSX.Element => 
+                                                                    React.createElement (
+                                                                                            AbsoluteDOM, 
+                                                                                            props
+                                                                                        ) 
+                                                };
+                                    } 
+                                    else 
+                                    {
+                                        return  { 
+                                                    kind    : Target.DOM, 
+                                                    mount   : mountAbsoluteDOM 
+                                                };
+                                    }
+
+                                case Target.ReactFlow:
+                                    // React only – reuse <LayoutView kind="reactflow" />
+                                    return  {
+                                                kind    : Target.ReactFlow,
+                                                render  :   (
+                                                                props   : ReactAdapterProps
+                                                            ) : JSX.Element => 
+                                                                React.createElement (
+                                                                                        LayoutView, 
+                                                                                        {
+                                                                                            ...props,
+                                                                                            kind    : Target.ReactFlow,
+                                                                                        }
+                                                                                    ),
+                                        };
+
+                                case Target.ThreeJS:
+                                    throw new Error("ThreeJS adapter not implemented yet.");
+
+                                default:
+                                    throw new Error(`Unsupported target: ${cfg.target}`);
+                                }
+                            }
