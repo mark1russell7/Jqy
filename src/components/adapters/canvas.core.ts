@@ -135,8 +135,8 @@ export const drawLayoutToCanvas =   (
                                         {
                                             const r         : number            = theme.node.radius;
                                             const rectangle : Shapes.Rectangle  = new Shapes.Rectangle  (
-                                                                                                            b.getPosition(), 
-                                                                                                            b.getSize()
+                                                                                                            b.getSize(), 
+                                                                                                            b.getPosition()
                                                                                                         );
                                             const center    : Vector            = b.getPosition().add(b.getSize().halve());
 
