@@ -46,10 +46,10 @@ export class Grid<T>
                 item : GridItem<T>
             ) 
             : void =>
-                        void (this.grid[cell.y][cell.x] = item);
+                void (this.grid[cell.y][cell.x] = item);
     get =   (
                 cell : Vector
             ) 
             : GridItem<T | undefined> => 
-                            this.grid[cell.y][cell.x];
+                this.grid[cell.y][cell.x];
 }

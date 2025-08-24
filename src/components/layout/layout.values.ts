@@ -22,10 +22,16 @@ import {
  * ========================================================= */
 
 export type ClassOf<T> = { new(...args: any[]): T };
-export const LayoutConfigs = new Config<Record<LayoutTypes, Layout>>(
+export const LayoutConfigs : Config<Record<LayoutTypes, Layout>> = new Config<Record<LayoutTypes, Layout>>(
     {
         grid   : new GridLayout(),
         radial : new RadialLayout(),
     }
 );
-export const resolveLayoutName = (node : NodeConfig, fallback : LayoutTypes) : LayoutTypes => node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) ? node.layout : fallback;
+export const resolveLayoutName =    (
+                                        node        : NodeConfig, 
+                                        fallback    : LayoutTypes
+                                    ) : LayoutTypes => 
+    node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) 
+        ? node.layout 
+        : fallback;

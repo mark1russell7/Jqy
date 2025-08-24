@@ -10,27 +10,20 @@ import {
 import { 
     MappedGrid 
 } from "./strategies/grid.mapped";
-export type PreferredSizeParam = {
+export type PreferredSizeParam = 
+{
   /* number of direct children */
-  count   : number;
+  count     : number;
   /* node box size used when graph-mode node is rendered (base unit) */
-  nodeSize: Vector;
+  nodeSize  : Vector;
   /* visual spacing knob */
-  spacing : number;
+  spacing   : number;
   /* where the node is being asked to measure for */
-  mode    : LayoutChildrenMode; // GRAPH | NESTED
+  mode      : LayoutChildrenMode; // GRAPH | NESTED
 };
 
 /** formerly autosizeParent */
 export type PreferredSizeReturn = Vector;
-export type AutosizeParentParam = 
-{
-    count   : number;
-    nodeSize: Vector;
-    spacing : number;
-    min     : Vector;
-}
-export type AutosizeParentReturn = Vector;
 
 export type NestedFrameParam = 
 {
@@ -63,22 +56,5 @@ export abstract class Layout
     abstract placeChildren  (args   : PlaceChildrenParam    )   : PlaceChildrenReturn;
     
     /** Return the layout’s preferred box size ONLY if the node has no externally-allocated size. */
-    abstract preferredSize  (args: PreferredSizeParam ) : PreferredSizeReturn;
+    abstract preferredSize  (args   : PreferredSizeParam    )   : PreferredSizeReturn;
 }
-
-/* =========================================================
- * NESTED GRID
- *  - Outer grid cells perfectly tessellate inner content
- *  - Each child renders inside a "cellInner" = (cell − 2*itemPad)
- * ========================================================= */
-
-
-/* ---------- Tunables (pure) ---------- */
-
-export const outerPad   = (s: number) : number => Math.max(12, s * 1.0); // padding inside PARENT (nested)
-export const itemPad    = (s: number) : number => Math.max(4, s * 0.25); // inner padding inside each GRID CELL
-
-export type PCTreeBelowParams = Pick<NestedFrameParam, 'parentSize' | 'spacing'>;
-/* ---------- GRAPH anchoring ---------- */
-export const pcTreeBelow = ({ parentSize, spacing }: PCTreeBelowParams) : Vector => new Vector(0, (parentSize?.y ?? 0) / 2 + spacing * 1.25)
-

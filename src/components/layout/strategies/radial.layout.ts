@@ -1,17 +1,33 @@
-import { Vector } from "../../geometry";
+import { 
+    Vector 
+} from "../../geometry";
 import {
-  PreferredSizeParam, PreferredSizeReturn,
-  Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
+    PreferredSizeParam, 
+    PreferredSizeReturn,
+    Layout, 
+    PlaceChildrenReturn, 
+    PlaceChildrenParam, 
+    NestedFramesReturn
 } from "../layout";
-import { LayoutChildrenMode } from "../layout.enum";
-import { MappedGrid } from "./grid.mapped";
-import { Config } from "../../config";
-import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
+import { 
+    LayoutChildrenMode 
+} from "../layout.enum";
+import { 
+    MappedGrid 
+} from "./grid.mapped";
+import { 
+    Config 
+} from "../../config";
+import { 
+    LayoutTuning, 
+    LayoutTuningConfig 
+} from "../layout.tuning";
 
 export  class   RadialLayout 
         extends Layout 
 {
-    constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) {
+    constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) 
+    {
         super();
     }
     nestedFrames    =   () 
@@ -107,14 +123,23 @@ export const graphRadialCenters =   (
                                     ) 
                                     : PlaceChildrenReturn => 
 {
-    const base  = tuning.get("radialBase")(nodeSize, spacing);
-    const r     = Math.max(tuning.get("minRadius")(), base * (1 + level * tuning.get("radialLevelScale")()));
+    const base  : number    = tuning.get("radialBase")(nodeSize, spacing);
+    const r     : number    = Math.max  (
+                                            tuning.get("minRadius")(), 
+                                            base *  (1 + level * tuning.get("radialLevelScale")())
+                                        );
 
-    const a     = tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
-    const c     = origin.add(a);
+    const a     : Vector    = tuning.get("anchor")  (
+                                                        { 
+                                                            mode    : LayoutChildrenMode.GRAPH, 
+                                                            parentSize, 
+                                                            spacing 
+                                                        }
+                                                    );
+    const c     : Vector    = origin.add(a);
 
-    const start = tuning.get("startAngle")();
-    const cw    = tuning.get("clockwise")();
+    const start : number    = tuning.get("startAngle")();
+    const cw    : boolean   = tuning.get("clockwise")();
     return  Object
                 .fromEntries(
                     mapIndex(children.length,
@@ -124,11 +149,17 @@ export const graphRadialCenters =   (
                                         [
                                             children[i].id, 
                                             Vector
-                                                .scalar(tuning.get("angleOf")(i, children.length, start, cw))
-                                                .trig  ( )
-                                                .scale (r)
-                                                .add   (c)
-                                                .round ( )
+                                                .scalar (tuning.get("angleOf")  (
+                                                                                    i, 
+                                                                                    children.length, 
+                                                                                    start, 
+                                                                                    cw
+                                                                                )
+                                                        )
+                                                .trig   ( )
+                                                .scale  (r)
+                                                .add    (c)
+                                                .round  ( )
                                         ]
                         )
                 );
