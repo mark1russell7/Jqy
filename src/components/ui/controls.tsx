@@ -2,6 +2,12 @@ import {
   JSX 
 } from "react";
 
+export type SelectOption<T> =
+{
+    label     : string;
+    value     : T;
+    disabled? : boolean;
+}
 /* ---------- Segmented (general) ---------- */
 export type SelectionProps<T> = 
 {
@@ -90,12 +96,6 @@ export function Segmented<T>(
 }
 
 /* ---------- Select (keep for node scope) ---------- */
-export type SelectOption<T> =
-{
-    label     : string;
-    value     : T;
-    disabled? : boolean;
-}
 export function Select<T>   (
                                 {
                                     label, 
@@ -162,7 +162,7 @@ export function Select<T>   (
 /* ---------- Slider ---------- */
 
 export type LabeledSliderProps = 
-    SelectionProps<number> 
+    Omit<SelectionProps<number>, 'options'> 
 &   {
         min         : number;
         max         : number;
