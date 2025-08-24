@@ -40,7 +40,6 @@ export type NestedFrameParam =
 };
 export type NestedFramesReturn = 
 {
-    pad     : number;
     ip      : number;
     content : Vector;
     grid    : MappedGrid;

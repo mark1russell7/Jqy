@@ -28,4 +28,4 @@ export const LayoutConfigs = new Config<Record<LayoutTypes, Layout>>(
         radial : new RadialLayout(),
     }
 );
-export const resolveLayoutName = (node : NodeConfig, fallback : LayoutTypes) : LayoutTypes => node.layout && LayoutConfigs[node.layout] ? node.layout : fallback;
+export const resolveLayoutName = (node : NodeConfig, fallback : LayoutTypes) : LayoutTypes => node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) ? node.layout : fallback;

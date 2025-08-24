@@ -8,7 +8,7 @@ import { MappedGrid, MappedGridItemData } from "./grid.mapped";
 import { GridItem } from "./grid";
 import { Config } from "../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
-import { gridUnit, mapToRect } from "../layout.iterators";
+import { gridUnit, IteratorsConfig, IteratorsSet, mapToRect } from "../layout.iterators";
 import { mapIndex } from "./radial.layout";
 
 /* Split an integer total into `parts` integers that sum to total.
@@ -73,8 +73,12 @@ export const rcSquare = (
 export  class   GridLayout 
         extends Layout 
 {
-    constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) {
-        super();
+    constructor(
+        private tuning : Config<LayoutTuning> = LayoutTuningConfig,
+        private iters  : Config<IteratorsSet> = IteratorsConfig
+    ) 
+    { 
+        super(); 
     }
     nestedFrames =  (
                         { 
@@ -86,14 +90,11 @@ export  class   GridLayout
                     : NestedFramesReturn => 
     {
         const gridSize  = this.tuning.get("rowCol")(children.length); // Vector(cols, rows)
-        const pad       = this.tuning.get("outerPad")(spacing);
         const ip        = this.tuning.get("itemPad")(spacing);
 
         // Inner content (tessellated space)
         const content : Vector = 
             parentSize
-                .subtract(Vector
-                            .scalar(2 * pad))
                 .round   ()
                 .clamp   (1, Infinity);
 
@@ -122,7 +123,6 @@ export  class   GridLayout
             );
         }
         return {
-            pad,
             ip,
             content,
             grid, // outer grid cells
@@ -137,14 +137,14 @@ export  class   GridLayout
         const { children, nodeSize, spacing, origin, parentSize, mode } = args;
         const rowCol    = this.tuning.get("rowCol")(children.length);
         const ip        = this.tuning.get("itemPad")(spacing);
-        const anchor    = this.tuning.get("anchor")({ mode, parentSize, spacing });
+        const anchor    = this.iters.get("grid").anchorOffset({ mode, parentSize, spacing });
         switch(args.mode)
         {
             case LayoutChildrenMode.GRAPH:
                 // GRAPH: logical cell = node + 2*itemPad; anchor below parent
                 const cell    = nodeSize.add(Vector.scalar(2 * ip));
                 const total   = rowCol.multiply(cell);
-                const topLeft = origin.add(anchor).subtract(total.scale(0.5));
+                const topLeft = origin.add(anchor).subtract(total.halve());
                 return Object
                         .fromEntries(
                             mapIndex(
@@ -159,21 +159,9 @@ export  class   GridLayout
                             )
                         );
             case LayoutChildrenMode.NESTED:
-                const { content } = this.nestedFrames(args);
-                const rect = new Shapes.Rectangle(
-                    content,
-                    content.halve()
-                )
-                return Object.fromEntries(
-                    mapIndex(
-                        children.length,
-                        (i : number) => {
-                            const u = gridUnit(i, children.length, rowCol);
-                            const p = mapToRect(u, rect); // centers inside inner content
-                            return [children[i].id, p];
-                        }
-                    )
-                );
+                const rect = new Shapes.Rectangle(parentSize, new Vector(0,0));
+                const centers = this.iters.get("grid").centersInRect(children.length, rowCol, rect);
+                return Object.fromEntries(children.map((c, i) => [c.id, centers[i]]));
         }
     };
     preferredSize = ({ count, nodeSize, spacing, mode }: PreferredSizeParam): PreferredSizeReturn => {

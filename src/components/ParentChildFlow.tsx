@@ -1,12 +1,9 @@
 import "reactflow/dist/style.css";
-import ReactFlow, { Background, Controls } from "reactflow";
 import { 
-    JSX,
     useMemo, 
     useState 
 } from "react";
 import { 
-    buildGraph, 
     NodeConfig
 } from "./graph";
 import { 
@@ -15,301 +12,137 @@ import {
 import { 
     LayoutTypes 
 } from "./layout/layout.enum";
-import { NestedProjection } from "./nested-projection";
+import { LayoutView, ReactAdapterKind } from "./adapters/react-view.adapter";
+import { computeLayout, ModeMap } from "./engine/computeLayout";
+import { LabeledSlider, Select } from "./ui/controls";
+import { Shell } from "./ui/styles";
+import { Configurator } from "./ui/Configurator";
 
-
-/** ----------------------------
- * Demo config
- * ---------------------------- */
-
-const DEMO = {
-    id          : "root",
-    label       : "Root",
-    position    : new Vector(400, 60),
-    layout      : LayoutTypes.Grid, // try "radial" too
-    children    : [
-        {
-            id          :   "A",
-            label       :   "A",
-            layout      :   LayoutTypes.Radial,
-            children    :   [
-                                { 
-                                    id      : "A1", 
-                                    label   : "A1" 
-                                }, 
-                                { 
-                                    id      : "A2", 
-                                    label   : "A2" 
-                                }, 
-                                { 
-                                    id      : "A3", 
-                                    label   : "A3" 
-                                }
-                            ]
-        },
-        {
-            id          :   "B",
-            label       :   "B",
-            layout      :   LayoutTypes.Grid,
-            children    :   [
-                                { 
-                                    id      : "B1", 
-                                    label   : "B1" 
-                                }, 
-                                { 
-                                    id      : "B2", 
-                                    label   : "B2" 
-                                }, 
-                                { 
-                                    id      : "B3", 
-                                    label   : "B3" 
-                                }, 
-                                { 
-                                    id      : "B4", 
-                                    label   : "B4" 
-                                }
-                            ]
-        },
-        {
-            id          : "C",
-            label       : "C",
-            layout      : LayoutTypes.Radial,
-            children    :   [
-                                { 
-                                    id      : "C1", 
-                                    label   : "C1" 
-                                }, 
-                                { 
-                                    id      : "C2", 
-                                    label   : "C2" 
-                                }, 
-                                { 
-                                    id      : "C3", 
-                                    label   : "C3" 
-                                }, 
-                                { 
-                                    id      : "C4", 
-                                    label   : "C4" 
-                                }
-                            ]
-        }
-    ]
+const DEMO: NodeConfig = {
+  id: "root",
+  label: "Root",
+  position: new Vector(200, 60),
+  children: [
+    { id: "A", label: "A", children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", label: "B", children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", label: "C", children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
 };
 Object.freeze(DEMO);
 
+const DEMO_MIXED: NodeConfig = {
+  id: "root",
+  label: "Root",
+  position: new Vector(200, 60),
+  layout: LayoutTypes.Grid,
+  children: [
+    { id: "A", label: "A", layout: LayoutTypes.Radial, children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", label: "B", layout: LayoutTypes.Grid,   children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", label: "C", layout: LayoutTypes.Radial, children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
+};
+Object.freeze(DEMO_MIXED);
+/* -------------------------------------------
+ * Helpers
+ * ------------------------------------------- */
+type LayoutOverrideMap = Record<string, LayoutTypes | undefined>;
+type NodeIndex = { id: string; label: string };
 
-const BAR_H = 72;
+const MIXED = "__mixed__";
 
-const OuterStyle : React.CSSProperties = 
-{
-    position    : "relative", 
-    width       : "100vw", 
-    height      : "100vh", 
-    overflow    : "hidden"
+function flattenNodes(n: NodeConfig): NodeIndex[] {
+  const out: NodeIndex[] = [{ id: n.id, label: n.label ?? n.id }];
+  for (const c of n.children ?? []) out.push(...flattenNodes(c));
+  return out;
 }
-const ControlsStyle : React.CSSProperties =
-{
-    position    : "absolute",
-    left        : 0,
-    top         : 0,
-    width       : "100%",
-    height      : BAR_H,
-    background  : "#f6f8fa",
-    borderBottom: "1px solid #d0d7de",
-    zIndex      : 1000,
-    padding     : 8,
-    boxSizing   : "border-box"
+function findNode(root: NodeConfig, id: string): NodeConfig | undefined {
+  if (root.id === id) return root;
+  for (const c of root.children ?? []) {
+    const hit = findNode(c, id);
+    if (hit) return hit;
+  }
+  return undefined;
 }
-
-const LeftGraphStyle : React.CSSProperties =
-{
-    position    : "absolute",
-    left        : 0,
-    top         : BAR_H,
-    bottom      : 0,
-    width       : "50%",
-    borderRight : "1px solid #e5e7eb",
-    boxSizing   : "border-box"
+function subtreeIds(root: NodeConfig, startId: string): string[] {
+  const node = findNode(root, startId);
+  if (!node) return [];
+  return flattenNodes(node).map(n => n.id);
 }
-
-const LeftGraphTitleStyle : React.CSSProperties =
-{
-    position    : "absolute",
-    left        : 8,
-    top         : 8,
-    fontSize    : 11,
-    color       : "#64748b",
-    zIndex      : 1
+function applyLayoutOverrides(node: NodeConfig, overrides: LayoutOverrideMap): NodeConfig {
+  const overridden: NodeConfig = { ...node, layout: overrides[node.id] ?? node.layout };
+  if (node.children?.length) overridden.children = node.children.map(c => applyLayoutOverrides(c, overrides));
+  return overridden;
 }
-
-const LeftGraphReactFlowContainerStyle : React.CSSProperties =
-{
-    position    : "absolute", 
-    left        : 0, 
-    right       : 0, 
-    top         : 0, 
-    bottom      : 0
+function allSame<T>(arr: T[]): { same: boolean; value: T | undefined } {
+  if (!arr.length) return { same: true, value: undefined };
+  const v = arr[0];
+  return { same: arr.every(x => x === v), value: v };
 }
 
-const RightGraphStyle : React.CSSProperties =
-{
-    position    : "absolute",
-    left        : "50%",
-    right       : 0,
-    top         : BAR_H,
-    bottom      : 0,
-    overflow    : "auto",
-    boxSizing   : "border-box"
-}
-const RightGraphTitleStyle : React.CSSProperties =
-{
-    position    : "absolute",
-    left        : 8,
-    top         : 8,
-    fontSize    : 11,
-    color       : "#64748b",
-    zIndex      : 1
-}
-
-const makeConfiguratorSlider = ({label, value, min, max, onChange}) : JSX.Element => (
-    <div style={{ 
-                    display     : "flex", 
-                    alignItems  : "center", 
-                    margin      : "0 12px" 
-                }}
-    >
-        <label style=   {{ 
-                            marginRight : 8, 
-                            fontSize    : 12 
-                        }}
-        >
-            {label}
-        </label>
-        <input 
-            type        =   "range" 
-            min         =   {min        } 
-            max         =   {max        } 
-            value       =   {value      } 
-            onChange    =   {onChange   } 
-        />
-        <span style={{ 
-                        marginLeft  : 6, 
-                        fontSize    : 12 
-                    }}
-        >
-            {value}
-        </span>
-    </div>
-);
-
-/** ----------------------------
+/* -------------------------------------------
  * Main demo
- * ---------------------------- */
+ * ------------------------------------------- */
+export type ParentChildLayoutsDemoProps = { config?: NodeConfig };
 
-export type ParentChildLayoutsDemoProps = 
-{
-    config? : NodeConfig;
-}
+export function ParentChildLayoutsDemo({ config = DEMO_MIXED }: ParentChildLayoutsDemoProps) {
+  const [adapter, setAdapter] = useState<ReactAdapterKind>("dom");
+  const [spacing, setSpacing] = useState(24);
+  const [nodeW, setNodeW] = useState(110);
+  const [nodeH, setNodeH] = useState(54);
 
-export const ParentChildLayoutsDemo =   (
-                                            { 
-                                                config = DEMO 
-                                            } : ParentChildLayoutsDemoProps
-                                        ) 
-                                        : React.JSX.Element => 
-{
-    const [layoutName   , setLayoutName ] = useState(LayoutTypes.Grid); 
-    const [spacing      , setSpacing    ] = useState(24);
-    const [nodeW        , setNodeW      ] = useState(110);
-    const [nodeH        , setNodeH      ] = useState(54);
+  // NEW: layout scope + mode map
+  const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
+  const [modes, setModes] = useState<ModeMap>({ root: "graph", A: "nested", B: "graph", C: "nested" });
+  const [scope, setScope] = useState<"all" | string>("all");
+  const [applyToSubtree, setApplyToSubtree] = useState(true);
 
-    const nodeSize  = useMemo   (
-                                    () => new Vector(nodeW, nodeH), 
-                                    [
-                                        nodeW, 
-                                        nodeH
-                                    ]
-                                );
-    const graphData = useMemo   (      
-                                    () => 
-                                        buildGraph({ config, layoutName, nodeSize, spacing }), 
-                                    [
-                                        config, 
-                                        layoutName, 
-                                        nodeSize, 
-                                        spacing
-                                    ]
-                                );
-    
+  // apply layout to scope by mutating a *derived* config (never the frozen constants)
+  const effectiveConfig = useMemo<NodeConfig>(() => {
+    function clone(n: NodeConfig): NodeConfig {
+      return { ...n, children: (n.children ?? []).map(clone) };
+    }
+    const copy = clone(config);
+    function setLayout(n: NodeConfig) {
+      if (scope === "all" || n.id === scope) n.layout = layoutName;
+      if (applyToSubtree || scope === "all") (n.children ?? []).forEach(setLayout);
+    }
+    setLayout(copy);
+    return copy;
+  }, [config, layoutName, scope, applyToSubtree]);
 
-    return (
-        <div style={OuterStyle}>
-            {/* Controls */}
-            <div style={ControlsStyle}>
-                <label style={{ marginRight: 8, fontSize: 12 }}>Layout</label>
-                <select 
-                    name        =   "layout" 
-                    value       =   {layoutName} 
-                    onChange    =   {(e) => setLayoutName(e.target.value as LayoutTypes)} 
-                    style       =   {{ marginRight: 12 }}
-                >
-                    <option value={LayoutTypes.Grid     }>Grid  </option>
-                    <option value={LayoutTypes.Radial   }>Radial</option>
-                </select>
+  const nodeSize = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
+  const result   = useMemo(() => computeLayout(effectiveConfig, modes, nodeSize, spacing), [effectiveConfig, modes, nodeSize, spacing]);
 
-                {makeConfiguratorSlider({
-                    label   : "Spacing",
-                    value   : spacing,
-                    min     : 0,
-                    max     : 80,
-                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setSpacing(parseInt(e.target.value, 10))
-                })}
+  return (
+    <div style={Shell.outer}>
+      <div style={Shell.bar}>
+        <Select label="Right Pane" value={adapter} onChange={(v) => setAdapter(v as ReactAdapterKind)}
+                options={[{ label: "DOM", value: "dom" }, { label: "Canvas", value: "canvas" }, { label: "React Flow", value: "reactflow" }]} />
+        <Configurator
+          root={config}
+          modes={modes} setModes={setModes}
+          layout={layoutName} setLayout={setLayoutName}
+          scope={scope} setScope={setScope}
+          applyToSubtree={applyToSubtree} setApplyToSubtree={setApplyToSubtree}
+        />
+        <LabeledSlider label="Spacing" value={spacing} min={0} max={80} onChange={setSpacing} />
+        <LabeledSlider label="Node W"  value={nodeW}   min={40} max={240} onChange={setNodeW} />
+        <LabeledSlider label="Node H"  value={nodeH}   min={30} max={180} onChange={setNodeH} />
+      </div>
 
-                {makeConfiguratorSlider({
-                    label   : "Node W",
-                    value   : nodeW,
-                    min     : 0,
-                    max     : 220,
-                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeW(parseInt(e.target.value, 10))
-                })}
-
-                {makeConfiguratorSlider({
-                    label   : "Node H",
-                    value   : nodeH,
-                    min     : 0,
-                    max     : 160,
-                    onChange: (e : React.ChangeEvent<HTMLInputElement>) => setNodeH(parseInt(e.target.value, 10))
-                })}
-            </div>
-
-            {/* Left: Graph (edges) */}
-            <div style = {LeftGraphStyle}>
-                <div style = {LeftGraphTitleStyle}>
-                    Graph (Edges)
-                </div>
-                <div style = {LeftGraphReactFlowContainerStyle}>
-                    <ReactFlow 
-                        nodes   =   {graphData.nodes} 
-                        edges   =   {graphData.edges} 
-                        fitView 
-                    >
-                        <Background gap={16} />
-                        <Controls />
-                    </ReactFlow>
-                </div>
-            </div>
-            {/* Right: Nested projection (true nesting) */}
-            <div style = {RightGraphStyle}>
-                <div style = {RightGraphTitleStyle}>
-                    Nested Projection
-                </div>
-                <NestedProjection 
-                    config      =   {config     } 
-                    layoutName  =   {layoutName } 
-                    nodeSize    =   {nodeSize   } 
-                    spacing     =   {spacing    } 
-                />
-            </div>
+      <div style={Shell.left}>
+        <div style={Shell.title}>Graph (Edges)</div>
+        <div style={Shell.rf}>
+          <LayoutView kind="reactflow" result={result} />
         </div>
-    );
+      </div>
+
+      <div style={Shell.right}>
+        <div style={Shell.title}>Right Pane: {adapter}</div>
+        <div style={{ position: "absolute", inset: 0 }}>
+          <LayoutView kind={adapter} result={result} />
+        </div>
+      </div>
+    </div>
+  );
 }

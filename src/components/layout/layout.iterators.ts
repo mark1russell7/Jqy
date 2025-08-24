@@ -1,36 +1,51 @@
-// layout/layout.iterators.ts
 import { Shapes, Vector } from "../geometry";
+import { Iterator, IteratorOps } from "./iterators.types";
 import { LayoutChildrenMode } from "./layout.enum";
+import { Config } from "../config";
+import { LayoutTuning, LayoutTuningConfig } from "./layout.tuning";
 
-export type SiblingPlacer = (i: number, n: number, rowCol: Vector) => Vector;
-export type RectMapper = (u: Vector, r: Shapes.Rectangle) => Vector;
-export type Anchor = (ctx: { mode: LayoutChildrenMode; parentSize: Vector; spacing: number }) => Vector;
+/** map unit [0,1]² → top-left rect (position + u * size). */
+export const mapToRect = (u: Vector, r: Shapes.Rectangle): Vector =>
+     r.getPosition().add(u.multiply(r.getSize()));
 
-export const mapToRect: RectMapper = (u : Vector, r : Shapes.Rectangle) : Vector =>
-    r.getPosition().add(u.multiply(r.getSize()));
-//   new Vector(r.cx + u.nx * r.w, r.cy + u.ny * r.h);
-
-/** Grid on a unit box with caller-provided row/col heuristic */
-export const gridUnit: SiblingPlacer = (i : number, n : number, rowCol : Vector) : Vector => {
-
-    const coordinates = rowCol.fold(
-        (x : number) : number => i % x,
-        (y : number) : number => Math.floor(i / y)
-    );
-  // cells fill [-0.5,0.5]^2 exactly
-    return coordinates
-                .add(Vector.scalar(1/2))
-                .divide(coordinates)
-                .add(Vector.scalar(-1/2));
+/** correct grid centers: ((col+.5)/cols, (row+.5)/rows) */
+export const gridUnit = (i: number, n: number, rowCol: Vector): Vector => {
+    const cols = Math.max(1, rowCol.x);
+    const rows = Math.max(1, rowCol.y);
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return new Vector((col + 0.5) / cols, (row + 0.5) / rows);
 };
 
-/** Radial around 0 with radius 0.5 */
-export const radialUnit : SiblingPlacer =   (
-                                                i : number, 
-                                                n : number
-                                            ) 
-                                            :   Vector => 
-                                                Vector
-                                                    .scalar((i / Math.max(1, n)) * Math.PI * 2)
-                                                    .trig()
-                                                    .scale(0.5);
+/** iterator registry */
+export type IteratorsSet = {
+    grid: Iterator;
+    radial: Iterator;
+};
+
+export const buildIterators = (tuning: Config<LayoutTuning> = LayoutTuningConfig): IteratorsSet => {
+    const opsGrid: IteratorOps = {
+        unit: gridUnit,
+        mapToRect,
+        anchor: ({ mode, parentSize, spacing }) =>
+            mode === LayoutChildrenMode.GRAPH ? tuning.get("anchor")({ mode, parentSize, spacing }) : new Vector(0, 0),
+    };
+
+    const opsRadial: IteratorOps = {
+        anchor: ({ mode, parentSize, spacing }) =>
+            mode === LayoutChildrenMode.GRAPH ? tuning.get("anchor")({ mode, parentSize, spacing }) : new Vector(0, 0),
+        angle: (i, n) => {
+            const start = tuning.get("startAngle")();
+            const cw    = tuning.get("clockwise")();
+            return tuning.get("angleOf")(i, n, start, cw);
+        },
+    };
+
+    return {
+        grid:   new Iterator(opsGrid),
+        radial: new Iterator(opsRadial),
+    };
+};
+
+/** default singleton */
+export const IteratorsConfig = new Config<IteratorsSet>(buildIterators());

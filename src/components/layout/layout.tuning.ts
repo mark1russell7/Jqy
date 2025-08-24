@@ -25,6 +25,7 @@ export type LayoutTuning = {
 
   /* NESTED radial preferred size if no size is provided (root-only or free): */
   nestedRadialPreferred: (count: number, nodeSize: Vector, spacing: number) => Vector;
+  nestedNodeScale: (level: number) => number;  // NEW
 };
 
 export const defaultTuning: LayoutTuning = {
@@ -53,6 +54,7 @@ export const defaultTuning: LayoutTuning = {
   radialLevelScale: () => 0.6,                                      // was “0.6”
   minRadius: () => 8,
 
+  nestedNodeScale: (level) => Math.pow(0.85, level + 1), // NEW: ~15% smaller per depth
   // sensible default: grows gently with child count
   nestedRadialPreferred: (count, nodeSize, spacing) => {
     const ring = Math.max(1, count);

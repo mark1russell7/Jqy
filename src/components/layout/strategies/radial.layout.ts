@@ -17,7 +17,6 @@ export  class   RadialLayout
     nestedFrames    =   () 
                         : NestedFramesReturn => (
                                                     {
-                                                        pad     : 0,
                                                         ip      : 0,
                                                         content : new Vector(0, 0),
                                                         grid    : new MappedGrid(new Vector(0, 0))
@@ -69,7 +68,6 @@ export const nestedRadialCenters =  (
                                     ) : PlaceChildrenReturn => 
 {
     const inner : Vector    = parentSize
-                                .subtract(Vector.scalar(2 * tuning.get("outerPad")(spacing)))
                                 .round   ()
                                 .clamp   (1, Infinity);
     const c     : Vector    = inner.scale(1/2);
