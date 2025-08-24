@@ -55,7 +55,8 @@ export const computeLayout =    (
                         node            : NodeConfig,
                         level           : number,
                         assigned?       : Shapes.Box,
-                        currentNodeSize : Vector = nodeSize
+                        currentNodeSize : Vector = nodeSize,
+                        parent          : Shapes.Box | undefined = undefined
                     ) : void  => 
                     {
                         const id        : string                = node.id;
@@ -87,7 +88,8 @@ export const computeLayout =    (
                             box = new Shapes.Box( 
                                                     id, 
                                                     tl, 
-                                                    size 
+                                                    size,
+                                                    parent?.id
                                                 );
                         }
 
@@ -121,7 +123,7 @@ export const computeLayout =    (
                                                                                         );
                                 for (const c of children) 
                                 {
-                                    const item  : GridItem<MappedGridItemData | undefined> | undefined = frames.grid.getItem(c.id)!;
+                                    const item  : GridItem<MappedGridItemData | undefined> = frames.grid.getItem(c.id);
                                     const pos   : Vector = item.dimensions.getPosition();
                                     const sz    : Vector = item.dimensions
                                                                 .getSize    ()
@@ -132,13 +134,15 @@ export const computeLayout =    (
                                                                         innerTL
                                                                             .add(pos)
                                                                             .add(Vector.scalar(frames.ip)),
-                                                                        sz
+                                                                        sz,
+                                                                        box.id
                                                                     );
                                     place   (
                                                 c, 
                                                 level + 1, 
                                                 childBox, 
-                                                nextNodeSize
+                                                nextNodeSize,
+                                                box
                                             ); // pass scaled base
                                 }
                             } 
@@ -244,13 +248,15 @@ export const computeLayout =    (
                                     const childBox  : Shapes.Box = new Shapes.Box   (
                                                                                         c.id, 
                                                                                         tlChild, 
-                                                                                        finalSize
+                                                                                        finalSize,
+                                                                                        box.id
                                                                                     );
                                     place   (
                                                 c, 
                                                 level + 1, 
                                                 childBox, 
-                                                nextNodeSize
+                                                nextNodeSize,
+                                                box
                                             );
                                 }
                             }
@@ -274,7 +280,8 @@ export const computeLayout =    (
                                 const childBox  : Shapes.Box = new Shapes.Box   (
                                                                                     c.id, 
                                                                                     tlChild, 
-                                                                                    currentNodeSize
+                                                                                    currentNodeSize,
+                                                                                    box.id
                                                                                 );
                                 wires.push  (
                                                 { 
@@ -286,7 +293,9 @@ export const computeLayout =    (
                                             c, 
                                             level + 1, 
                                             childBox, 
-                                            currentNodeSize);
+                                            currentNodeSize,
+                                            box
+                                        );
                             }
                         }
                     }
@@ -295,7 +304,8 @@ export const computeLayout =    (
                 root, 
                 0, 
                 undefined, 
-                nodeSize
+                nodeSize,
+                undefined
             );
     return  { 
                 boxes, 

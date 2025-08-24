@@ -121,7 +121,7 @@ export  class   GridLayout
                     ) 
                     : NestedFramesReturn => 
     {
-        const gridSize : Vector = this.tuning.get("rowCol")(children.length); // Vector(cols, rows)
+        const gridSize : Vector = this.tuning.get("rowCol" )(children.length); // Vector(cols, rows)
         const ip       : number = this.tuning.get("itemPad")(spacing);
 
         // Inner content (tessellated space)
@@ -134,7 +134,10 @@ export  class   GridLayout
         const X : SplitEvenReturn = splitEven(content.x, gridSize.x);
         const Y : SplitEvenReturn = splitEven(content.y, gridSize.y);
 
-        const grid : MappedGrid = new MappedGrid(gridSize);
+        const grid : MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(
+            gridSize,
+            () => ({ id: '' })
+        );
         for (let i : number = 0; i < children.length; i++) 
         {
             const cell : Vector = new Vector(

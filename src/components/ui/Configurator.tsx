@@ -229,10 +229,10 @@ export const Configurator = (
             <Segmented<string | undefined>
                 label       =   "Mode"
                 value       =   {allSame 
-                                    ? (activeMode as string | undefined) 
-                                    : undefined                         }
-                options     =   {modeOptions                            }
-                onChange    =   {onModeChange                           }
+                                    ? activeMode
+                                    : undefined }
+                options     =   {modeOptions    }
+                onChange    =   {onModeChange   }
             />
         </div>
     );

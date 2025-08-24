@@ -17,30 +17,46 @@ export class GridItem<T>
 
 export class Grid<T> 
 {
-    public grid : GridItem<T | undefined>[][];
-    constructor(public size : Vector) 
-    {
-        this.grid = Array
-                        .from(
-                            { 
-                                length : size.y 
-                            }, 
-                            () => Array
-                                    .from(
-                                        { 
-                                            length : size.x 
-                                        }, 
-                                        () => new GridItem<undefined>(
-                                                                new Vector(0, 0), 
-                                                                new Shapes.Rectangle(
-                                                                                        new Vector(0, 0), 
-                                                                                        new Vector(0, 0)
-                                                                                    ),
-                                                                undefined
-                                                             )
-                                    )
-                        );
+    static empty<T>(
+        size : Vector,
+        factory : (
+            x : number,
+            y : number
+        ) => T
+    ) : Grid<T>{
+        return new Grid<T>(
+            size,
+            Array
+                .from(
+                    { 
+                        length : size.y 
+                    }, 
+                    (
+                        y : number
+                    ) => Array
+                            .from(
+                                { 
+                                    length : size.x 
+                                }, 
+                                (
+                                    x : number
+                                ) => new GridItem<T>(
+                                                        new Vector(0, 0), 
+                                                        new Shapes.Rectangle(
+                                                                                new Vector(0, 0), 
+                                                                                new Vector(0, 0)
+                                                                            ),
+                                                        factory(x, y)
+                                                    )
+                            )
+                )
+        )
     }
+    constructor(
+        public size : Vector,
+        public grid : GridItem<T>[][]
+    ) 
+    {}
     set =   (
                 cell : Vector, 
                 item : GridItem<T>

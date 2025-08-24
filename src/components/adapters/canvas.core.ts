@@ -44,11 +44,13 @@ export const depthOf =  (
                                             () => 
                                             {
                                                 d++;
-                                                if(boxes[p]?.parentId! === undefined)
+                                                const boxesBox      : Shapes.Box = boxes[p];
+                                                const parentBoxID   :  string | undefined = boxesBox.parentId;
+                                                if(parentBoxID === undefined)
                                                 {
                                                     return false;
                                                 }
-                                                p = boxes[p]?.parentId!;
+                                                p = parentBoxID;
                                                 return true;
                                             }
                                         );

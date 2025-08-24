@@ -1,4 +1,5 @@
 import { 
+    Shapes,
     Vector 
 } from "../../geometry";
 import { 
@@ -11,9 +12,38 @@ export type MappedGridItemData =
 {
     id : MappedGridItemID;
 };
-export  class   MappedGrid<T extends MappedGridItemData = MappedGridItemData> 
+export type MappedGridItemDataType = MappedGridItemData;
+export  class   MappedGrid<T extends MappedGridItemDataType = MappedGridItemDataType> 
         extends Grid<T>
 {
+    static emptyMapped<T extends MappedGridItemDataType>(
+        size : Vector,
+        factory : () => T
+    ) : MappedGrid<T> {
+        return new MappedGrid<T>(
+            size,
+            Array
+                .from(
+                    { 
+                        length : size.y 
+                    }, 
+                    () => Array
+                            .from(
+                                { 
+                                    length : size.x 
+                                }, 
+                                () => new GridItem<T>(
+                                                        new Vector(0, 0), 
+                                                        new Shapes.Rectangle(
+                                                                                new Vector(0, 0), 
+                                                                                new Vector(0, 0)
+                                                                            ),
+                                                            factory()
+                                                        )
+                            )
+                )
+        )
+    }
     protected map : Map<MappedGridItemID, Vector> = new Map();
     override set =  (   
                         cell : Vector, 
@@ -29,12 +59,12 @@ export  class   MappedGrid<T extends MappedGridItemData = MappedGridItemData>
                     this.map.get(id);
     getItem =   (
                     id : MappedGridItemID
-                ) : GridItem<T | undefined> | undefined => 
+                ) : GridItem<T | undefined> => 
     {
         const cell : Vector | undefined = this.getCell(id);
         if (!cell) 
         {
-            return undefined;
+            throw new Error(`Cell not found for item ID: ${id}`);
         }
         return this.grid[cell.y][cell.x];
     }

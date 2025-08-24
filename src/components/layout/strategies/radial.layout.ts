@@ -35,7 +35,11 @@ export  class   RadialLayout
                                                     {
                                                         ip      : 0,
                                                         content : new Vector(0, 0),
-                                                        grid    : new MappedGrid(new Vector(0, 0))
+                                                        grid    : MappedGrid
+                                                                    .emptyMapped(
+                                                                                    new Vector(0, 0), 
+                                                                                    () => ({ id: '' })
+                                                                                )
                                                     }
                                                 );
     placeChildren   =   (

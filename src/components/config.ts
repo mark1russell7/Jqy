@@ -29,9 +29,10 @@ export class Config<T extends Record<string, any>>
 
     constructor (
                     private settings : T, 
-                    private defaults : T = settings
+                    private readonly defaults : T = { ...settings } // @Note: Shallow Copy
                 ) 
     {
+        Object.freeze(this.defaults);
         
     }
 }
