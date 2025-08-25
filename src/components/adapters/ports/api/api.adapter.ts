@@ -1,6 +1,6 @@
-import { LayoutResultEx, ModeMap, LayoutEngine } from "../layout/engine/layout.engine";
-import { Vector } from "../geometry";
-import { NodeConfig } from "../graph";
+import { LayoutResultEx, ModeMap, LayoutEngine } from "../../../layout/engine/layout.engine";
+import { Vector } from "../../../geometry";
+import { NodeConfig } from "../../../graph";
 
 export type RunLayoutApiInput = {
   root: NodeConfig;

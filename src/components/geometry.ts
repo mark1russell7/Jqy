@@ -1,25 +1,12 @@
 // geometry.ts
-// - Adds Vector branding (Position/Size/Offset/Any) with Vector.as(brand)
-// - Shapes.Rectangle stores branded position/size but remains compatible
-// - Shapes.Box adds depth (z) and parentId, getters preserve brands
+// Vector now uses the generic brand system (brand.ts). Brands are reusable globally.
 
 import { add, divide, multiply, subtract } from "./math";
+import { brand, Branded } from "./brand";
 
 export type VectorBrand = "Any" | "Position" | "Size" | "Offset" | "Center";
-export type BrandRegistry = Record<VectorBrand, { description: string }>;
 
-export const VectorBrands: BrandRegistry = {
-  Any: { description: "unbranded vector (generic)" },
-  Position: { description: "top-left or absolute position" },
-  Size: { description: "width/height size vector" },
-  Offset: { description: "delta/translation vector" },
-  Center: { description: "center point (often computed)" },
-};
-
-export enum Dimension {
-  X = "x",
-  Y = "y",
-}
+export enum Dimension { X = "x", Y = "y" }
 
 export type Fold = (value: number) => number;
 export type NestFold = (vector: Vector) => number;
@@ -27,30 +14,23 @@ export type FoldWith = (value1: number, value2: number) => number;
 export type Reduce = (x: number, y: number) => number;
 
 export class Vector {
-  // NOTE: __brand is intentionally not readonly so .as(...) can rebrand in place (purely for typing).
-  //       At runtime we also set a non-enumerable property for easier debugging.
-  public __brand?: VectorBrand;
-
   constructor(public readonly x: number, public readonly y: number) {}
 
-  public as<B extends VectorBrand>(brand: B): Vector & { __brand: B } {
-    // attach a non-enumerable brand for debugging, while returning a branded type
-    Object.defineProperty(this, "__brand", { value: brand, enumerable: false, configurable: true });
-    return this as unknown as Vector & { __brand: B };
+  public as<B extends VectorBrand>(b: B): Branded<Vector, B> {
+    // keep a debug runtime brand
+    return brand(this, b);
   }
-
-  // convenience shorthands
   public asPosition() { return this.as("Position"); }
-  public asSize() { return this.as("Size"); }
-  public asOffset() { return this.as("Offset"); }
-  public asCenter() { return this.as("Center"); }
+  public asSize()     { return this.as("Size"); }
+  public asOffset()   { return this.as("Offset"); }
+  public asCenter()   { return this.as("Center"); }
 
   public reflect = (axis: Dimension) => (axis === Dimension.X ? new Vector(this.x, -this.y) : new Vector(-this.x, this.y));
   public scale = (factor: number) => this.multiply(Vector.scalar(factor));
   public sum = () => this.reduce(add);
   public crossProduct = (vector: Vector) => this.reflect(Dimension.X).dotProduct(vector.swap());
   public normalize = () => this.scale(1 / this.length());
-  public length = () => Math.sqrt(this.dotProduct(this)); // hypot would be more stable
+  public length = () => Math.sqrt(this.dotProduct(this));
   public round = () => this.map(Math.round);
   public map = (f: Fold) => this.fold(f, f);
   public reduce = (f: Reduce) => f(this.x, this.y);
@@ -85,16 +65,11 @@ export class Vector {
 export namespace Shapes {
   export class Rectangle {
     constructor(public size: Vector, public position: Vector) {
-      // ensure stored shape uses branded vectors internally
       this.size = size.as("Size");
       this.position = position.as("Position");
     }
-    getPosition(): Vector & { __brand: VectorBrand } {
-      return this.position.as("Position");
-    }
-    getSize(): Vector & { __brand: VectorBrand } {
-      return this.size.as("Size");
-    }
+    getPosition(): Branded<Vector, "Position"> { return this.position.as("Position"); }
+    getSize(): Branded<Vector, "Size"> { return this.size.as("Size"); }
   }
 
   export class Box extends Rectangle {
@@ -107,9 +82,6 @@ export namespace Shapes {
     ) {
       super(size, position);
     }
-    setDepth(d: number): this {
-      this.depth = d;
-      return this;
-    }
+    setDepth(d: number): this { this.depth = d; return this; }
   }
 }

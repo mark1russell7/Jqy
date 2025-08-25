@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T00:37:35.512Z
+Generated on 2025-08-25T01:50:00.046Z
 
 ## Directory structure (src)
 
@@ -9,19 +9,28 @@ Generated on 2025-08-25T00:37:35.512Z
 
 ├── components/
 │   ├── adapters/
-│   │   ├── api.adapter.ts
-│   │   ├── canvas.adapter.tsx
-│   │   ├── canvas.core.ts
-│   │   ├── canvas.vanilla.ts
+│   │   ├── ports/
+│   │   │   ├── api/
+│   │   │   │   └── api.adapter.ts
+│   │   │   ├── react/
+│   │   │   │   ├── canvas.react.adapter.tsx
+│   │   │   │   ├── dom.react.adapter.tsx
+│   │   │   │   ├── react-flow.react.adapter.ts
+│   │   │   │   ├── react-three-fiber.react.adapter.tsx
+│   │   │   │   └── react-view.adapter.tsx
+│   │   │   ├── vanilla/
+│   │   │   │   ├── canvas.vanilla.ts
+│   │   │   │   ├── dom.vanilla.adapter.ts
+│   │   │   │   └── threejs.vanilla.adapter.ts
+│   │   │   └── ports.ts
+│   │   ├── targets/
+│   │   │   └── canvas.core.ts
 │   │   ├── env.ts
 │   │   ├── factory.ts
-│   │   ├── r3f.adapter.tsx
-│   │   ├── react-dom.adapter.tsx
-│   │   ├── react-flow.adapter.ts
-│   │   ├── react-view.adapter.tsx
-│   │   ├── theme.ts
-│   │   ├── three.adapter.ts
-│   │   └── vanilla-dom.adapter.ts
+│   │   └── theme.ts
+│   ├── iteration/
+│   │   ├── iterate.ts
+│   │   └── iteration.limits.ts
 │   ├── layout/
 │   │   ├── engine/
 │   │   │   └── layout.engine.ts
@@ -40,15 +49,20 @@ Generated on 2025-08-25T00:37:35.512Z
 │   │   ├── layout.registry.ts
 │   │   ├── layout.ts
 │   │   └── layout.tuning.ts
+│   ├── playground/
+│   │   └── controller.ts
 │   ├── ui/
 │   │   ├── Configurator.tsx
 │   │   ├── controls.tsx
 │   │   └── styles.ts
+│   ├── brand.ts
 │   ├── class.types.ts
 │   ├── config.ts
+│   ├── errors.ts
 │   ├── geometry.sanity.test.ts
 │   ├── geometry.ts
 │   ├── graph.ts
+│   ├── logging.ts
 │   ├── math.ts
 │   └── ParentChildFlow.tsx
 └── App.tsx
@@ -69,469 +83,6 @@ function App()
 }
 
 export default App;
-
-```
-
-### src/components/adapters/api.adapter.ts
-
-``` ts
-import { 
-    computeLayout, 
-    LayoutResult, 
-    ModeMap 
-} from "../engine/computeLayout";
-import { 
-    Vector 
-} from "../geometry";
-import { 
-    NodeConfig 
-} from "../graph";
-
-export type RunLayoutApiInput = 
-{
-    root      : NodeConfig,
-    modes     : ModeMap,
-    nodeSize  : Vector,
-    spacing   : number
-}
-
-export const runLayoutAPI = (
-                                {
-                                    root,
-                                    modes,
-                                    nodeSize,
-                                    spacing
-                                } : RunLayoutApiInput
-                            ) : LayoutResult => 
-                                computeLayout   (
-                                                    root, 
-                                                    modes, 
-                                                    nodeSize, 
-                                                    spacing
-                                                );
-
-
-```
-
-### src/components/adapters/canvas.adapter.tsx
-
-``` tsx
-import { 
-    JSX,
-    useEffect, 
-    useRef 
-} from "react";
-import { 
-    LayoutResult 
-} from "../engine/layout.engine";
-import { 
-    Theme, 
-    defaultTheme 
-} from "./theme";
-import { 
-    drawLayoutToCanvas 
-} from "./canvas.core";
-
-export type Canvas2DProps =
-{
-  result  : LayoutResult;
-  theme?  : Theme;
-}
-export const Canvas2D = ( 
-                            { 
-                                result, 
-                                theme = defaultTheme 
-                            } : Canvas2DProps
-                        ) : JSX.Element => 
-                        {
-                            const ref : React.RefObject<HTMLCanvasElement | null> = useRef<HTMLCanvasElement | null>(null);
-                            const draw =    (
-                                                parent : HTMLElement,
-                                                cvs    : HTMLCanvasElement
-                                            ) : void => 
-                                            {
-                                                const dpr  : number                   = Math.max(
-                                                                                                    1, 
-                                                                                                        window.devicePixelRatio 
-                                                                                                    ||  1
-                                                                                                );
-                                                const rect : DOMRect                  = parent.getBoundingClientRect();
-                                                cvs.width                             = Math.max(
-                                                                                                    1, 
-                                                                                                    Math.round  (
-                                                                                                                        rect.width  
-                                                                                                                    *   dpr
-                                                                                                                )
-                                                                                                );
-                                                cvs.height                            = Math.max(
-                                                                                                    1, 
-                                                                                                    Math.round  (
-                                                                                                                        rect.height 
-                                                                                                                    *   dpr
-                                                                                                                )
-                                                                                                );
-                                                const ctx  : CanvasRenderingContext2D = cvs.getContext("2d")!;
-                                                ctx.setTransform(
-                                                                    dpr, 
-                                                                    0, 
-                                                                    0, 
-                                                                    dpr, 
-                                                                    0, 
-                                                                    0
-                                                                );
-                                                drawLayoutToCanvas  (
-                                                                        ctx, 
-                                                                        result, 
-                                                                        theme
-                                                                    );
-                                            }
-                            useEffect   (
-                                            () : (() => void) => 
-                                            {
-                                                const cvs       : HTMLCanvasElement = ref.current!;
-                                                const parent    : HTMLElement       = cvs.parentElement!;
-                                                const ro        : ResizeObserver    = new ResizeObserver(
-                                                                                                            () : void => 
-                                                                                                                draw(parent, cvs)
-                                                                                                        );
-                                                ro.observe(parent);
-                                                draw(
-                                                        parent, 
-                                                        cvs
-                                                    );
-                                                return  () : void => 
-                                                            ro.disconnect();
-                                            }, 
-                                            [
-                                                result, 
-                                                theme
-                                            ]
-                                        );
-
-                            return  <canvas style   =   {
-                                                            { 
-                                                                position    : "absolute", 
-                                                                inset       : 0, 
-                                                                width       : "100%", 
-                                                                height      : "100%", 
-                                                                display     : "block" 
-                                                            }
-                                                        } 
-                                            ref     =   {
-                                                            ref
-                                                        } 
-                                    />;
-                        }
-
-
-```
-
-### src/components/adapters/canvas.core.ts
-
-``` ts
-import { 
-    LayoutResult 
-} from "../engine/layout.engine";
-import { 
-    Shapes, 
-    Vector 
-} from "../geometry";
-import { 
-    Theme, 
-    defaultTheme 
-} from "./theme";
-
-export const MAX_DEPTH      = 1_000;
-export const finite_loop    =   (
-                                    f : () => boolean
-                                ) : void => 
-                                {
-                                    let i : number = 1;
-                                    for (
-                                            let keepGoing : boolean = true; 
-                                            i <= MAX_DEPTH && keepGoing; 
-                                            i++, keepGoing = f()
-                                        );
-                                    if(i === MAX_DEPTH)
-                                    {
-                                        throw new Error("Maximum depth exceeded");
-                                    }
-                                        
-                                }
-
-export const depthOf =  (
-                            box     : Shapes.Box, 
-                            boxes   : LayoutResult["boxes"]
-                        ) : number => 
-                        {
-                            let     d           : number     = 0
-                            const   boxesBox    : Shapes.Box = boxes[box.id];
-                            if(boxesBox.parentId === undefined)
-                            {
-                                return d;
-                            }
-                            let p : string = boxesBox.parentId;
-                            finite_loop(
-                                            () => 
-                                            {
-                                                d++;
-                                                const boxesBox      : Shapes.Box = boxes[p];
-                                                const parentBoxID   :  string | undefined = boxesBox.parentId;
-                                                if(parentBoxID === undefined)
-                                                {
-                                                    return false;
-                                                }
-                                                p = parentBoxID;
-                                                return true;
-                                            }
-                                        );
-                            return d;
-                        }
-
-export const drawLayoutToCanvas =   (
-                                        ctx     : CanvasRenderingContext2D,
-                                        result  : LayoutResult,
-                                        theme   : Theme = defaultTheme
-                                    ) : void => 
-                                    {
-                                        const   { 
-                                                    width, 
-                                                    height 
-                                                } 
-                                                : 
-                                                { 
-                                                    width   : number, 
-                                                    height  : number 
-                                                } = ctx.canvas;
-
-                                        // background
-                                        ctx.save();
-                                        ctx.fillStyle   = theme.canvas.bg;
-                                        ctx.fillRect(
-                                                        0, 
-                                                        0, 
-                                                        width, 
-                                                        height
-                                                    );
-                                        ctx.restore();
-
-                                        // wires first (under boxes)
-                                        ctx.save();
-                                        ctx.strokeStyle = theme.wire.stroke;
-                                        ctx.lineWidth   = theme.wire.width;
-                                        for (const w of result.wires) 
-                                        {
-                                            const a : Shapes.Box = result.boxes[w.source];
-                                            const b : Shapes.Box = result.boxes[w.target];
-                                            if (!a || !b) 
-                                            {
-                                                continue;
-                                            }
-                                            const va : Vector = a
-                                                                    .size
-                                                                    .halve()
-                                                                    .add(a.getPosition());
-                                            const vb : Vector = b
-                                                                    .size
-                                                                    .halve()
-                                                                    .add(b.getPosition());
-                                            ctx.beginPath   ();
-                                            ctx.moveTo      (
-                                                                va.x, 
-                                                                va.y
-                                                            );
-                                            ctx.lineTo      (
-                                                                vb.x, 
-                                                                vb.y
-                                                            );
-                                            ctx.stroke      ();
-                                        }
-                                        ctx.restore();
-
-                                        // draw boxes sorted by depth (parents under children)
-                                        const sorted = Object
-                                                        .values (result.boxes)
-                                                        .sort   (
-                                                                    (
-                                                                        A : Shapes.Box, 
-                                                                        B : Shapes.Box
-                                                                    ) : number =>
-                                                                        depthOf(A, result.boxes) 
-                                                                    -   depthOf(B, result.boxes)
-                                                                );
-
-                                        ctx.save();
-                                        ctx.font            = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-                                        ctx.textAlign       = "center";
-                                        ctx.textBaseline    = "middle";
-                                        for (const b of sorted) 
-                                        {
-                                            const r         : number            = theme.node.radius;
-                                            const rectangle : Shapes.Rectangle  = new Shapes.Rectangle  (
-                                                                                                            b.getSize(), 
-                                                                                                            b.getPosition()
-                                                                                                        );
-                                            const center    : Vector            = b.getPosition().add(b.getSize().halve());
-
-                                            ctx.beginPath();
-                                            roundedRect (
-                                                            ctx, 
-                                                            rectangle, 
-                                                            r
-                                                        );
-                                            ctx.fillStyle   = theme.node.bg;
-                                            ctx.fill();
-                                            ctx.strokeStyle = theme.node.border;
-                                            ctx.lineWidth = 1;
-                                            ctx.stroke();
-
-                                            ctx.fillStyle = theme.node.text;
-                                            ctx.fillText(
-                                                            b.id, 
-                                                            center.x, 
-                                                            center.y
-                                                        );
-                                        }
-                                        ctx.restore();
-                                    }
-
-const roundedRect = (
-                                        ctx         : CanvasRenderingContext2D,
-                                        rectangle   : Shapes.Rectangle, 
-                                        r           : number
-                    ) : void => 
-                    {
-                        const size              : Vector    = rectangle.getSize();
-                        const position          : Vector    = rectangle.getPosition();
-                        const rr                : number    = Math.min  (
-                                                                            r, 
-                                                                            size
-                                                                                .halve()
-                                                                                .min()
-                                                                        );
-                        const sizeAndPosition   : Vector    = size.add(position);
-                        ctx.moveTo  (
-                                        position.x + rr, 
-                                        position.y
-                                    );
-                        ctx.arcTo   (
-                                        sizeAndPosition.x, 
-                                        position.y, 
-                                        sizeAndPosition.x, 
-                                        sizeAndPosition.y, 
-                                        rr
-                                    );
-                        ctx.arcTo   (
-                                        sizeAndPosition.x, 
-                                        sizeAndPosition.y, 
-                                        position.x, 
-                                        sizeAndPosition.y, 
-                                        rr
-                                    );
-                        ctx.arcTo   (
-                                        position.x, 
-                                        sizeAndPosition.y, 
-                                        position.x, 
-                                        position.y, 
-                                        rr
-                                    );
-                        ctx.arcTo   (
-                                        position.x, 
-                                        position.y, 
-                                        sizeAndPosition.x, 
-                                        position.y, 
-                                        rr
-                                    );
-                        ctx.closePath();
-                    }
-
-```
-
-### src/components/adapters/canvas.vanilla.ts
-
-``` ts
-import { 
-    LayoutResult 
-} from "../engine/computeLayout";
-import { 
-    drawLayoutToCanvas 
-} from "./canvas.core";
-import { 
-    Theme, 
-    defaultTheme 
-} from "./theme";
-
-export type CanvasMount = 
-{
-    update  : (r: LayoutResult  ) => void;
-    destroy : (                 ) => void;
-};
-
-export const mountCanvas2D =    (
-                                    container   : HTMLElement,
-                                    initial     : LayoutResult,
-                                    theme       : Theme         = defaultTheme
-                                ) : CanvasMount => 
-                                {
-                                    const canvas : HTMLCanvasElement    = document.createElement("canvas");
-                                    canvas.style.position               = "absolute";
-                                    canvas.style.inset                  = "0";
-                                    canvas.style.width                  = "100%";
-                                    canvas.style.height                 = "100%";
-                                    container.appendChild(canvas);
-
-                                    const draw =    (r: LayoutResult) : void => 
-                                                    {
-                                                        const dpr   : number                    = Math.max  (
-                                                                                                                1, 
-                                                                                                                    window.devicePixelRatio 
-                                                                                                                ||  1
-                                                                                                            );
-                                                        const rect  : DOMRect                   = canvas.getBoundingClientRect();
-                                                        canvas.width                            = Math.max  (
-                                                                                                                1, 
-                                                                                                                Math.round  (
-                                                                                                                                    rect.width  
-                                                                                                                                *   dpr
-                                                                                                                            )
-                                                                                                            );
-                                                        canvas.height                           = Math.max  (
-                                                                                                                1, 
-                                                                                                                Math.round  (
-                                                                                                                                    rect.height 
-                                                                                                                                *   dpr
-                                                                                                                            )
-                                                                                                            );
-                                                        const ctx   : CanvasRenderingContext2D  = canvas.getContext("2d")!;
-                                                        ctx.setTransform(
-                                                                            dpr, 
-                                                                            0,
-                                                                            0, 
-                                                                            dpr, 
-                                                                            0, 
-                                                                            0
-                                                                        );
-                                                        drawLayoutToCanvas  (
-                                                                                ctx, 
-                                                                                r, 
-                                                                                theme
-                                                                            );
-                                                    };
-
-                                    draw(initial);
-
-                                    const ro : ResizeObserver = new ResizeObserver(() => draw(initial));
-                                    ro.observe(container);
-
-                                    return  {
-                                                update  :   draw,
-                                                destroy :   () : void => 
-                                                            {
-                                                                ro.disconnect();
-                                                                container.removeChild(canvas);
-                                                            }
-                                            };
-                                }
 
 ```
 
@@ -582,210 +133,410 @@ export type AdapterConfig =
 ### src/components/adapters/factory.ts
 
 ``` ts
-import React, { JSX, ReactElement } from "react";
-import { 
-    AdapterConfig, 
-    Framework, 
-    Target 
-} from "./env";
-import { 
-    runLayoutAPI, 
-    RunLayoutApiInput
-} from "./api.adapter";
-import { 
-    Canvas2D, 
-    Canvas2DProps
-} from "./canvas.adapter";
-import { 
-    AbsoluteDOM, 
-    AbsoluteDOMProps
-} from "./react-dom.adapter";
-import { 
-    LayoutView, 
-    ReactAdapterProps
-} from "./react-view.adapter";
-import { 
-    CanvasMount,
-    mountCanvas2D 
-} from "./canvas.vanilla";
-import { 
-    DOMMount,
-    mountAbsoluteDOM 
-} from "./vanilla-dom.adapter";
-import { 
-    LayoutResult 
-} from "../layout/engine/layout.engine";
 // factory.ts
+// - Adds makeTargetAdapter returning the new TargetAdapter using PortKind
+// - Keeps existing getAdapter/makeRenderer exports for backwards-compat
+
+import React, { JSX, ReactElement } from "react";
+import { AdapterConfig, Framework, Target } from "./env";
+import { runLayoutAPI, RunLayoutApiInput } from "./ports/api/api.adapter";
+import { Canvas2D, Canvas2DProps } from "./ports/react/canvas.react.adapter";
+import { AbsoluteDOM, AbsoluteDOMProps } from "./ports/react/dom.react.adapter";
+import { LayoutView, ReactAdapterProps } from "./ports/react/react-view.adapter";
+import { CanvasMount, mountCanvas2D } from "./ports/vanilla/canvas.vanilla";
+import { DOMMount, mountAbsoluteDOM } from "./ports/vanilla/dom.vanilla.adapter";
+import { LayoutResultEx } from "../layout/engine/layout.engine";
+import { PortKind, TargetAdapter as NewTargetAdapter } from "./ports/ports";
+
+// --- legacy Renderer + factories (unchanged API) -----------------------------
 
 export type Renderer =
-    | { kind : Target.API                                              }
-    | { kind : Target.DOM                                              }
-    | { kind : Target.Canvas                                           }
-    | { kind : Framework.React   , Component : React.ComponentType<any>}
-    | { kind : Target.ReactFlow  , Component : React.ComponentType<any>};
+  | { kind: Target.API }
+  | { kind: Target.DOM }
+  | { kind: Target.Canvas }
+  | { kind: Framework.React; Component: React.ComponentType<any> }
+  | { kind: Target.ReactFlow; Component: React.ComponentType<any> };
 
-export const makeRenderer = (
-                                target : Target
-                            ) : Renderer => 
-                            {
-                                switch (target) 
-                                {
-                                    case Target.API:    return  { 
-                                                                    kind       : Target.API 
-                                                                };
-                                    case Target.DOM:    return  { 
-                                                                    kind        : Target.DOM 
-                                                                };
-                                    case Target.Canvas      : return  { 
-                                                                    kind        : Target.Canvas 
-                                                                };
-                                    case Target.ReactFlow   : return   { 
-                                                                        kind        : Target.ReactFlow, 
-                                                                        Component   : LayoutView 
-                                                                    };
-                                    case Target.ThreeJS:
-                                    default:            return  { 
-                                                                    kind        : Framework.React, 
-                                                                    Component   : LayoutView 
-                                                                };
-                                }
-                            }
+export const makeRenderer = (target: Target): Renderer => {
+  switch (target) {
+    case Target.API:
+      return { kind: Target.API };
+    case Target.DOM:
+      return { kind: Target.DOM };
+    case Target.Canvas:
+      return { kind: Target.Canvas };
+    case Target.ReactFlow:
+      return { kind: Target.ReactFlow, Component: LayoutView };
+    case Target.ThreeJS:
+    default:
+      return { kind: Framework.React, Component: LayoutView };
+  }
+};
 
+export type GetAdapterReturnRunLayoutAPI = {
+  kind: Target.API;
+  run: (input: RunLayoutApiInput) => LayoutResultEx;
+};
 
-/**
- * getAdapter(cfg)
- * - For React: returns { kind: 'react', render: (props) => ReactElement }
- * - For Vanilla: returns { kind: 'vanilla', mount(container, initial) => { update, destroy } }
- * - For API: returns { kind: 'api', run(root, modes, nodeSize, spacing) => LayoutResult }
- */
-export type GetAdapterReturnRunLayoutAPI = 
-{
-    kind            :   Target.API,
-    run             :   (
-                            input   : RunLayoutApiInput
-                        ) => LayoutResult
+export type GetAdapterReturnReact = {
+  kind: Framework.React;
+  render: (props: Canvas2DProps) => ReactElement;
+};
+
+export type GetAdapterReturnVanillaCanvas = {
+  kind: Target.Canvas;
+  mount: (container: HTMLElement, initial: LayoutResultEx) => CanvasMount;
+};
+
+export type GetAdapterReturnVanillaDOM = {
+  kind: Target.DOM;
+  mount: (container: HTMLElement, initial: LayoutResultEx) => DOMMount;
+};
+
+export type GetAdapterReturnReactFlow = {
+  kind: Target.ReactFlow;
+  render: (props: ReactAdapterProps) => ReactElement;
+};
+
+export type GetAdapterReturn =
+  | GetAdapterReturnRunLayoutAPI
+  | GetAdapterReturnReact
+  | GetAdapterReturnVanillaCanvas
+  | GetAdapterReturnVanillaDOM
+  | GetAdapterReturnReactFlow;
+
+export const getAdapter = (cfg: AdapterConfig): GetAdapterReturn => {
+  switch (cfg.target) {
+    case Target.API:
+      return { kind: Target.API, run: runLayoutAPI };
+
+    case Target.Canvas:
+      if (cfg.framework === Framework.React) {
+        return {
+          kind: Framework.React,
+          render: (props: Canvas2DProps): ReactElement => React.createElement(Canvas2D, props),
+        };
+      } else {
+        return { kind: Target.Canvas, mount: mountCanvas2D };
+      }
+
+    case Target.DOM:
+      if (cfg.framework === Framework.React) {
+        return {
+          kind: Framework.React,
+          render: (props: AbsoluteDOMProps): JSX.Element => React.createElement(AbsoluteDOM, props),
+        };
+      } else {
+        return { kind: Target.DOM, mount: mountAbsoluteDOM };
+      }
+
+    case Target.ReactFlow:
+      return {
+        kind: Target.ReactFlow,
+        render: (props: ReactAdapterProps): JSX.Element =>
+          React.createElement(LayoutView, { ...props, kind: Target.ReactFlow }),
+      };
+
+    case Target.ThreeJS:
+      throw new Error("ThreeJS adapter not implemented yet.");
+
+    default:
+      throw new Error(`Unsupported target: ${cfg.target}`);
+  }
+};
+
+// --- NEW: clean TargetAdapter using PortKind --------------------------------
+
+export function makeTargetAdapter(cfg: AdapterConfig): NewTargetAdapter {
+  switch (cfg.target) {
+    case Target.API:
+      return {
+        target: Target.API,
+        port: { kind: PortKind.API, run: runLayoutAPI },
+      };
+    case Target.DOM:
+      if (cfg.framework === Framework.React) {
+        return {
+          target: Target.DOM,
+          port: { kind: PortKind.React, component: AbsoluteDOM },
+        };
+      } else {
+        return {
+          target: Target.DOM,
+          port: {
+            kind: PortKind.Vanilla,
+            mount: (container, initial) => mountAbsoluteDOM(container, initial),
+          },
+        };
+      }
+    case Target.Canvas:
+      if (cfg.framework === Framework.React) {
+        return {
+          target: Target.Canvas,
+          port: { kind: PortKind.React, component: Canvas2D },
+        };
+      } else {
+        return {
+          target: Target.Canvas,
+          port: {
+            kind: PortKind.Vanilla,
+            mount: (container, initial) => mountCanvas2D(container, initial),
+          },
+        };
+      }
+    case Target.ReactFlow:
+      return {
+        target: Target.ReactFlow,
+        port: { kind: PortKind.React, component: LayoutView },
+      };
+    default:
+      throw new Error(`Unsupported target: ${cfg.target}`);
+  }
 }
-
-export type GetAdapterReturnReact = 
-{
-    kind   :    Framework.React,
-    render :    (
-                    props   : Canvas2DProps
-                ) => ReactElement
-}
-
-export type GetAdapterReturnVanillaCanvas = 
-{
-    kind   :    Target.Canvas,
-    mount  :    (
-                    container   : HTMLElement,
-                    initial     : LayoutResult
-                ) => CanvasMount
-}
-
-export type GetAdapterReturnVanillaDOM = 
-{
-    kind   :    Target.DOM,
-    mount  :    (
-                    container   : HTMLElement,
-                    initial     : LayoutResult
-                ) => DOMMount
-}
-
-export type GetAdapterReturnReactFlow = 
-{
-    kind   :    Target.ReactFlow,
-    render :    (
-                    props   : ReactAdapterProps
-                ) => ReactElement
-}
-
-export type GetAdapterReturn =      GetAdapterReturnRunLayoutAPI 
-                                |   GetAdapterReturnReact
-                                |   GetAdapterReturnVanillaCanvas
-                                |   GetAdapterReturnVanillaDOM
-                                |   GetAdapterReturnReactFlow
-export const getAdapter =   (
-                                cfg : AdapterConfig
-                            ) : GetAdapterReturn => 
-                            {
-                                switch (cfg.target) 
-                                {
-                                    case Target.API:
-                                        return  { 
-                                                    kind    : Target.API, 
-                                                    run     : runLayoutAPI 
-                                                };
-
-                                    case Target.Canvas:
-                                        if (cfg.framework === Framework.React) 
-                                        {
-                                            return  { 
-                                                        kind    :   Framework.React, 
-                                                        render  :   (props : Canvas2DProps) : ReactElement => 
-                                                                        React.createElement (
-                                                                                                Canvas2D, 
-                                                                                                props
-                                                                                            ) 
-                                                    };
-                                        } 
-                                        else 
-                                        {
-                                            return  { 
-                                                        kind    : Target.Canvas, 
-                                                        mount   : mountCanvas2D 
-                                                    };
-                                        }
-
-                                case Target.DOM:
-                                    if (cfg.framework === Framework.React) 
-                                    {
-                                        return  { 
-                                                    kind    : Framework.React, 
-                                                    render  :   (
-                                                                    props   : AbsoluteDOMProps
-                                                                ) : JSX.Element => 
-                                                                    React.createElement (
-                                                                                            AbsoluteDOM, 
-                                                                                            props
-                                                                                        ) 
-                                                };
-                                    } 
-                                    else 
-                                    {
-                                        return  { 
-                                                    kind    : Target.DOM, 
-                                                    mount   : mountAbsoluteDOM 
-                                                };
-                                    }
-
-                                case Target.ReactFlow:
-                                    // React only – reuse <LayoutView kind="reactflow" />
-                                    return  {
-                                                kind    : Target.ReactFlow,
-                                                render  :   (
-                                                                props   : ReactAdapterProps
-                                                            ) : JSX.Element => 
-                                                                React.createElement (
-                                                                                        LayoutView, 
-                                                                                        {
-                                                                                            ...props,
-                                                                                            kind    : Target.ReactFlow,
-                                                                                        }
-                                                                                    ),
-                                        };
-
-                                case Target.ThreeJS:
-                                    throw new Error("ThreeJS adapter not implemented yet.");
-
-                                default:
-                                    throw new Error(`Unsupported target: ${cfg.target}`);
-                                }
-                            }
 
 ```
 
-### src/components/adapters/r3f.adapter.tsx
+### src/components/adapters/ports/api/api.adapter.ts
+
+``` ts
+import { LayoutResultEx, ModeMap, LayoutEngine } from "../../../layout/engine/layout.engine";
+import { Vector } from "../../../geometry";
+import { NodeConfig } from "../../../graph";
+
+export type RunLayoutApiInput = {
+  root: NodeConfig;
+  modes: ModeMap;
+  nodeSize: Vector;
+  spacing: number;
+};
+
+const engine = new LayoutEngine();
+
+export const runLayoutAPI = ({ root, modes, nodeSize, spacing }: RunLayoutApiInput): LayoutResultEx =>
+  engine.compute({ root, modes, nodeSize, spacing });
+
+```
+
+### src/components/adapters/ports/ports.ts
+
+``` ts
+// ports.ts
+// - Cleanly separates PortKind from Target
+// - No magic string literals in your codebase
+
+import React from "react";
+import { RunLayoutApiInput } from "./api/api.adapter";
+import { LayoutResultEx } from "../../layout/engine/layout.engine";
+import { Target } from "../env";
+
+export enum PortKind {
+  API = "api",
+  React = "react",
+  Vanilla = "vanilla",
+}
+
+export type ApiPort = { kind: PortKind.API; run: (input: RunLayoutApiInput) => LayoutResultEx };
+export type ReactPort = { kind: PortKind.React; component: React.ComponentType<any> };
+export type VanillaPort = {
+  kind: PortKind.Vanilla;
+  mount: (
+    container: HTMLElement,
+    initial: LayoutResultEx
+  ) => { update(r: LayoutResultEx): void; destroy(): void };
+};
+
+export type Port = ApiPort | ReactPort | VanillaPort;
+
+export type TargetAdapter =
+  | { target: Target.API; port: ApiPort }
+  | { target: Target.DOM | Target.Canvas | Target.ReactFlow; port: ReactPort | VanillaPort };
+
+```
+
+### src/components/adapters/ports/react/canvas.react.adapter.tsx
+
+``` tsx
+import { JSX, useEffect, useRef } from "react";
+import { LayoutResult } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
+import { CanvasRenderer2D } from "../../targets/canvas.core";
+
+export type Canvas2DProps = {
+  result: LayoutResult;
+  theme?: Theme;
+  /** enable partial redraw when new results come in */
+  partial?: boolean;
+};
+
+export const Canvas2D = ({ result, theme = defaultTheme, partial = true }: Canvas2DProps): JSX.Element => {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const rendererRef = useRef<CanvasRenderer2D | null>(null);
+
+  const resizeAndRedraw = (parent: HTMLElement, cvs: HTMLCanvasElement): void => {
+    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
+    const rect = parent.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width * dpr));
+    const h = Math.max(1, Math.round(rect.height * dpr));
+    if (cvs.width !== w || cvs.height !== h) {
+      cvs.width = w; cvs.height = h;
+      const ctx = cvs.getContext("2d")!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // after size change, do a full draw to avoid artifacts
+      rendererRef.current?.fullDraw(result);
+    }
+  };
+
+  useEffect(() => {
+    const cvs = ref.current!;
+    const parent = cvs.parentElement!;
+    // initial DPR + renderer
+    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
+    const rect = parent.getBoundingClientRect();
+    cvs.width = Math.max(1, Math.round(rect.width * dpr));
+    cvs.height = Math.max(1, Math.round(rect.height * dpr));
+    const ctx = cvs.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    rendererRef.current = new CanvasRenderer2D(cvs, theme);
+    rendererRef.current.fullDraw(result);
+
+    const ro = new ResizeObserver(() => resizeAndRedraw(parent, cvs));
+    ro.observe(parent);
+
+    return () => {
+      ro.disconnect();
+      rendererRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount once
+
+  // theme/result updates
+  useEffect(() => {
+    if (!rendererRef.current) return;
+    rendererRef.current.setTheme(theme);
+    rendererRef.current.update(result, { partial });
+  }, [result, theme, partial]);
+
+  return (
+    <canvas
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
+      ref={ref}
+    />
+  );
+};
+
+```
+
+### src/components/adapters/ports/react/dom.react.adapter.tsx
+
+``` tsx
+import { JSX } from "react/jsx-dev-runtime";
+import { LayoutResult } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
+
+export type AbsoluteDOMProps = {
+  result: LayoutResult;
+  theme?: Theme;
+};
+
+export function AbsoluteDOM({ result, theme = defaultTheme }: AbsoluteDOMProps): JSX.Element {
+  const all = result.boxes;
+  const boxes = Object.values(all).sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id));
+
+  const lines = result.wires.map((w) => {
+    const a = result.boxes[w.source];
+    const b = result.boxes[w.target];
+    if (!a || !b) return null;
+    const A = a.getPosition().add(a.getSize().halve());
+    const B = b.getPosition().add(b.getSize().halve());
+    return (
+      <line
+        key={`${w.source}-${w.target}`}
+        x1={A.x}
+        y1={A.y}
+        x2={B.x}
+        y2={B.y}
+        stroke={theme.wire.stroke}
+        strokeWidth={theme.wire.width}
+      />
+    );
+  });
+
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      <svg style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{lines}</svg>
+      {boxes.map((b) => (
+        <div
+          key={b.id}
+          data-parent={b.parentId ?? ""}
+          style={{
+            position: "absolute",
+            left: b.getPosition().x,
+            top: b.getPosition().y,
+            width: b.getSize().x,
+            height: b.getSize().y,
+            border: `1px solid ${theme.node.border}`,
+            borderRadius: theme.node.radius,
+            background: theme.node.bg,
+            boxSizing: "border-box",
+            fontSize: theme.node.fontSize,
+            color: theme.node.text,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            userSelect: "none",
+          }}
+        >
+          {b.id}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+```
+
+### src/components/adapters/ports/react/react-flow.react.adapter.ts
+
+``` ts
+import type { CSSProperties } from "react";
+import type { Node, Edge } from "reactflow";
+import { Vector } from "../../../geometry";
+import { LayoutResultEx } from "../../../layout/engine/layout.engine";
+
+const nodeStyle = (v: Vector): CSSProperties => ({
+  width: v.x,
+  height: v.y,
+  border: "1px solid #cbd5e1",
+  borderRadius: 10,
+  background: "#fff",
+  fontSize: 12,
+  boxSizing: "border-box" as const,
+});
+
+export type toReactFlowReturn = { nodes: Node[]; edges: Edge[] };
+
+export function toReactFlow({ boxes, wires }: LayoutResultEx): toReactFlowReturn {
+  const nodes: Node[] = Object.values(boxes).map((b) => {
+    const rel: Vector = b.parentId ? b.getPosition().subtract(boxes[b.parentId].getPosition()) : b.getPosition();
+
+    const base: Node = {
+      id: b.id,
+      position: rel,
+      data: { label: b.id },
+      style: nodeStyle(b.size),
+    };
+
+    return b.parentId ? { ...base, parentNode: b.parentId, extent: "parent" } : base;
+  });
+
+  const edges: Edge[] = wires.map((w) => ({ id: `${w.source}-${w.target}`, source: w.source, target: w.target }));
+  return { nodes, edges };
+}
+
+```
+
+### src/components/adapters/ports/react/react-three-fiber.react.adapter.tsx
 
 ``` tsx
 // TODO: Implement React-Three-Fiber <Canvas> wrapper and map boxes->meshes.
@@ -796,286 +547,512 @@ export function R3FView()
 
 ```
 
-### src/components/adapters/react-dom.adapter.tsx
-
-``` tsx
-import { 
-    JSX 
-} from "react/jsx-dev-runtime";
-import { 
-    LayoutResult 
-} from "../engine/layout.engine";
-import { 
-    Theme, 
-    defaultTheme 
-} from "./theme";
-import { 
-    depthOf 
-} from "./canvas.core";
-
-
-export type AbsoluteDOMProps = 
-{
-    result: LayoutResult;
-    theme?: Theme;
-}
-export function AbsoluteDOM (
-                                { 
-                                    result, 
-                                    theme   = defaultTheme 
-                                } : AbsoluteDOMProps
-                            ) : JSX.Element 
-                            {
-                                const all   = result.boxes;
-                                const boxes = Object
-                                                .values (all)
-                                                .sort   (
-                                                            (a, b) => 
-                                                                    depthOf(a, all) 
-                                                                -   depthOf(b, all)
-                                                        );
-
-                                const lines = result
-                                                .wires
-                                                .map(
-                                                        (w) => 
-                                                        {
-                                                            const a = result.boxes[w.source];
-                                                            const b = result.boxes[w.target];
-                                                            if (!a || !b) 
-                                                            {
-                                                                return null;
-                                                            }
-                                                            const A = a.getPosition().add(a.getSize().halve());
-                                                            const B = b.getPosition().add(b.getSize().halve());
-                                                            return (
-                                                                <line
-                                                                    key         =   {`${w.source}-${w.target}`}
-                                                                    x1          =   {A.x} 
-                                                                    y1          =   {A.y} 
-                                                                    x2          =   {B.x} 
-                                                                    y2          =   {B.y}
-                                                                    stroke      =   {theme.wire.stroke} 
-                                                                    strokeWidth =   {theme.wire.width}
-                                                                />
-                                                            );
-                                                        });
-
-                                return (
-                                    <div style  =   {
-                                                        { 
-                                                            position    : "absolute", 
-                                                            inset       : 0 
-                                                        }
-                                                    }
-                                    >
-                                        <svg style  =   {
-                                                            { 
-                                                                position        : "absolute", 
-                                                                inset           : 0, 
-                                                                pointerEvents   : "none" 
-                                                            }
-                                                        }
-                                        >
-                                            {lines}
-                                        </svg>
-                                        {
-                                            boxes.map(
-                                                        (b) => 
-                                                        (
-                                                            <div
-                                                                key             =   {b.id}
-                                                                data-parent     =   {b.parentId ?? ""}
-                                                                style           =   {{
-                                                                                        position        : "absolute",
-                                                                                        left            : b.getPosition().x, 
-                                                                                        top             : b.getPosition().y,
-                                                                                        width           : b.getSize().x, 
-                                                                                        height          : b.getSize().y,
-                                                                                        border          : `1px solid ${theme.node.border}`,
-                                                                                        borderRadius    : theme.node.radius,
-                                                                                        background      : theme.node.bg,
-                                                                                        boxSizing       : "border-box",
-                                                                                        fontSize        : theme.node.fontSize,
-                                                                                        color           : theme.node.text,
-                                                                                        display         : "flex",
-                                                                                        alignItems      : "center",
-                                                                                        justifyContent  : "center",
-                                                                                        userSelect      : "none",
-                                                                                    }}
-                                                            >
-                                                                {b.id}
-                                                            </div>
-                                                        )
-                                                    )
-                                        }
-                                    </div>
-                                );
-                            }
-
-```
-
-### src/components/adapters/react-flow.adapter.ts
-
-``` ts
-import type { 
-    CSSProperties 
-} from "react";
-import type { 
-    Node, 
-    Edge 
-} from "reactflow";
-import { 
-    LayoutResult 
-} from "../engine/layout.engine";
-import { 
-    Vector 
-} from "../geometry";
-
-const nodeStyle =   (
-                        v : Vector
-                    ) : CSSProperties => 
-                    ({
-                        width           : v.x,
-                        height          : v.y,
-                        border          : "1px solid #cbd5e1",
-                        borderRadius    : 10,
-                        background      : "#fff",
-                        fontSize        : 12,
-                        boxSizing       : "border-box" as const,
-                    });
-export type toReactFlowReturn = 
-{
-    nodes   : Node[]; 
-    edges   : Edge[];
-};
-export function toReactFlow (
-                                { 
-                                    boxes, 
-                                    wires 
-                                }: LayoutResult
-                            ) : toReactFlowReturn 
-                            {
-                                const nodes : Node[] = Object
-                                                            .values (boxes)
-                                                            .map    (
-                                                                        (b) => 
-                                                                        {
-                                                                            const rel   : Vector    =   b.parentId
-                                                                                                            ?   b.getPosition().subtract(boxes[b.parentId].getPosition())
-                                                                                                            :   b.getPosition();
-
-                                                                            const base  : Node  = 
-                                                                            {
-                                                                                id          :   b.id,
-                                                                                position    :   rel,
-                                                                                data        :   { 
-                                                                                                    label   : b.id 
-                                                                                                },
-                                                                                style       :   nodeStyle   (
-                                                                                                                b.size
-                                                                                                            ),
-                                                                            };
-
-                                                                            return  b.parentId
-                                                                                        ?   { 
-                                                                                                ...base, 
-                                                                                                parentNode  : b.parentId, 
-                                                                                                extent      : "parent"
-                                                                                            }
-                                                                                        :   base;
-                                                                        }
-                                                                    );
-
-                                const edges :   Edge[]  =   wires
-                                                                .map(
-                                                                        (w) => 
-                                                                        ({ 
-                                                                            id      : `${w.source}-${w.target}`, 
-                                                                            source  : w.source, 
-                                                                            target  : w.target 
-                                                                        })
-                                                                    );
-                                return  { 
-                                            nodes, 
-                                            edges 
-                                        };
-                            }
-
-```
-
-### src/components/adapters/react-view.adapter.tsx
+### src/components/adapters/ports/react/react-view.adapter.tsx
 
 ``` tsx
 import { JSX, useMemo } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
-import { LayoutResult } from "../engine/layout.engine";
-import { toReactFlow } from "./react-flow.adapter";
-import { AbsoluteDOM } from "./react-dom.adapter";
-import { Canvas2D } from "./canvas.adapter";
-import { Theme, defaultTheme } from "./theme";
-import { Target } from "./env";
+import { Target } from "../../env";
+import { LayoutResultEx } from "../../../layout/engine/layout.engine";
+import { defaultTheme, Theme } from "../../theme";
+import { toReactFlow } from "./react-flow.react.adapter";
+import { Canvas2D } from "./canvas.react.adapter";
+import { AbsoluteDOM } from "./dom.react.adapter";
 
-
-export type ReactAdapterProps = 
-{
-    kind    : Target;
-    result  : LayoutResult;
-    theme?  : Theme;
+export type ReactAdapterProps = {
+  kind: Target;
+  result: LayoutResultEx;
+  theme?: Theme;
 };
 
-export const LayoutView =   (
-                                {
-                                    kind, 
-                                    result, 
-                                    theme = defaultTheme,
-                                } : ReactAdapterProps
-                            ) : JSX.Element => 
-                            {
-                                if (kind === Target.ReactFlow) 
-                                {
-                                    const   { 
-                                                nodes, 
-                                                edges 
-                                            } = useMemo (
-                                                            () => 
-                                                                toReactFlow(result), 
-                                                            [
-                                                                result
-                                                            ]
-                                                        );
-                                    return (
-                                        <div 
-                                            style   =   {
-                                                            { 
-                                                                position    : "absolute", 
-                                                                inset       : 0 
-                                                            }
-                                                        }
-                                        >
-                                            <ReactFlow 
-                                                nodes   =   {nodes} 
-                                                edges   =   {edges} 
-                                                fitView
-                                            >
-                                                <Background gap =   {16} />
-                                                <Controls />
-                                            </ReactFlow>
-                                        </div>
-                                    );
-                                }
-                                if (kind === Target.Canvas) 
-                                {
-                                    return  <Canvas2D 
-                                                result  =   {result} 
-                                                theme   =   {theme} 
-                                            />;
-                                }
-                                return  <AbsoluteDOM 
-                                            result  =   {result} 
-                                            theme   =   {theme} 
-                                        />;
-                            }
+export const LayoutView = ({ kind, result, theme = defaultTheme }: ReactAdapterProps): JSX.Element => {
+  if (kind === Target.ReactFlow) {
+    const { nodes, edges } = useMemo(() => toReactFlow(result), [result]);
+    return (
+      <div style={{ position: "absolute", inset: 0 }}>
+        <ReactFlow nodes={nodes} edges={edges} fitView>
+          <Background gap={16} />
+          <Controls />
+        </ReactFlow>
+      </div>
+    );
+  }
+  if (kind === Target.Canvas) return <Canvas2D result={result} theme={theme} />;
+  return <AbsoluteDOM result={result} theme={theme} />;
+};
+
+```
+
+### src/components/adapters/ports/vanilla/canvas.vanilla.ts
+
+``` ts
+import { LayoutResultEx } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
+import { CanvasRenderer2D } from "../../targets/canvas.core";
+
+export type CanvasMount = {
+  update: (r: LayoutResultEx, opts?: { partial?: boolean }) => void;
+  destroy: () => void;
+};
+
+export const mountCanvas2D = (
+  container: HTMLElement,
+  initial: LayoutResultEx,
+  theme: Theme = defaultTheme
+): CanvasMount => {
+  const canvas: HTMLCanvasElement = document.createElement("canvas");
+  Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
+  container.appendChild(canvas);
+
+  // initial sizing + DPR
+  const dpr: number = Math.max(1, (window.devicePixelRatio as number) || 1);
+  const rect: DOMRect = container.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const ctx = canvas.getContext("2d")!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const renderer = new CanvasRenderer2D(canvas, theme);
+  renderer.fullDraw(initial);
+
+  const ro: ResizeObserver = new ResizeObserver(() => {
+    const rr = container.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rr.width * dpr));
+    const h = Math.max(1, Math.round(rr.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      const c = canvas.getContext("2d")!;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      renderer.fullDraw(initial);
+    }
+  });
+  ro.observe(container);
+
+  return {
+    update: (r, opts) => renderer.update(r, { partial: opts?.partial ?? true }),
+    destroy: () => {
+      ro.disconnect();
+      container.removeChild(canvas);
+    },
+  };
+};
+
+```
+
+### src/components/adapters/ports/vanilla/dom.vanilla.adapter.ts
+
+``` ts
+import { LayoutResult, LayoutResultEx } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
+
+export type DOMMount = {
+  update: (r: LayoutResultEx) => void;
+  destroy: () => void;
+};
+
+const draw =    (
+                    {
+                        r,
+                        root,
+                        svg,
+                        svgNS,
+                        theme
+                    } : {
+                        r : LayoutResult,
+                        root : HTMLElement,
+                        svg : SVGElement,
+                        svgNS : string,
+                        theme : Theme,
+                    }
+                ) : void => 
+{
+    // clear
+    root
+        .querySelectorAll("[data-node]")
+        .forEach(n => n.remove());
+    
+    while (svg.firstChild) 
+    {
+        svg.removeChild(svg.firstChild);
+    }
+
+    // wires
+    for (const w of r.wires) 
+    {
+        const a = r.boxes[w.source];
+        const b = r.boxes[w.target];
+        if (!a || !b) 
+        {
+            continue;
+        }
+        const A = a.getPosition().add(a.getSize().halve());
+        const B = b.getPosition().add(b.getSize().halve());
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", String(A.x));
+        line.setAttribute("y1", String(A.y));
+        line.setAttribute("x2", String(B.x));
+        line.setAttribute("y2", String(B.y));
+        line.setAttribute("stroke", theme.wire.stroke);
+        line.setAttribute("stroke-width", String(theme.wire.width));
+        svg.appendChild(line);
+    }
+
+    // nodes
+    for (const box of Object.values(r.boxes)) 
+    {
+        const element               = document.createElement("div");
+        element.dataset.node        = box.id;
+        const style                 = element.style;
+        style.position              = "absolute";
+        style.left                  = `${box.getPosition().x}px`;
+        style.top                   = `${box.getPosition().y}px`;
+        style.width                 = `${box.getSize().x}px`;
+        style.height                = `${box.getSize().y}px`;
+        style.border                = `1px solid ${theme.node.border}`;
+        style.borderRadius          = `${theme.node.radius}px`;
+        style.background            = theme.node.bg;
+        style.boxSizing             = "border-box";
+        style.fontSize              = `${theme.node.fontSize}px`;
+        style.color                 = theme.node.text;
+        style.display               = "flex";
+        style.alignItems            = "center";
+        style.justifyContent        = "center";
+        (style as any).userSelect   = "none"; // TS dom lib sometimes misses this
+        element.textContent         = box.id;
+        root.appendChild(element);
+    }
+};
+
+export const mountAbsoluteDOM = (
+                                    container   : HTMLElement,
+                                    initial     : LayoutResult,
+                                    theme       : Theme = defaultTheme
+                                ) : DOMMount => 
+{
+    const root          : HTMLDivElement = document.createElement("div");
+    root.style.position = "relative";
+    root.style.width    = "100%";
+    root.style.height   = "100%";
+    container.appendChild(root);
+
+    const svgNS : string        = "http://www.w3.org/2000/svg";
+    const svg   : SVGElement    = document.createElementNS(svgNS, "svg") as SVGElement;
+    Object.assign   (
+                        svg.style, 
+                        { 
+                            position        : "absolute", 
+                            inset           : "0", 
+                            pointerEvents   : "none" 
+                        }
+                    );
+    root.appendChild(svg);
+
+    draw(
+            {
+                r: initial,
+                root,
+                svg,
+                svgNS,
+                theme
+            }
+        );
+
+    return  {
+                update  :   (r : LayoutResult) => 
+                                draw(
+                                        {
+                                            r,
+                                            root,
+                                            svg,
+                                            svgNS,
+                                            theme
+                                        }
+                                    ),
+                destroy :   () => 
+                                container.removeChild(root),
+            };
+}
+
+```
+
+### src/components/adapters/ports/vanilla/threejs.vanilla.adapter.ts
+
+``` ts
+// TODO: Implement Three.js scene graph binding for boxes + wires.
+// Placeholder to keep the target shape consistent.
+export function mountThreeJS() 
+{
+    throw new Error("Three.js adapter not implemented yet.");
+}
+
+```
+
+### src/components/adapters/targets/canvas.core.ts
+
+``` ts
+// canvas.core.ts
+// - full draw (kept): drawLayoutToCanvas
+// - new: CanvasRenderer2D with dirty-rect partial redraw (clip wires + boxes)
+// - stable z-order via (depth,id)
+
+import { LayoutResult } from "../../layout/engine/layout.engine";
+import { Shapes, Vector } from "../../geometry";
+import { Theme, defaultTheme } from "../theme";
+
+/* ----------------------- public full draw (unchanged api) ------------------ */
+export const drawLayoutToCanvas = (
+  ctx: CanvasRenderingContext2D,
+  result: LayoutResult,
+  theme: Theme = defaultTheme
+): void => {
+  const { width, height } = ctx.canvas;
+  paintBackground(ctx, theme, 0, 0, width, height);
+  drawWires(ctx, result, theme);
+  drawBoxes(ctx, result, theme);
+};
+
+/* ----------------------------- CanvasRenderer2D ----------------------------- */
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+export class CanvasRenderer2D {
+  private ctx: CanvasRenderingContext2D;
+  private prev: LayoutResult | null = null;
+  private theme: Theme;
+
+  constructor(private canvas: HTMLCanvasElement, theme: Theme = defaultTheme) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2D context not available");
+    this.ctx = ctx;
+    this.theme = theme;
+  }
+
+  setTheme(theme: Theme): void {
+    this.theme = theme;
+  }
+
+  /** Ensure DPR/size; call this after you size+transform the canvas in your adapter. */
+  fullDraw(result: LayoutResult): void {
+    drawLayoutToCanvas(this.ctx, result, this.theme);
+    this.prev = result;
+  }
+
+  update(next: LayoutResult, opts: { partial?: boolean } = {}): void {
+    const partial = opts.partial ?? true;
+    if (!partial || !this.prev) {
+      this.fullDraw(next);
+      return;
+    }
+
+    const dirty = diffDirtyRect(this.prev, next, 2); // 2px pad
+    if (!dirty) {
+      // nothing material changed
+      this.prev = next;
+      return;
+    }
+
+    const area = this.canvas.width * this.canvas.height;
+    const dirtyArea = dirty.w * dirty.h;
+    // heuristic: large changes → cheaper to full redraw
+    if (dirtyArea / Math.max(1, area) > 0.6) {
+      this.fullDraw(next);
+      return;
+    }
+
+    // clear + background for dirty region
+    paintBackground(this.ctx, this.theme, dirty.x, dirty.y, dirty.w, dirty.h);
+
+    // redraw wires clipped to dirty rect
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(dirty.x, dirty.y, dirty.w, dirty.h);
+    this.ctx.clip();
+    drawWires(this.ctx, next, this.theme);
+    this.ctx.restore();
+
+    // redraw boxes intersecting dirty rect in correct z-order
+    drawBoxesInRect(this.ctx, next, this.theme, dirty);
+
+    this.prev = next;
+  }
+}
+
+/* ----------------------------- drawing helpers ----------------------------- */
+
+function paintBackground(
+  ctx: CanvasRenderingContext2D,
+  theme: Theme,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void {
+  ctx.save();
+  ctx.fillStyle = theme.canvas.bg;
+  ctx.fillRect(x, y, Math.max(0, w), Math.max(0, h));
+  ctx.restore();
+}
+
+function drawWires(ctx: CanvasRenderingContext2D, result: LayoutResult, theme: Theme): void {
+  ctx.save();
+  ctx.strokeStyle = theme.wire.stroke;
+  ctx.lineWidth = theme.wire.width;
+  for (const w of result.wires) {
+    const a = result.boxes[w.source];
+    const b = result.boxes[w.target];
+    if (!a || !b) continue;
+    const va: Vector = a.size.halve().add(a.getPosition());
+    const vb: Vector = b.size.halve().add(b.getPosition());
+    ctx.beginPath();
+    ctx.moveTo(va.x, va.y);
+    ctx.lineTo(vb.x, vb.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBoxes(ctx: CanvasRenderingContext2D, result: LayoutResult, theme: Theme): void {
+  const sorted = Object.values(result.boxes).sort(
+    (A, B) => A.depth - B.depth || A.id.localeCompare(B.id)
+  );
+
+  ctx.save();
+  ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const b of sorted) {
+    drawOneBox(ctx, b, theme);
+  }
+  ctx.restore();
+}
+
+function drawBoxesInRect(
+  ctx: CanvasRenderingContext2D,
+  result: LayoutResult,
+  theme: Theme,
+  r: Rect
+): void {
+  const sorted = Object.values(result.boxes).sort(
+    (A, B) => A.depth - B.depth || A.id.localeCompare(B.id)
+  );
+
+  ctx.save();
+  ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const b of sorted) {
+    if (intersects(rectOfBox(b), r)) drawOneBox(ctx, b, theme);
+  }
+  ctx.restore();
+}
+
+function drawOneBox(
+  ctx: CanvasRenderingContext2D,
+  b: Shapes.Box,
+  theme: Theme
+): void {
+  const r = theme.node.radius;
+  const rectangle = new Shapes.Rectangle(b.getSize(), b.getPosition());
+  const center: Vector = b.getPosition().add(b.getSize().halve());
+
+  ctx.beginPath();
+  roundedRect(ctx, rectangle, r);
+  ctx.fillStyle = theme.node.bg;
+  ctx.fill();
+  ctx.strokeStyle = theme.node.border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = theme.node.text;
+  ctx.fillText(b.id, center.x, center.y);
+}
+
+function roundedRect(ctx: CanvasRenderingContext2D, rectangle: Shapes.Rectangle, r: number): void {
+  const size: Vector = rectangle.getSize();
+  const position: Vector = rectangle.getPosition();
+  const rr: number = Math.min(r, size.halve().min());
+  const sizeAndPosition: Vector = size.add(position);
+  ctx.moveTo(position.x + rr, position.y);
+  ctx.arcTo(sizeAndPosition.x, position.y, sizeAndPosition.x, sizeAndPosition.y, rr);
+  ctx.arcTo(sizeAndPosition.x, sizeAndPosition.y, position.x, sizeAndPosition.y, rr);
+  ctx.arcTo(position.x, sizeAndPosition.y, position.x, position.y, rr);
+  ctx.arcTo(position.x, position.y, sizeAndPosition.x, position.y, rr);
+  ctx.closePath();
+}
+
+/* ------------------------------- diff helpers ------------------------------ */
+
+function rectOfBox(b: Shapes.Box): Rect {
+  const p = b.getPosition();
+  const s = b.getSize();
+  return { x: p.x, y: p.y, w: s.x, h: s.y };
+}
+function union(a: Rect | null, b: Rect): Rect {
+  if (!a) return { ...b };
+  const x1 = Math.min(a.x, b.x);
+  const y1 = Math.min(a.y, b.y);
+  const x2 = Math.max(a.x + a.w, b.x + b.w);
+  const y2 = Math.max(a.y + a.h, b.y + b.h);
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+}
+function inflate(r: Rect, pad: number): Rect {
+  return { x: r.x - pad, y: r.y - pad, w: r.w + 2 * pad, h: r.h + 2 * pad };
+}
+function intersects(a: Rect, b: Rect): boolean {
+  return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+}
+function lineBounds(a: Vector, b: Vector, pad = 1): Rect {
+  const x1 = Math.min(a.x, b.x), y1 = Math.min(a.y, b.y);
+  const x2 = Math.max(a.x, b.x), y2 = Math.max(a.y, b.y);
+  return inflate({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, pad);
+}
+
+function diffDirtyRect(prev: LayoutResult, next: LayoutResult, pad = 0): Rect | null {
+  let dirty: Rect | null = null;
+  const ids = new Set<string>([...Object.keys(prev.boxes), ...Object.keys(next.boxes)]);
+
+  // box moves/resizes/add/removes
+  for (const id of ids) {
+    const A = prev.boxes[id];
+    const B = next.boxes[id];
+    if (!A && B) { dirty = union(dirty, inflate(rectOfBox(B), pad)); continue; }
+    if (A && !B) { dirty = union(dirty, inflate(rectOfBox(A), pad)); continue; }
+    if (A && B) {
+      const ra = rectOfBox(A);
+      const rb = rectOfBox(B);
+      if (ra.x !== rb.x || ra.y !== rb.y || ra.w !== rb.w || ra.h !== rb.h) {
+        dirty = union(union(dirty, inflate(ra, pad)), inflate(rb, pad));
+      }
+    }
+  }
+
+  // wire changes due to moved endpoints (cheap superset: any wire connected to a changed box)
+  if (dirty) {
+    const changed = new Set<string>();
+    for (const id of ids) {
+      const A = prev.boxes[id], B = next.boxes[id];
+      if (!!A !== !!B) { changed.add(id); continue; }
+      if (A && B) {
+        const ra = rectOfBox(A), rb = rectOfBox(B);
+        if (ra.x !== rb.x || ra.y !== rb.y || ra.w !== rb.w || ra.h !== rb.h) changed.add(id);
+      }
+    }
+    for (const w of next.wires) {
+      if (changed.has(w.source) || changed.has(w.target)) {
+        const a = next.boxes[w.source]; const b = next.boxes[w.target];
+        if (a && b) {
+          const ca = a.size.halve().add(a.getPosition());
+          const cb = b.size.halve().add(b.getPosition());
+          dirty = union(dirty, lineBounds(ca, cb, pad + 1));
+        }
+      }
+    }
+  }
+
+  return dirty ? inflate(dirty, pad) : null;
+}
 
 ```
 
@@ -1119,130 +1096,37 @@ export const defaultTheme : Theme = {
 
 ```
 
-### src/components/adapters/three.adapter.ts
+### src/components/brand.ts
 
 ``` ts
-// TODO: Implement Three.js scene graph binding for boxes + wires.
-// Placeholder to keep the target shape consistent.
-export function mountThreeJS() 
-{
-    throw new Error("Three.js adapter not implemented yet.");
+// brand.ts
+// Generic, reusable branding for ANY type (Vector, ids, enums, etc.)
+
+export const kBrand = Symbol("brand");
+
+export type Brand<Name extends string> = { readonly [kBrand]: Name };
+export type Branded<T, Name extends string> = T & Brand<Name>;
+
+// Attach a non-enumerable runtime brand for debugging; erases at type-level into an opaque type.
+export function brand<T, Name extends string>(value: T, name: Name): Branded<T, Name> {
+    try { Object.defineProperty(value as object, kBrand, { value: name, enumerable: false }); } catch {}
+    return value as Branded<T, Name>;
+}
+export function brandOf(v: unknown): string | undefined {
+    try { return (v as any)?.[kBrand] as string | undefined; } catch { return undefined; }
+}
+export function isBranded<Name extends string>(v: unknown, name: Name): boolean {
+    return brandOf(v) === name;
 }
 
-```
+// Common opaque aliases you can adopt progressively (no breaking changes required)
+export type NodeId   = Branded<string, "NodeId">;
+export type EdgeId   = Branded<string, "EdgeId">;
+export type LayoutId = Branded<string, "LayoutId">;
 
-### src/components/adapters/vanilla-dom.adapter.ts
-
-``` ts
-import { 
-    LayoutResult 
-} from "../engine/computeLayout";
-import { 
-    Theme, 
-    defaultTheme 
-} from "./theme";
-
-export type DOMMount = 
-{ 
-    update  :   (
-                    r : LayoutResult
-                ) => void; 
-    destroy :   () => void 
-};
-
-export const mountAbsoluteDOM = (
-                                    container   : HTMLElement,
-                                    initial     : LayoutResult,
-                                    theme       : Theme = defaultTheme
-                                ) : DOMMount => 
-                                {
-                                    const root          : HTMLDivElement = document.createElement("div");
-                                    root.style.position = "relative";
-                                    root.style.width    = "100%";
-                                    root.style.height   = "100%";
-                                    container.appendChild(root);
-
-                                    const svgNS : string        = "http://www.w3.org/2000/svg";
-                                    const svg   : SVGElement    = document.createElementNS(svgNS, "svg") as SVGElement;
-                                    Object.assign   (
-                                                        svg.style, 
-                                                        { 
-                                                            position        : "absolute", 
-                                                            inset           : "0", 
-                                                            pointerEvents   : "none" 
-                                                        }
-                                                    );
-                                    root.appendChild(svg);
-
-                                    const draw =    (
-                                                        r : LayoutResult
-                                                    ) : void => 
-                                                    {
-                                                        // clear
-                                                        root
-                                                            .querySelectorAll("[data-node]")
-                                                            .forEach(n => n.remove());
-                                                        
-                                                        while (svg.firstChild) 
-                                                        {
-                                                            svg.removeChild(svg.firstChild);
-                                                        }
-
-                                                        // wires
-                                                        for (const w of r.wires) 
-                                                        {
-                                                            const a = r.boxes[w.source];
-                                                            const b = r.boxes[w.target];
-                                                            if (!a || !b) 
-                                                            {
-                                                                continue;
-                                                            }
-                                                            const A = a.getPosition().add(a.getSize().halve());
-                                                            const B = b.getPosition().add(b.getSize().halve());
-                                                            const line = document.createElementNS(svgNS, "line");
-                                                            line.setAttribute("x1", String(A.x));
-                                                            line.setAttribute("y1", String(A.y));
-                                                            line.setAttribute("x2", String(B.x));
-                                                            line.setAttribute("y2", String(B.y));
-                                                            line.setAttribute("stroke", theme.wire.stroke);
-                                                            line.setAttribute("stroke-width", String(theme.wire.width));
-                                                            svg.appendChild(line);
-                                                        }
-
-                                                        // nodes
-                                                        for (const b of Object.values(r.boxes)) 
-                                                        {
-                                                            const el                = document.createElement("div");
-                                                            el.dataset.node         = b.id;
-                                                            const s                 = el.style;
-                                                            s.position              = "absolute";
-                                                            s.left                  = `${b.getPosition().x}px`;
-                                                            s.top                   = `${b.getPosition().y}px`;
-                                                            s.width                 = `${b.getSize().x}px`;
-                                                            s.height                = `${b.getSize().y}px`;
-                                                            s.border                = `1px solid ${theme.node.border}`;
-                                                            s.borderRadius          = `${theme.node.radius}px`;
-                                                            s.background            = theme.node.bg;
-                                                            s.boxSizing             = "border-box";
-                                                            s.fontSize              = `${theme.node.fontSize}px`;
-                                                            s.color                 = theme.node.text;
-                                                            s.display               = "flex";
-                                                            s.alignItems            = "center";
-                                                            s.justifyContent        = "center";
-                                                            (s as any).userSelect   = "none"; // TS dom lib sometimes misses this
-                                                            el.textContent          = b.id;
-                                                            root.appendChild(el);
-                                                        }
-                                                    };
-
-                                    draw(initial);
-
-                                    return  {
-                                                update  :   draw,
-                                                destroy :   () => 
-                                                                container.removeChild(root),
-                                            };
-                                }
+export const asNodeId   = (s: string): NodeId   => brand(s, "NodeId");
+export const asEdgeId   = (s: string): EdgeId   => brand(s, "EdgeId");
+export const asLayoutId = (s: string): LayoutId => brand(s, "LayoutId");
 
 ```
 
@@ -1297,6 +1181,31 @@ export class Config<T extends Record<string, any>>
 }
 ```
 
+### src/components/errors.ts
+
+``` ts
+// errors.ts
+export type ErrorCode =
+    | "LIMIT_MAX_DEPTH"
+    | "LIMIT_MAX_NODES"
+    | "LIMIT_MAX_CHILDREN"
+    | "LIMIT_MAX_EDGES"
+    | "INVALID_CONFIG";
+
+export class LayoutError extends Error {
+    constructor(public code: ErrorCode, message: string, public readonly details?: Record<string, unknown>) {
+        super(message);
+        this.name = "LayoutError";
+    }
+}
+export class LimitError extends LayoutError {
+    constructor(code: Exclude<ErrorCode, "INVALID_CONFIG">, message: string, details?: Record<string, unknown>) {
+        super(code, message, details);
+        this.name = "LimitError";
+    }
+}
+```
+
 ### src/components/geometry.sanity.test.ts
 
 ``` ts
@@ -1312,154 +1221,92 @@ console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
 ### src/components/geometry.ts
 
 ``` ts
-import { 
-    add, 
-    divide, 
-    multiply, 
-    subtract 
-} from "./math";
+// geometry.ts
+// Vector now uses the generic brand system (brand.ts). Brands are reusable globally.
 
-export enum Dimension 
-{
-    X = "x",
-    Y = "y"
-}
-export type Fold        =   (value  : number) => number;
-export type NestFold    =   (vector : Vector) => number;
-export type FoldWith    =   (
-                                value1 : number, 
-                                value2 : number
-                            ) => number;
-export type Reduce      =   (
-                                x : number, 
-                                y : number
-                            ) => number;
-export class Vector 
-{
-    constructor (
-                    public readonly x : number, 
-                    public readonly y : number
-                ) 
-    {
+import { add, divide, multiply, subtract } from "./math";
+import { brand, Branded } from "./brand";
 
-    }
-    public  reflect         =   (axis       : Dimension )   =>  axis === Dimension.X 
-                                                                    ? new Vector( this.x, -this.y) 
-                                                                    : new Vector(-this.x,  this.y);
-    public  scale           =   (factor     : number    )   =>  this.multiply   (Vector.scalar(factor));
-    public  sum             =   (                       )   =>  this.reduce     (add);
-    public  crossProduct    =   (vector     : Vector    )   =>  this.reflect    (Dimension.X)
-                                                                    .dotProduct (vector.swap());
-    public  normalize       =   (                       )   =>  this.scale      (1 / this.length());
-    public  length          =   (                       )   =>  Math.sqrt       (this.dotProduct(this)); // Math.hypot(this.x, this.y); is more numerically stable
-    public  round           =   (                       )   =>  this.map        (Math.round);
-    public  map             =   (f          : Fold      )   =>  this.fold       (f,f);
-    public  reduce          =   (f          : Reduce    )   =>  f               (this.x, this.y);
-    static  scalar          =   (scalar     : number    )   =>  new Vector      (scalar, scalar);
-    public  trig            =   (                       )   =>  this.fold       (Math.cos, Math.sin);
-    public  swap            =   (                       )   =>  new Vector      (this.y, this.x);
-    public  area            =   (                       )   =>  this.reduce     (multiply);
-    public  aspectRatio     =   (                       )   =>  this.reduce     (divide);
-    public  add             =   (vector     :   Vector  )   =>  this.mapWith    (add        , vector);
-    public  multiply        =   (vector     :   Vector  )   =>  this.mapWith    (multiply   , vector);
-    public  subtract        =   (vector     :   Vector  )   =>  this.mapWith    (subtract   , vector);
-    public  divide          =   (vector     :   Vector  )   =>  this.mapWith    (divide     , vector);
-    public  max             =   (                       )   =>  this.reduce     (Math.max);
-    public  min             =   (                       )   =>  this.reduce     (Math.min);
-    public  negate          =   (                       )   =>  this.scale      (-1);
-    public  halve           =   (                       )   =>  this.scale      (1 / 2);
-    public  dotProduct      =   (vector     :   Vector  )   =>  this.multiply   (vector)
-                                                                    .sum        ();
-    public  rotate          =   (radians    :   number  )   =>  Vector
-                                                                    .scalar     (radians)
-                                                                    .trig       ()
-                                                                    .nestFold   (
-                                                                                    (v : Vector) => v
-                                                                                                        .reflect(Dimension.X)
-                                                                                                        .multiply(this)
-                                                                                                        .sum(),
-                                                                                    (v : Vector) => v
-                                                                                                        .swap()
-                                                                                                        .multiply(this)
-                                                                                                        .sum()
-                                                                                );
-    public  clamp           =   (
-                                    min     : number = -Infinity, 
-                                    max     : number =  Infinity
-                                ) => this.map   (
-                                                    (x : number) => 
-                                                                    Math.min(
-                                                                                Math.max(
-                                                                                            x, 
-                                                                                            min
-                                                                                        ), 
-                                                                                max
-                                                                            )
-                                                );
-    public  nestFold        =   (   
-                                    left    : NestFold, 
-                                    right   : NestFold
-                                ) => new Vector (
-                                                    left(this), 
-                                                    right(this)
-                                                );
-    public  mapWith         =   (
-                                    f       : FoldWith, 
-                                    vector  : Vector
-                                ) => this.foldWith  (
-                                                        f, 
-                                                        f, 
-                                                        vector
-                                                    );
-    public  foldWith        =   (   
-                                    left    : FoldWith, 
-                                    right   : FoldWith, 
-                                    vector  : Vector
-                                ) => new Vector (
-                                                    left (this.x, vector.x), 
-                                                    right(this.y, vector.y)
-                                                );
-    public  fold            =   (
-                                    left    : Fold, 
-                                    right   : Fold
-                                ) => new Vector (
-                                                    left(this.x), 
-                                                    right(this.y)
-                                                );
+export type VectorBrand = "Any" | "Position" | "Size" | "Offset" | "Center";
+
+export enum Dimension { X = "x", Y = "y" }
+
+export type Fold = (value: number) => number;
+export type NestFold = (vector: Vector) => number;
+export type FoldWith = (value1: number, value2: number) => number;
+export type Reduce = (x: number, y: number) => number;
+
+export class Vector {
+  constructor(public readonly x: number, public readonly y: number) {}
+
+  public as<B extends VectorBrand>(b: B): Branded<Vector, B> {
+    // keep a debug runtime brand
+    return brand(this, b);
+  }
+  public asPosition() { return this.as("Position"); }
+  public asSize()     { return this.as("Size"); }
+  public asOffset()   { return this.as("Offset"); }
+  public asCenter()   { return this.as("Center"); }
+
+  public reflect = (axis: Dimension) => (axis === Dimension.X ? new Vector(this.x, -this.y) : new Vector(-this.x, this.y));
+  public scale = (factor: number) => this.multiply(Vector.scalar(factor));
+  public sum = () => this.reduce(add);
+  public crossProduct = (vector: Vector) => this.reflect(Dimension.X).dotProduct(vector.swap());
+  public normalize = () => this.scale(1 / this.length());
+  public length = () => Math.sqrt(this.dotProduct(this));
+  public round = () => this.map(Math.round);
+  public map = (f: Fold) => this.fold(f, f);
+  public reduce = (f: Reduce) => f(this.x, this.y);
+  static scalar = (scalar: number) => new Vector(scalar, scalar);
+  public trig = () => this.fold(Math.cos, Math.sin);
+  public swap = () => new Vector(this.y, this.x);
+  public area = () => this.reduce(multiply);
+  public aspectRatio = () => this.reduce(divide);
+  public add = (vector: Vector) => this.mapWith(add, vector);
+  public multiply = (vector: Vector) => this.mapWith(multiply, vector);
+  public subtract = (vector: Vector) => this.mapWith(subtract, vector);
+  public divide = (vector: Vector) => this.mapWith(divide, vector);
+  public max = () => this.reduce(Math.max);
+  public min = () => this.reduce(Math.min);
+  public negate = () => this.scale(-1);
+  public halve = () => this.scale(1 / 2);
+  public dotProduct = (vector: Vector) => this.multiply(vector).sum();
+  public rotate = (radians: number) =>
+    Vector.scalar(radians).trig().nestFold(
+      (v: Vector) => v.reflect(Dimension.X).multiply(this).sum(),
+      (v: Vector) => v.swap().multiply(this).sum()
+    );
+  public clamp = (min: number = -Infinity, max: number = Infinity) =>
+    this.map((x: number) => Math.min(Math.max(x, min), max));
+  public nestFold = (left: NestFold, right: NestFold) => new Vector(left(this), right(this));
+  public mapWith = (f: FoldWith, vector: Vector) => this.foldWith(f, f, vector);
+  public foldWith = (left: FoldWith, right: FoldWith, vector: Vector) =>
+    new Vector(left(this.x, vector.x), right(this.y, vector.y));
+  public fold = (left: Fold, right: Fold) => new Vector(left(this.x), right(this.y));
 }
 
-export namespace Shapes 
-{
-    export class Rectangle
-    {
-        constructor(
-            public size     : Vector,
-            public position : Vector
-        ) 
-        {
-
-        }
-        getPosition() : Vector 
-        {
-            return this.position;
-        }
-        getSize() : Vector 
-        {
-            return this.size;
-        }
+export namespace Shapes {
+  export class Rectangle {
+    constructor(public size: Vector, public position: Vector) {
+      this.size = size.as("Size");
+      this.position = position.as("Position");
     }
+    getPosition(): Branded<Vector, "Position"> { return this.position.as("Position"); }
+    getSize(): Branded<Vector, "Size"> { return this.size.as("Size"); }
+  }
 
-    export class Box extends Rectangle 
-    {
-        constructor(
-            public  id        : string,
-                    position  : Vector,
-                    size      : Vector,
-            public  parentId? : string,
-        ) {
-            super(size, position);
-        }
+  export class Box extends Rectangle {
+    constructor(
+      public id: string,
+      position: Vector,
+      size: Vector,
+      public parentId?: string,
+      public depth: number = 0
+    ) {
+      super(size, position);
     }
+    setDepth(d: number): this { this.depth = d; return this; }
+  }
 }
 
 ```
@@ -1514,327 +1361,510 @@ export type Edge =
 
 ```
 
+### src/components/iteration/iterate.ts
+
+``` ts
+// iteration/iterate.ts
+import { Logger } from "../logging";
+
+export type LimitAction = "throw" | "truncate" | "warn";
+
+export function enforceBound(
+    label: string,
+    count: number,
+    limit: number,
+    action: LimitAction,
+    log?: Logger
+): number {
+    if (count <= limit) return count;
+    const ctx = { label, count, limit, action };
+    switch (action) {
+        case "throw":
+            throw new Error(`${label}: limit ${limit} exceeded (count=${count})`);
+        case "warn":
+            log?.warn(`${label}: trimming to limit`, ctx);
+            return limit;
+        case "truncate":
+        default:
+            return limit;
+    }
+}
+
+export function timesBounded(
+    n: number,
+    limit: number,
+    action: LimitAction,
+    each: (i: number) => void,
+    log?: Logger,
+    label: string = "timesBounded"
+): number {
+    const k = enforceBound(label, n, limit, action, log);
+    for (let i = 0; i < k; i++) each(i);
+    return k;
+}
+
+export function mapIndexBounded<T>(
+    n: number,
+    limit: number,
+    action: LimitAction,
+    f: (i: number) => T,
+    log?: Logger,
+    label: string = "mapIndexBounded"
+): T[] {
+    const out: T[] = [];
+    timesBounded(n, limit, action, (i) => out.push(f(i)), log, label);
+    return out;
+}
+
+export function sliceBound<T>(arr: readonly T[], limit: number, action: LimitAction, log?: Logger, label = "sliceBound"): T[] {
+    const k = enforceBound(label, arr.length, limit, action, log);
+    return arr.slice(0, k);
+}
+
+//@tentative
+export function forEachBounded<T>(
+    arr: readonly T[],
+    limit: number,
+    action: LimitAction,
+    each: (item: T, i: number) => void,
+    log?: Logger,
+    label: string = "forEachBounded"
+): number {
+    const k = enforceBound(label, arr.length, limit, action, log);
+    for (let i = 0; i < k; i++) each(arr[i], i);
+    return k;
+}
+```
+
+### src/components/iteration/iteration.limits.ts
+
+``` ts
+// iteration/limits.ts
+// Hard bounds + policy everywhere (depth, nodes, children, edges, ops)
+import { Config } from "../config";
+import type { LimitAction } from "./iterate";
+
+export type IterationLimits = {
+  maxDepth: number;
+  maxNodes: number;
+  maxChildrenPerNode: number;
+  maxEdges: number;
+  maxOpsPerPass: number; // coarse fuse for any while/for you add later
+  onLimit: LimitAction;  // "throw" | "truncate" | "warn"
+};
+
+export const defaultIterationLimits: IterationLimits = {
+  maxDepth: 1000,
+  maxNodes: 5000,
+  maxChildrenPerNode: 1000,
+  maxEdges: 10000,
+  maxOpsPerPass: 100_000,
+  onLimit: "warn",
+};
+
+export const IterationConfig = new Config<IterationLimits>(defaultIterationLimits);
+
+/** Simple guardable loop if you need it somewhere ad-hoc. */
+export function boundedLoop(limit: number, body: (i: number) => boolean): void {
+  let i = 0;
+  for (; i < limit && body(i); i++);
+  if (i >= limit) throw new Error(`boundedLoop: limit ${limit} reached`);
+}
+
+```
+
 ### src/components/layout/engine/layout.engine.ts
 
 ``` ts
-import { 
-  Shapes,
-    Vector 
-} from "../../geometry";
-import { 
-    NodeConfig 
-} from "../../graph";
-import { 
-    LayoutTypes, 
-    LayoutChildrenMode 
-} from "../layout.enum";
+// layout.engine.ts
+// - DI logger + limits
+// - Bounds applied to depth, node count, children per node, edges
+// - Stable behavior under truncation; warnings via logger (default Noop)
+
+import { Shapes, Vector } from "../../geometry";
+import { NodeConfig } from "../../graph";
+import { LayoutTypes, LayoutChildrenMode } from "../layout.enum";
 import { LayoutConfigs } from "../layout.registry";
-import { 
-    Layout, 
-    NestedFramesReturn,
-    PlaceChildrenReturn
-} from "../layout";
-import { 
-    LayoutTuningConfig 
-} from "../layout.tuning";
-import { 
-    MappedGridItemData 
-} from "../strategies/grid/grid.mapped";
-import { 
-    GridItem 
-} from "../strategies/grid/grid";
+import { Layout, NestedFramesReturn } from "../layout";
+import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
+import { GridItem } from "../strategies/grid/grid";
+import { Config } from "../../config";
+import { IteratorsConfig, IteratorsSet } from "../iterator/iterator.registry";
+import { IterationConfig, IterationLimits } from "../../iteration/iteration.limits";
+import { ConsoleLogger, Logger, NoopLogger } from "../../logging";
+import { sliceBound } from "../../iteration/iterate";
 
-
+export type NodeId = string;
 export type ModeMap = Record<string, LayoutChildrenMode>;
+export type Wire = { source: NodeId; target: NodeId };
 
-export type Wire = 
-{ 
-    source  : string; 
-    target  : string 
+export type LayoutStats = {
+  nodeCount: number;
+  maxDepth: number;
+  bounds: Shapes.Rectangle;
+  overlaps?: Array<[NodeId, NodeId]>;
 };
 
-export type LayoutResult = 
-{ 
-    boxes   : Record<string, Shapes.Box>; 
-    wires   : Wire[] 
+export type LayoutResult = {
+  boxes: Record<NodeId, Shapes.Box>;
+  wires: Wire[];
 };
-export const computeLayout =    (
-                                    root        : NodeConfig,
-                                    modes       : ModeMap,
-                                    nodeSize    : Vector,
-                                    spacing     : number
-                                ) : LayoutResult =>
-{
-    const boxes: Record<string, Shapes.Box> = {};
+
+export type LayoutResultEx = LayoutResult & { stats: LayoutStats };
+
+export type ComputeParams = {
+  root: NodeConfig;
+  modes: ModeMap;
+  nodeSize: Vector; // treat as Size (caller may brand)
+  spacing: number;
+};
+
+export type EngineOptions = {
+  iterators?: Config<IteratorsSet>;
+  tuning?: Config<LayoutTuning>;
+  limits?: Config<IterationLimits>;
+  collectOverlaps?: boolean;
+  logger?: Logger;
+};
+
+export class LayoutEngine {
+  private readonly tuning: Config<LayoutTuning>;
+  private readonly iters: Config<IteratorsSet>;
+  private readonly limits: Config<IterationLimits>;
+  private readonly collectOverlaps: boolean;
+  private readonly log: Logger;
+
+  private nodeCount = 0;
+  private edgeCount = 0;
+
+  constructor(opts: EngineOptions = {}) {
+    this.tuning = opts.tuning ?? LayoutTuningConfig;
+    this.iters = opts.iterators ?? IteratorsConfig;
+    this.limits = opts.limits ?? IterationConfig;
+    this.collectOverlaps = !!opts.collectOverlaps;
+    this.log = opts.logger ?? new NoopLogger();
+  }
+
+  compute({ root, modes, nodeSize, spacing }: ComputeParams): LayoutResultEx {
+    this.nodeCount = 0;
+    this.edgeCount = 0;
+
+    const boxes: Record<NodeId, Shapes.Box> = {};
     const wires: Wire[] = [];
 
-    const place =   (
-                        node            : NodeConfig,
-                        level           : number,
-                        assigned?       : Shapes.Box,
-                        currentNodeSize : Vector = nodeSize,
-                        parent          : Shapes.Box | undefined = undefined
-                    ) : void  => 
-                    {
-                        const id        : string                = node.id;
-                        const mode      : LayoutChildrenMode    = modes[id] ?? LayoutChildrenMode.GRAPH;
-                        const chosen    : LayoutTypes           = resolveLayoutName (
-                                                                                        node, 
-                                                                                        node.layout ?? LayoutTypes.Grid
-                                                                                    );
-                        const strat     : Layout                = LayoutConfigs.get<LayoutTypes>(chosen);
+    this.placeNode({
+      node: root,
+      level: 0,
+      modes,
+      nodeSize,
+      spacing,
+      parentBox: undefined,
+      assigned: undefined,
+      boxes,
+      wires,
+    });
 
-                        // Resolve this node's box
-                        let   box       : Shapes.Box;
-                        if (assigned) 
-                        {
-                            box = assigned;
-                        } 
-                        else 
-                        {
-                            const size =
-                                mode === LayoutChildrenMode.GRAPH
-                                    ? currentNodeSize
-                                    : strat.preferredSize({
-                                        count       : (node.children ?? []).length,
-                                        nodeSize    : currentNodeSize,
-                                        spacing,
-                                        mode        : LayoutChildrenMode.NESTED,
-                                    });
-                            const tl = node.position ?? Vector.scalar(0);
-                            box = new Shapes.Box( 
-                                                    id, 
-                                                    tl, 
-                                                    size,
-                                                    parent?.id
-                                                );
-                        }
+    const stats = this.finalizeStats(boxes, this.collectOverlaps);
+    return { boxes, wires, stats };
+  }
 
-                        boxes[id] = box;
+  // --- Internal traversal ----------------------------------------------------
 
-                        const children = node.children ?? [];
-                        if (!children.length) 
-                        {
-                            return;
-                        }
+  private placeNode(args: {
+    node: NodeConfig;
+    level: number;
+    modes: ModeMap;
+    nodeSize: Vector;
+    spacing: number;
+    parentBox?: Shapes.Box;
+    assigned?: Shapes.Box;
+    boxes: Record<NodeId, Shapes.Box>;
+    wires: Wire[];
+  }): void {
+    const { node, level, modes, nodeSize, spacing, parentBox, assigned, boxes, wires } = args;
 
-                        if (mode === LayoutChildrenMode.NESTED) 
-                        {
-                            // children placed INSIDE this node’s box
-                            const pad           : number = LayoutTuningConfig.get("outerPad")(spacing);
-                            const inner         : Vector = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-                            const innerTL       : Vector = box.position.add(Vector.scalar(pad));
-                            const nextNodeSize  : Vector = currentNodeSize.scale(
-                                LayoutTuningConfig.get("nestedNodeScale")(level)
-                            );
+    const maxDepth = this.limits.get("maxDepth");
+    const policy = this.limits.get("onLimit");
+    if (level > maxDepth) {
+      this.log.warn("Max depth exceeded", { node: node.id, level, maxDepth });
+      return; // truncate rather than throw by default
+    }
 
-                            if (chosen === LayoutTypes.Grid) 
-                            {
-                                // Grid nested: cells hard-size children (independent of sliders)
-                                const frames : NestedFramesReturn = strat.nestedFrames  (  
-                                                                                            { 
-                                                                                                children, 
-                                                                                                parentSize  : inner, 
-                                                                                                spacing 
-                                                                                            }
-                                                                                        );
-                                for (const c of children) 
-                                {
-                                    const item  : GridItem<MappedGridItemData | undefined> = frames.grid.getItem(c.id);
-                                    const pos   : Vector = item.dimensions.getPosition();
-                                    const sz    : Vector = item.dimensions
-                                                                .getSize    ()
-                                                                .subtract   (Vector.scalar(2 * frames.ip))
-                                                                .clamp      (1, Infinity);
-                                    const childBox = new Shapes.Box (
-                                                                        c.id,
-                                                                        innerTL
-                                                                            .add(pos)
-                                                                            .add(Vector.scalar(frames.ip)),
-                                                                        sz,
-                                                                        box.id
-                                                                    );
-                                    place   (
-                                                c, 
-                                                level + 1, 
-                                                childBox, 
-                                                nextNodeSize,
-                                                box
-                                            ); // pass scaled base
-                                }
-                            } 
-                            else 
-                            {
-                                // Radial (or any center-based) nested
-                                // 1) get centers (uses nextNodeSize only)
-                                const centers : Record<string, Vector> = strat.placeChildren(
-                                                                                                {
-                                                                                                    mode        : LayoutChildrenMode.NESTED,
-                                                                                                    children, 
-                                                                                                    parent      : node,
-                                                                                                    origin      : inner.halve(),
-                                                                                                    level, 
-                                                                                                    nodeSize    : nextNodeSize, 
-                                                                                                    spacing, 
-                                                                                                    parentSize  : inner,
-                                                                                                }
-                                                                                            );
+    if (this.nodeCount >= this.limits.get("maxNodes")) {
+      this.log.warn("Max nodes reached, skipping remaining traversal", { maxNodes: this.limits.get("maxNodes") });
+      return;
+    }
 
-                                // 2) compute each child's *base* desired size (before global fit)
-                                const baseSizes : Record<string, Vector> = {};
-                                for (const c of children) 
-                                {
-                                    const childMode     : LayoutChildrenMode    = modes[c.id] ?? LayoutChildrenMode.GRAPH;
-                                    const childChosen   : LayoutTypes           = resolveLayoutName (   
-                                                                                                        c, 
-                                                                                                        c.layout ?? LayoutTypes.Grid
-                                                                                                    );
-                                    const childStrat    : Layout                = LayoutConfigs.get<LayoutTypes>(childChosen);
-                                    const sz : Vector = (childMode === LayoutChildrenMode.NESTED)
-                                                            ? childStrat.preferredSize  (
-                                                                                            {
-                                                                                                count       : (c.children ?? []).length,
-                                                                                                nodeSize    : nextNodeSize,
-                                                                                                spacing,
-                                                                                                mode        : LayoutChildrenMode.NESTED,
-                                                                                            }
-                                                                                        )
-                                                                        .scale          (
-                                                                                            LayoutTuningConfig
-                                                                                                .get("nestedContainerScale")
-                                                                                                (level)
-                                                                                        )
-                                                            : nextNodeSize;
-                                    baseSizes[c.id] = sz;
-                                }
-                    
-                                // 3) derive a *single* scale k that guarantees fit:
-                                //    - radial containment (half-diagonal inside ring)
-                                //    - tangential non-overlap (chord >= width)
-                                //    - global max-fraction of parent inner
-                                const n             : number = Math.max(1, children.length);
-                                const innerRadius   : number = inner.halve().min();
-                                const ip            : number = LayoutTuningConfig.get("itemPad")(spacing);
-                                // radius used by nestedRadialCenters (to keep consistent)
-                                const r             : number = Math.max(
-                                    LayoutTuningConfig.get("minRadius")(),
-                                    innerRadius - nextNodeSize.max() / 2 - ip
-                                );
-                                const theta         : number = (Math.PI * 2) / n;
-                                const chord         : number = 2 * r * Math.sin(theta / 2);
+    const id = node.id;
+    const mode: LayoutChildrenMode = modes[id] ?? LayoutChildrenMode.GRAPH;
+    const chosen: LayoutTypes = this.resolveLayoutName(node, node.layout ?? LayoutTypes.Grid);
+    const strat: Layout = LayoutConfigs.get<LayoutTypes>(chosen);
 
-                                let maxWidth        : number = 0;
-                                let maxHalfDiag     : number = 0;
-                                let maxSideForFrac  : number = 0;
-                                for (const c of children) 
-                                {
-                                    const sz : Vector   = baseSizes[c.id];
-                                    maxWidth            = Math.max(maxWidth, sz.x);
-                                    maxHalfDiag         = Math.max(maxHalfDiag, sz.length() / 2);
-                                    maxSideForFrac      = Math.max(maxSideForFrac, sz.max());
-                                }
-                                const fracMax       : number = LayoutTuningConfig.get("nestedChildMaxFraction")();
-                                const kRadial       : number = maxHalfDiag > 0 ? (r - ip) / maxHalfDiag : 1;
-                                const kTangential   : number = (n >= 2 && maxWidth > 0) ? (chord - ip) / maxWidth : 1;
-                                const kFraction     : number = maxSideForFrac > 0 ? ((innerRadius * 2) * fracMax) / maxSideForFrac : 1;
-                                let   k             : number = Math.min (
-                                                                            1, 
-                                                                            kRadial, 
-                                                                            kTangential, 
-                                                                            kFraction
-                                                                        );
-                                if (!isFinite(k) || k <= 0) 
-                                {
-                                    k = Math.min(
-                                                    1, 
-                                                    kFraction, 
-                                                    0.1
-                                                );
-                                }
-                    
-                                // 4) place scaled children
-                                for (const c of children) {
-                                    const p         : Vector = centers[c.id] ?? inner.scale(1 / 2);
-                                    const finalSize : Vector = baseSizes[c.id]
-                                                                .scale(k)
-                                                                .clamp(1, Infinity);
-                                    const tlChild   : Vector = innerTL
-                                                                .add(
-                                                                        p.subtract(finalSize.halve())
-                                                                    );
-                                    const childBox  : Shapes.Box = new Shapes.Box   (
-                                                                                        c.id, 
-                                                                                        tlChild, 
-                                                                                        finalSize,
-                                                                                        box.id
-                                                                                    );
-                                    place   (
-                                                c, 
-                                                level + 1, 
-                                                childBox, 
-                                                nextNodeSize,
-                                                box
-                                            );
-                                }
-                            }
-                        } else {
-                            // GRAPH mode: children outside; constant base node size from current level
-                            const centers : PlaceChildrenReturn = strat.placeChildren({
-                                mode: LayoutChildrenMode.GRAPH,
-                                children,
-                                parent: node,
-                                origin: box.position.add(box.size.scale(1 / 2)),
-                                level,
-                                nodeSize: currentNodeSize,
-                                spacing,
-                                parentSize: box.size,
-                            });
+    // Resolve this node's box (and set depth once)
+    let box: Shapes.Box;
+    if (assigned) {
+      box = assigned;
+      box.depth = level;
+    } else {
+      const size =
+        mode === LayoutChildrenMode.GRAPH
+          ? nodeSize
+          : strat.preferredSize({
+              count: (node.children ?? []).length,
+              nodeSize,
+              spacing,
+              mode: LayoutChildrenMode.NESTED,
+            });
+      const tl = (node.position ?? Vector.scalar(0)).as("Position");
+      box = new Shapes.Box(id, tl, size.as("Size"), parentBox?.id, level);
+    }
 
-                            for (const c of children) 
-                            {
-                                const cc        : Vector = centers[c.id];
-                                const tlChild   : Vector = cc.subtract(currentNodeSize.halve());
-                                const childBox  : Shapes.Box = new Shapes.Box   (
-                                                                                    c.id, 
-                                                                                    tlChild, 
-                                                                                    currentNodeSize,
-                                                                                    box.id
-                                                                                );
-                                wires.push  (
-                                                { 
-                                                    source  : id, 
-                                                    target  : c.id 
-                                                }
-                                            );
-                                place   (
-                                            c, 
-                                            level + 1, 
-                                            childBox, 
-                                            currentNodeSize,
-                                            box
-                                        );
-                            }
-                        }
-                    }
+    boxes[id] = box;
+    this.nodeCount++;
 
-    place   (
-                root, 
-                0, 
-                undefined, 
-                nodeSize,
-                undefined
-            );
-    return  { 
-                boxes, 
-                wires 
-            };
-};
-export const resolveLayoutName = (
-    node: NodeConfig,
-    fallback: LayoutTypes
-): LayoutTypes => node.layout && LayoutConfigs.get<LayoutTypes>(node.layout)
-        ? node.layout
-        : fallback;
+    const childrenRaw = node.children ?? [];
+    const children = sliceBound(
+      childrenRaw,
+      this.limits.get("maxChildrenPerNode"),
+      policy,
+      this.log,
+      "childrenPerNode"
+    );
+
+    if (!children.length) return;
+
+    if (mode === LayoutChildrenMode.NESTED) {
+      if (chosen === LayoutTypes.Grid) {
+        this.placeNestedGridChildren({
+          node,
+          children,
+          level,
+          nodeSize,
+          spacing,
+          parentBox: box,
+          strat,
+          modes,
+          boxes,
+          wires,
+        });
+      } else {
+        this.placeNestedRadialChildren({
+          node,
+          children,
+          level,
+          nodeSize,
+          spacing,
+          parentBox: box,
+          strat,
+          modes,
+          boxes,
+          wires,
+        });
+      }
+    } else {
+      // GRAPH mode: children outside; add wires
+      const centers = strat.placeChildren({
+        mode: LayoutChildrenMode.GRAPH,
+        children,
+        parent: node,
+        origin: box.position.add(box.size.scale(1 / 2)),
+        level,
+        nodeSize,
+        spacing,
+        parentSize: box.size,
+      });
+
+      for (const c of children) {
+        if (this.edgeCount >= this.limits.get("maxEdges")) {
+          this.log.warn("Max edges reached, remaining edges skipped", { maxEdges: this.limits.get("maxEdges") });
+          break;
+        }
+        const center = centers[c.id];
+        const tlChild = center.subtract(nodeSize.halve()).as("Position");
+        const childBox = new Shapes.Box(c.id, tlChild, nodeSize.as("Size"), box.id, level + 1);
+
+        wires.push({ source: id, target: c.id });
+        this.edgeCount++;
+
+        this.placeNode({
+          node: c,
+          level: level + 1,
+          modes,
+          nodeSize,
+          spacing,
+          parentBox: box,
+          assigned: childBox,
+          boxes,
+          wires,
+        });
+      }
+    }
+  }
+
+  private placeNestedGridChildren(args: {
+    node: NodeConfig;
+    children: NodeConfig[];
+    level: number;
+    nodeSize: Vector;
+    spacing: number;
+    parentBox: Shapes.Box;
+    strat: Layout;
+    modes: ModeMap;
+    boxes: Record<NodeId, Shapes.Box>;
+    wires: Wire[];
+  }): void {
+    const { children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
+
+    const pad = this.tuning.get("outerPad")(spacing);
+    const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
+    const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
+    const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
+
+    const frames: NestedFramesReturn = strat.nestedFrames({
+      children,
+      parentSize: inner,
+      spacing,
+    });
+
+    for (const c of children) {
+      const item: GridItem<any> = frames.grid.getItem(c.id);
+      const pos: Vector = item.dimensions.getPosition();
+      const sz: Vector = item.dimensions.getSize().subtract(Vector.scalar(2 * frames.ip)).clamp(1, Infinity);
+
+      const childBox = new Shapes.Box(
+        c.id,
+        innerTL.add(pos).add(Vector.scalar(frames.ip)).as("Position"),
+        sz.as("Size"),
+        parentBox.id,
+        parentBox.depth + 1
+      );
+
+      this.placeNode({
+        node: c,
+        level: parentBox.depth + 1,
+        modes,
+        nodeSize: nextNodeSize,
+        spacing,
+        parentBox,
+        assigned: childBox,
+        boxes,
+        wires,
+      });
+    }
+  }
+
+  private placeNestedRadialChildren(args: {
+    node: NodeConfig;
+    children: NodeConfig[];
+    level: number;
+    nodeSize: Vector;
+    spacing: number;
+    parentBox: Shapes.Box;
+    strat: Layout;
+    modes: ModeMap;
+    boxes: Record<NodeId, Shapes.Box>;
+    wires: Wire[];
+  }): void {
+    const { node, children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
+
+    const pad = this.tuning.get("outerPad")(spacing);
+    const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
+    const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
+    const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
+
+    const centers = strat.placeChildren({
+      mode: LayoutChildrenMode.NESTED,
+      children,
+      parent: node,
+      origin: inner.halve(),
+      level,
+      nodeSize: nextNodeSize,
+      spacing,
+      parentSize: inner,
+    });
+
+    for (const c of children) {
+      const p = centers[c.id] ?? inner.scale(1 / 2);
+      const childBox = new Shapes.Box(
+        c.id,
+        innerTL.add(p.subtract(nextNodeSize.halve())).as("Position"),
+        nextNodeSize.as("Size"),
+        parentBox.id,
+        parentBox.depth + 1
+      );
+
+      this.placeNode({
+        node: c,
+        level: parentBox.depth + 1,
+        modes,
+        nodeSize: nextNodeSize,
+        spacing,
+        parentBox,
+        assigned: childBox,
+        boxes,
+        wires,
+      });
+    }
+  }
+
+  // --- Helpers ---------------------------------------------------------------
+
+  private resolveLayoutName(node: NodeConfig, fallback: LayoutTypes): LayoutTypes {
+    return node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) ? node.layout : fallback;
+  }
+
+  private finalizeStats(boxes: Record<NodeId, Shapes.Box>, includeOverlaps: boolean): LayoutStats {
+    const ids = Object.keys(boxes);
+    const nodeCount = ids.length;
+
+    let maxDepth = 0;
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const id of ids) {
+      const b = boxes[id];
+      maxDepth = Math.max(maxDepth, b.depth);
+      const pos = b.getPosition();
+      const sz = b.getSize();
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x + sz.x);
+      maxY = Math.max(maxY, pos.y + sz.y);
+    }
+
+    if (!isFinite(minX)) {
+      minX = minY = maxX = maxY = 0;
+    }
+
+    const bounds = new Shapes.Rectangle(new Vector(maxX - minX, maxY - minY).as("Size"), new Vector(minX, minY).as("Position"));
+    const stats: LayoutStats = { nodeCount, maxDepth, bounds };
+
+    if (includeOverlaps) {
+      const overlaps: Array<[NodeId, NodeId]> = [];
+      for (let i = 0; i < ids.length; i++) {
+        const a = boxes[ids[i]];
+        const aPos = a.getPosition(); const aSz = a.getSize();
+        const aX2 = aPos.x + aSz.x; const aY2 = aPos.y + aSz.y;
+        for (let j = i + 1; j < ids.length; j++) {
+          const b = boxes[ids[j]];
+          const bPos = b.getPosition(); const bSz = b.getSize();
+          const bX2 = bPos.x + bSz.x; const bY2 = bPos.y + bSz.y;
+          const disjoint = aX2 <= bPos.x || bX2 <= aPos.x || aY2 <= bPos.y || bY2 <= aPos.y;
+          if (!disjoint) overlaps.push([a.id, b.id]);
+        }
+      }
+      stats.overlaps = overlaps;
+    }
+
+    return stats;
+  }
+}
+
+// Back-compat helper
+export const computeLayout = (root: NodeConfig, modes: ModeMap, nodeSize: Vector, spacing: number): LayoutResultEx =>
+  new LayoutEngine({ logger: new NoopLogger() }).compute({ root, modes, nodeSize, spacing });
 
 ```
 
@@ -1844,14 +1874,14 @@ export const resolveLayoutName = (
 import { Config } from "../../config";
 import { Iterator } from "./iterator.types";
 import { LayoutTypes } from "../layout.enum";
-import { buildIterators } from "./layout.iterators";
+import { buildIterators, IteratorsSet } from "./layout.iterators";
 
 export interface IteratorRegistry {
-  [LayoutTypes.Grid  ]: Iterator;
+  [LayoutTypes.Grid]: Iterator;
   [LayoutTypes.Radial]: Iterator;
-  // later: [LayoutTypes.Spiral]: Iterator;
 }
 export const IteratorsConfig = new Config<Record<keyof IteratorRegistry, Iterator>>(buildIterators());
+export type { IteratorsSet }; // re-export for convenience
 
 ```
 
@@ -2003,102 +2033,46 @@ import { Config } from "../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
 
 /** map unit [0,1]² → top-left rect (position + u * size). */
-export const mapToRect =    (
-                                u   : Vector, 
-                                r   : Shapes.Rectangle
-                            ) : Vector =>
-    r
-        .getPosition()
-        .add(u.multiply(r.getSize()));
+export const mapToRect = (u: Vector, r: Shapes.Rectangle): Vector =>
+  r.getPosition().add(u.multiply(r.getSize()));
 
 /** correct grid centers: ((col+.5)/cols, (row+.5)/rows) */
-export const gridUnit = (
-                            i       : number, 
-                            n       : number, 
-                            rowCol  : Vector
-                        ) : Vector => 
-{
-    const coordinates = rowCol.clamp(1, Infinity)
-    const cell = new Vector(
-        i % coordinates.x,
-        Math.floor(i / coordinates.x)
-    );
-    return cell.add(Vector.scalar(1/2)).divide(coordinates);
+export const gridUnit = (i: number, n: number, rowCol: Vector): Vector => {
+  const coordinates = rowCol.clamp(1, Infinity);
+  const cell = new Vector(i % coordinates.x, Math.floor(i / coordinates.x));
+  return cell.add(Vector.scalar(1 / 2)).divide(coordinates);
 };
 
-/** iterator registry */
-export type IteratorsSet = 
-{
-   [LayoutTypes.Grid]    : Iterator;  
-   [LayoutTypes.Radial]  : Iterator;
+export type IteratorsSet = {
+  [LayoutTypes.Grid]: Iterator;
+  [LayoutTypes.Radial]: Iterator;
 };
 
-export const buildIterators =   (
-                                    tuning  : Config<LayoutTuning> = LayoutTuningConfig
-                                ) : IteratorsSet => 
-{
-    const opsGrid: IteratorOps = 
-    {
-        unit        : gridUnit,
-        mapToRect,
-        anchor      :   (
-                            { 
-                                mode, 
-                                parentSize, 
-                                spacing 
-                            }
-                        ) =>
-            mode === LayoutChildrenMode.GRAPH 
-                ? tuning.get("anchor")  (
-                                            { 
-                                                mode, 
-                                                parentSize, 
-                                                spacing 
-                                            }
-                                        ) 
-                : new Vector(0, 0),
-    };
+export const buildIterators = (tuning: Config<LayoutTuning> = LayoutTuningConfig): IteratorsSet => {
+  const opsGrid: IteratorOps = {
+    unit: gridUnit,
+    mapToRect,
+    anchor: ({ mode, parentSize, spacing }) =>
+      mode === LayoutChildrenMode.GRAPH
+        ? tuning.get("anchor")({ mode, parentSize, spacing })
+        : new Vector(0, 0),
+  };
 
-    const opsRadial : IteratorOps = 
-    {
-        anchor  :   (
-                        { 
-                            mode, 
-                            parentSize, 
-                            spacing 
-                        } : AnchorIteratorParams
-                    ) : Vector =>
-            mode === LayoutChildrenMode.GRAPH ? tuning.get("anchor")(
-                                                                        { 
-                                                                            mode, 
-                                                                            parentSize, 
-                                                                            spacing 
-                                                                        }
-                                                                    ) : new Vector(0, 0),
-        angle   :   (
-                        i : number, 
-                        n : number
-                    ) : number => 
-        {
-            const start : number = tuning.get("startAngle")();
-            const cw    : boolean = tuning.get("clockwise")();
-            return tuning.get("angleOf")(
-                                            i, 
-                                            n, 
-                                            start, 
-                                            cw
-                                        );
-        },
-    };
+  const opsRadial: IteratorOps = {
+    anchor: ({ mode, parentSize, spacing }: AnchorIteratorParams) =>
+      mode === LayoutChildrenMode.GRAPH ? tuning.get("anchor")({ mode, parentSize, spacing }) : new Vector(0, 0),
+    angle: (i: number, n: number): number => {
+      const start = tuning.get("startAngle")();
+      const cw = tuning.get("clockwise")();
+      return tuning.get("angleOf")(i, n, start, cw);
+    },
+  };
 
-    return  {
-                grid    : new Iterator(opsGrid),
-                radial  : new Iterator(opsRadial),
-            };
+  return {
+    grid: new Iterator(opsGrid),
+    radial: new Iterator(opsRadial),
+  };
 };
-
-/** default singleton */
-export const IteratorsConfig = new Config<IteratorsSet>(buildIterators());
 
 ```
 
@@ -2122,29 +2096,24 @@ export enum LayoutChildrenMode
 ### src/components/layout/layout.registry.ts
 
 ``` ts
-import { 
-    Config 
-} from "../config";
-import { 
-    Layout 
-} from "./layout";
-import { 
-    LayoutTypes 
-} from "./layout.enum";
+// layout.registry.ts
+import { Config } from "../config";
+import { Layout } from "./layout";
+import { LayoutTypes } from "./layout.enum";
+import { GridLayout } from "./strategies/grid/grid.layout";
+import { RadialLayout } from "./strategies/radial/radial.layout";
 
-export interface LayoutRegistry
-{
-    [LayoutTypes.Grid   ] : import("./strategies/grid/grid.layout").GridLayout;
-    [LayoutTypes.Radial ] : import("./strategies/radial/radial.layout").RadialLayout;
+export interface LayoutRegistry {
+  [LayoutTypes.Grid]: import("./strategies/grid/grid.layout").GridLayout;
+  [LayoutTypes.Radial]: import("./strategies/radial/radial.layout").RadialLayout;
 }
 
-export type LayoutKind      = keyof LayoutRegistry;
-export const LayoutConfigs  = new Config<Record<LayoutKind, Layout>>(
-    {
-        [LayoutTypes.Grid   ]   : new (await import("./strategies/grid/grid.layout"  )).GridLayout(),
-        [LayoutTypes.Radial ]   : new (await import("./strategies/radial/radial.layout")).RadialLayout(),
-    }
-);
+export type LayoutKind = keyof LayoutRegistry;
+
+export const LayoutConfigs = new Config<Record<LayoutKind, Layout>>({
+  [LayoutTypes.Grid]: new GridLayout(),
+  [LayoutTypes.Radial]: new RadialLayout(),
+});
 
 ```
 
@@ -2223,9 +2192,7 @@ import {
 import { 
     Vector 
 } from "../geometry";
-import { 
-    AnchorIteratorParams 
-} from "./iterator.types";
+import { AnchorIteratorParams } from "./iterator/iterator.types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";
@@ -2337,44 +2304,19 @@ export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);
 ### src/components/layout/strategies/grid/grid.layout.ts
 
 ``` ts
-import { 
-    Vector, 
-    Shapes 
-} from "../../../geometry";
+import { Vector, Shapes } from "../../../geometry";
 import {
-    Layout, 
-    NestedFrameParam, 
-    PlaceChildrenReturn, 
-    PreferredSizeParam,
-    NestedFramesReturn, 
-    PreferredSizeReturn, 
-    PlaceChildrenParam
+  Layout, NestedFrameParam, PlaceChildrenReturn, PreferredSizeParam,
+  NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam
 } from "../../layout";
-import { 
-    LayoutChildrenMode, 
-    LayoutTypes
-} from "../../layout.enum";
-import { 
-    MappedGrid, 
-    MappedGridItemData 
-} from "./grid.mapped";
-import { 
-    GridItem 
-} from "./grid";
-import { 
-    Config 
-} from "../../../config";
-import { 
-    LayoutTuning, 
-    LayoutTuningConfig 
-} from "../../layout.tuning";
-import { 
-    IteratorsConfig, 
-    IteratorsSet 
-} from "../../iterator/layout.iterators";
-import { 
-    mapIndex 
-} from "../radial/radial.layout";
+import { LayoutChildrenMode, LayoutTypes } from "../../layout.enum";
+import { MappedGrid, MappedGridItemData } from "./grid.mapped";
+import { GridItem } from "./grid";
+import { Config } from "../../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
+import { IteratorsConfig, IteratorsSet } from "../../iterator/iterator.registry";
+import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
+import { IterationConfig } from "../../../iteration/iteration.limits";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */
@@ -2440,166 +2382,82 @@ export const rcSquare = (
                         );
 };
 
+export class GridLayout extends Layout {
+  constructor(
+    private tuning: Config<LayoutTuning> = LayoutTuningConfig,
+    private iters: Config<IteratorsSet> = IteratorsConfig
+  ) { super(); }
 
-export  class   GridLayout 
-        extends Layout 
-{
-    constructor(
-        private tuning : Config<LayoutTuning> = LayoutTuningConfig,
-        private iters  : Config<IteratorsSet> = IteratorsConfig
-    ) 
-    { 
-        super(); 
+  nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = sliceBound(children, maxPer, policy);
+
+    const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const content: Vector = parentSize.round().clamp(1, Infinity);
+
+    const X = splitEven(content.x, gridSize.x);
+    const Y = splitEven(content.y, gridSize.y);
+
+    const grid: MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(gridSize, () => ({ id: "" }));
+
+    for (let i = 0; i < safeChildren.length; i++) {
+      const cell = new Vector(i % gridSize.x, Math.floor(i / gridSize.x));
+      const position = new Vector(X.offs[cell.x], Y.offs[cell.y]);
+      const size = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
+      grid.set(cell, new GridItem<MappedGridItemData>(cell, new Shapes.Rectangle(size, position), { id: safeChildren[i].id }));
     }
-    nestedFrames =  (
-                        { 
-                            children, 
-                            parentSize, 
-                            spacing 
-                        } : NestedFrameParam
-                    ) 
-                    : NestedFramesReturn => 
-    {
-        const gridSize : Vector = this.tuning.get("rowCol" )(children.length); // Vector(cols, rows)
-        const ip       : number = this.tuning.get("itemPad")(spacing);
 
-        // Inner content (tessellated space)
-        const content : Vector = 
-            parentSize
-                .round   ()
-                .clamp   (1, Infinity);
+    return { ip, content, grid };
+  };
 
-        // Perfect integer subdivision with remainder distribution
-        const X : SplitEvenReturn = splitEven(content.x, gridSize.x);
-        const Y : SplitEvenReturn = splitEven(content.y, gridSize.y);
+  placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn => {
+    const { children, nodeSize, spacing, origin, parentSize, mode } = args;
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = sliceBound(children, maxPer, policy);
 
-        const grid : MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(
-            gridSize,
-            () => ({ id: '' })
+    const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const anchor: Vector = this.iters.get(LayoutTypes.Grid).anchorOffset({ mode, parentSize, spacing });
+
+    switch (mode) {
+      case LayoutChildrenMode.GRAPH: {
+        const cell = nodeSize.add(Vector.scalar(2 * ip));
+        const total = rowCol.multiply(cell);
+        const topLeft = origin.add(anchor).subtract(total.halve());
+        return Object.fromEntries(
+          mapIndexBounded(
+            safeChildren.length,
+            safeChildren.length, // already bounded
+            "truncate",
+            (i: number) => [
+              safeChildren[i].id,
+              topLeft
+                .add(cell.multiply(new Vector(i % rowCol.x, Math.floor(i / rowCol.x))))
+                .add(cell.halve())
+                .round(),
+            ]
+          )
         );
-        for (let i : number = 0; i < children.length; i++) 
-        {
-            const cell : Vector = new Vector(
-                i % gridSize.x,
-                Math.floor(i / gridSize.x)
-            );
-            const position : Vector = new Vector(X.offs [cell.x], Y.offs [cell.y]);
-            const size     : Vector = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
-            grid.set(
-                cell, 
-                new GridItem<MappedGridItemData>(
-                    cell, 
-                    new Shapes.Rectangle(size, position), 
-                    { 
-                        id : children[i].id 
-                    }
-                )
-            );
-        }
-        return  {
-                    ip,
-                    content,
-                    grid, // outer grid cells
-                };
+      }
+      case LayoutChildrenMode.NESTED: {
+        const rect = new Shapes.Rectangle(parentSize, new Vector(0, 0));
+        const centers = this.iters.get(LayoutTypes.Grid).centersInRect(safeChildren.length, rowCol, rect);
+        return Object.fromEntries(safeChildren.map((c, i) => [c.id, centers[i]]));
+      }
     }
+  };
 
-    placeChildren = (
-                        args : PlaceChildrenParam
-                    ) 
-                    : PlaceChildrenReturn => 
-    {
-        const   { 
-                    children, 
-                    nodeSize, 
-                    spacing, 
-                    origin, 
-                    parentSize, 
-                    mode
-                } : PlaceChildrenParam = args;
-        const rowCol : Vector = this.tuning.get("rowCol")(children.length);
-        const ip     : number = this.tuning.get("itemPad")(spacing);
-        const anchor : Vector = this.iters
-                                    .get(LayoutTypes.Grid)
-                                    .anchorOffset   (
-                                                        { 
-                                                            mode, 
-                                                            parentSize, 
-                                                            spacing 
-                                                        }
-                                                    );
-        switch(args.mode)
-        {
-            case LayoutChildrenMode.GRAPH:
-                // GRAPH: logical cell = node + 2*itemPad; anchor below parent
-                const cell    : Vector = nodeSize.add(Vector.scalar(2 * ip));
-                const total   : Vector = rowCol.multiply(cell);
-                const topLeft : Vector = origin
-                                            .add(anchor)
-                                            .subtract(total.halve());
-                return Object
-                        .fromEntries(
-                            mapIndex(
-                                children.length,
-                                (i : number) => [
-                                    children[i].id,
-                                    topLeft
-                                        .add    (
-                                                    cell
-                                                        .multiply   (
-                                                                        new Vector  (
-                                                                                        i % rowCol.x, 
-                                                                                        Math.floor(i / rowCol.x)
-                                                                                    )
-                                                                    )
-                                                )
-                                        .add    (cell.halve())
-                                        .round  ()
-                                ]
-                            )
-                        );
-            case LayoutChildrenMode.NESTED:
-                const rect = new Shapes.Rectangle   (
-                                                        parentSize, 
-                                                        new Vector(0,0)
-                                                    );
-                const centers = this.iters
-                                    .get(LayoutTypes.Grid)
-                                    .centersInRect  (
-                                                        children.length, 
-                                                        rowCol, 
-                                                        rect
-                                                    );
-                return Object
-                        .fromEntries(
-                                        children
-                                        .map(
-                                                (c, i) => 
-                                                    [
-                                                        c.id, 
-                                                        centers[i]
-                                                    ]
-                                            )
-                                    );
-        }
-    };
-    preferredSize = (
-                        { 
-                            count, 
-                            nodeSize, 
-                            spacing, 
-                            mode 
-                        } : PreferredSizeParam
-                    ) : PreferredSizeReturn => 
-    {
-        // grid preferred size = exact cells for nodeSize + itemPad, plus outerPad
-        const rowCol    : Vector = this.tuning.get("rowCol")(count);
-        const ip        : number = this.tuning.get("itemPad")(spacing);
-        const pad       : number = this.tuning.get("outerPad")(spacing);
-        const cell      : Vector = nodeSize.add(Vector.scalar(2 * ip));
-        const inner     : Vector = rowCol.multiply(cell);
-        return inner.add(Vector.scalar(2 * pad));
-    };
-    
+  preferredSize = ({ count, nodeSize, spacing }: PreferredSizeParam): PreferredSizeReturn => {
+    const rowCol: Vector = this.tuning.get("rowCol")(count);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const pad: number = this.tuning.get("outerPad")(spacing);
+    const cell: Vector = nodeSize.add(Vector.scalar(2 * ip));
+    const inner: Vector = rowCol.multiply(cell);
+    return inner.add(Vector.scalar(2 * pad));
+  };
 }
 ```
 
@@ -2761,193 +2619,114 @@ export class Grid<T>
 ### src/components/layout/strategies/radial/radial.layout.ts
 
 ``` ts
-import { 
-    Vector 
-} from "../../../geometry";
+import { Vector } from "../../../geometry";
 import {
-    PreferredSizeParam, 
-    PreferredSizeReturn,
-    Layout, 
-    PlaceChildrenReturn, 
-    PlaceChildrenParam, 
-    NestedFramesReturn
+  PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
 } from "../../layout";
-import { 
-    LayoutChildrenMode 
-} from "../../layout.enum";
-import { 
-    MappedGrid 
-} from "../grid/grid.mapped";
-import { 
-    Config 
-} from "../../../config";
-import { 
-    LayoutTuning, 
-    LayoutTuningConfig 
-} from "../../layout.tuning";
+import { LayoutChildrenMode } from "../../layout.enum";
+import { MappedGrid } from "../grid/grid.mapped";
+import { Config } from "../../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
+import { IterationConfig } from "../../../iteration/iteration.limits";
+import { mapIndexBounded } from "../../../iteration/iterate";
 
-export  class   RadialLayout 
-        extends Layout 
-{
-    constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) 
-    {
-        super();
+export class RadialLayout extends Layout {
+  constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) { super(); }
+  nestedFrames = (): NestedFramesReturn => ({
+    ip: 0,
+    content: new Vector(0, 0),
+    grid: MappedGrid.emptyMapped(new Vector(0, 0), () => ({ id: "" })),
+  });
+
+  placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn =>
+    args.mode === LayoutChildrenMode.NESTED ? nestedRadialCenters(this.tuning, args) : graphRadialCenters(this.tuning, args);
+
+  preferredSize = ({ count, nodeSize, spacing, mode }: PreferredSizeParam): PreferredSizeReturn =>
+    mode === LayoutChildrenMode.NESTED ? this.tuning.get("nestedRadialPreferred")(count, nodeSize, spacing) : nodeSize;
+}
+
+/* ==================== helpers ==================== */
+export const nestedRadialCenters = (
+  tuning: Config<LayoutTuning>,
+  { children, parentSize, nodeSize, spacing }: PlaceChildrenParam
+): PlaceChildrenReturn => {
+  const maxPer = IterationConfig.get("maxChildrenPerNode");
+  const policy = IterationConfig.get("onLimit");
+
+  const inner: Vector = parentSize.round().clamp(1, Infinity);
+  const c: Vector = inner.scale(1 / 2);
+  const start = tuning.get("startAngle")();
+  const cw = tuning.get("clockwise")();
+  const baseR = inner.min() / 2 - nodeSize.max() / 2 - tuning.get("itemPad")(spacing);
+  const r = Math.max(tuning.get("minRadius")(), baseR);
+
+  return Object.fromEntries(
+    mapIndexBounded(children.length, maxPer, policy, (i) => [
+      children[i].id,
+      Vector.scalar(tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c),
+    ])
+  );
+};
+
+export const graphRadialCenters = (
+  tuning: Config<LayoutTuning>,
+  { children, origin, nodeSize, spacing, level, parentSize }: PlaceChildrenParam
+): PlaceChildrenReturn => {
+  const maxPer = IterationConfig.get("maxChildrenPerNode");
+  const policy = IterationConfig.get("onLimit");
+
+  const base = tuning.get("radialBase")(nodeSize, spacing);
+  const r = Math.max(tuning.get("minRadius")(), base * (1 + level * tuning.get("radialLevelScale")()));
+  const a = tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
+  const c = origin.add(a);
+
+  const start = tuning.get("startAngle")();
+  const cw = tuning.get("clockwise")();
+
+  return Object.fromEntries(
+    mapIndexBounded(children.length, maxPer, policy, (i) => [
+      children[i].id,
+      Vector.scalar(tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c).round(),
+    ])
+  );
+};
+
+```
+
+### src/components/logging.ts
+
+``` ts
+// logging.ts
+export enum LogLevel { Debug = 10, Info = 20, Warn = 30, Error = 40, Off = 99 }
+export type LogCtx = Record<string, unknown>;
+
+export interface Logger {
+    level: LogLevel;
+    child(bindings: LogCtx): Logger;
+    debug(msg: string, ctx?: LogCtx): void;
+    info (msg: string, ctx?: LogCtx): void;
+    warn (msg: string, ctx?: LogCtx): void;
+    error(msg: string, ctx?: LogCtx): void;
+}
+
+export class NoopLogger implements Logger {
+    level = LogLevel.Off;
+    child(): Logger { return this; }
+    debug(): void {} info(): void {} warn(): void {} error(): void {}
+}
+
+export class ConsoleLogger implements Logger {
+    constructor(public level: LogLevel = LogLevel.Warn, private readonly bindings: LogCtx = {}) {}
+    child(bindings: LogCtx): Logger { return new ConsoleLogger(this.level, { ...this.bindings, ...bindings }); }
+    private out(kind: "debug"|"info"|"warn"|"error", msg: string, ctx?: LogCtx): void {
+        // eslint-disable-next-line no-console
+        console[kind]({ msg, ...this.bindings, ...(ctx ?? {}) });
     }
-    nestedFrames    =   () 
-                        : NestedFramesReturn => (
-                                                    {
-                                                        ip      : 0,
-                                                        content : new Vector(0, 0),
-                                                        grid    : MappedGrid
-                                                                    .emptyMapped(
-                                                                                    new Vector(0, 0), 
-                                                                                    () => ({ id: '' })
-                                                                                )
-                                                    }
-                                                );
-    placeChildren   =   (
-                            args : PlaceChildrenParam
-                        ) 
-                        : PlaceChildrenReturn => 
-                                                args.mode === LayoutChildrenMode.NESTED
-                                                    ? nestedRadialCenters(this.tuning, args)
-                                                    : graphRadialCenters (this.tuning, args);
-    preferredSize = (
-                        { 
-                            count, 
-                            nodeSize, 
-                            spacing, 
-                            mode 
-                        } : PreferredSizeParam
-                    ) 
-                    : PreferredSizeReturn => 
-                                                mode === LayoutChildrenMode.NESTED 
-                                                    /*  caller has no external size; 
-                                                        provide a pleasant default via tuning */
-                                                            ? this  .tuning
-                                                                    .get("nestedRadialPreferred")   (
-                                                                                                        count, 
-                                                                                                        nodeSize, 
-                                                                                                        spacing
-                                                                                                    )
-                                                            /*  graph node’s own box uses nodeSize (engine decides); 
-                                                                return nodeSize to be explicit */
-                                                            : nodeSize;
-                                            
+    debug(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Debug) this.out("debug", msg, ctx); }
+    info (msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Info ) this.out("info" , msg, ctx); }
+    warn (msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Warn ) this.out("warn" , msg, ctx); }
+    error(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Error) this.out("error", msg, ctx); }
 }
-/* =========================================================
- * NESTED RADIAL
- *  - Place on a circle and uniform-scale to fit inner content
- * ========================================================= */
-
-export const nestedRadialCenters =  (
-                                        tuning: Config<LayoutTuning>, 
-                                        { 
-                                            children, 
-                                            parentSize, 
-                                            nodeSize, 
-                                            spacing 
-                                        } : PlaceChildrenParam
-                                    ) : PlaceChildrenReturn => 
-{
-    const inner : Vector    = parentSize
-                                .round   ()
-                                .clamp   (1, Infinity);
-    const c     : Vector    = inner.scale(1/2);
-    const start : number    = tuning.get("startAngle")();
-    const cw    : boolean   = tuning.get("clockwise")();
-    const baseR : number    = inner.min() / 2 - nodeSize.max() / 2 - tuning.get("itemPad")(spacing);
-    const r     : number    = Math.max(tuning.get("minRadius")(), baseR);
-    return Object
-            .fromEntries(
-                            mapIndex(children.length,
-                                        (
-                                            i : number
-                                        ) 
-                                        : [string, Vector] =>  
-                                                                [
-                                                                    children[i].id, 
-                                                                    Vector
-                                                                        .scalar(tuning.get("angleOf")(i, children.length, start, cw))
-                                                                        .trig  ( )
-                                                                        .scale (r)
-                                                                        .add   (c)
-                                                                ]
-                                    )
-                        );
-}
-
-export const graphRadialCenters =   (
-                                        tuning: Config<LayoutTuning>,
-                                        { 
-                                            children,
-                                            origin, 
-                                            nodeSize, 
-                                            spacing, 
-                                            level, 
-                                            parentSize 
-                                        } : PlaceChildrenParam
-                                    ) 
-                                    : PlaceChildrenReturn => 
-{
-    const base  : number    = tuning.get("radialBase")(nodeSize, spacing);
-    const r     : number    = Math.max  (
-                                            tuning.get("minRadius")(), 
-                                            base *  (1 + level * tuning.get("radialLevelScale")())
-                                        );
-
-    const a     : Vector    = tuning.get("anchor")  (
-                                                        { 
-                                                            mode    : LayoutChildrenMode.GRAPH, 
-                                                            parentSize, 
-                                                            spacing 
-                                                        }
-                                                    );
-    const c     : Vector    = origin.add(a);
-
-    const start : number    = tuning.get("startAngle")();
-    const cw    : boolean   = tuning.get("clockwise")();
-    return  Object
-                .fromEntries(
-                    mapIndex(children.length,
-                                ( 
-                                    i : number
-                                ) =>  
-                                        [
-                                            children[i].id, 
-                                            Vector
-                                                .scalar (tuning.get("angleOf")  (
-                                                                                    i, 
-                                                                                    children.length, 
-                                                                                    start, 
-                                                                                    cw
-                                                                                )
-                                                        )
-                                                .trig   ( )
-                                                .scale  (r)
-                                                .add    (c)
-                                                .round  ( )
-                                        ]
-                        )
-                );
-}
-export const mapIndex = <T> (
-                                n : number, 
-                                f : (i: number) => T
-                            ) 
-                            : T[] => 
-                                Array
-                                    .from(
-                                            { 
-                                                length : n 
-                                            }, 
-                                            (
-                                                _ : undefined, 
-                                                i : number
-                                            ) => 
-                                                f(i)
-                                         );
-
 
 ```
 
@@ -2966,493 +2745,246 @@ export const divide     = (a : number, b : number) : number => a / b;
 
 ``` tsx
 import "reactflow/dist/style.css";
-import { 
-    JSX,
-    useEffect,
-    useMemo, 
-    useState 
-} from "react";
-import { 
-    NodeConfig
-} from "./graph";
-import { 
-    Vector 
-} from "./geometry";
-import { 
-    LayoutChildrenMode,
-    LayoutTypes 
-} from "./layout/layout.enum";
-import { 
-    LayoutView 
-} from "./adapters/react-view.adapter";
-import { 
-    computeLayout, 
-    LayoutResult, 
-    ModeMap 
-} from "./layout/engine/layout.engine";
-import { 
-    LabeledSlider, 
-    Segmented 
-} from "./ui/controls";
-import { 
-    Shell 
-} from "./ui/styles";
-import { 
-    Configurator 
-} from "./ui/Configurator";
-import { 
-    Target 
-} from "./adapters/env";
+import { JSX, useEffect, useMemo, useState } from "react";
+import { NodeConfig } from "./graph";
+import { Vector } from "./geometry";
+import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
+import { LayoutEngine, LayoutResultEx, ModeMap } from "./layout/engine/layout.engine";
+import { LabeledSlider, Segmented } from "./ui/controls";
+import { Shell } from "./ui/styles";
+import { Configurator } from "./ui/Configurator";
+import { Target } from "./adapters/env";
+import { LayoutView } from "./adapters/ports/react/react-view.adapter";
 
-const DEMO : NodeConfig = 
-{
-    id        : "root",
-    label     : "Root",
-    position  : new Vector(200, 60),
-    children  : [
-                    { 
-                        id          : "A", 
-                        label       : "A", 
-                        children    :   [
-                                            { id    : "A1" }, 
-                                            { id    : "A2" }, 
-                                            { id    : "A3" }
-                                        ] 
-                                    },
-                    { 
-                        id          : "B", 
-                        label       : "B", 
-                        children    :   [
-                                            { id    : "B1" }, 
-                                            { id    : "B2" }, 
-                                            { id    : "B3" }, 
-                                            { id    : "B4" }
-                                        ] 
-                    },
-                    { 
-                        id          : "C", 
-                        label       : "C", 
-                        children    :   [
-                                            { id    : "C1" }, 
-                                            { id    : "C2" }, 
-                                            { id    : "C3" }, 
-                                            { id    : "C4" }
-                                        ] 
-                    },
-                ],
+const DEMO: NodeConfig = {
+  id: "root",
+  label: "Root",
+  position: new Vector(200, 60),
+  children: [
+    { id: "A", label: "A", children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", label: "B", children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", label: "C", children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
 };
 Object.freeze(DEMO);
 
-const DEMO_MIXED: NodeConfig = 
-{
-    id          : "root",
-    label       : "Root",
-    position    : new Vector(200, 60),
-    layout      : LayoutTypes.Grid,
-    children    :   [
-                        { 
-                            id          : "A", 
-                            label       : "A", 
-                            layout      : LayoutTypes.Radial, 
-                            children    :   [
-                                                { id: "A1" }, 
-                                                { id: "A2" }, 
-                                                { id: "A3" }
-                                            ] 
-                        },
-                        { 
-                            id          : "B", 
-                            label       : "B", 
-                            layout      : LayoutTypes.Grid, 
-                            children    :   [
-                                                { id: "B1" }, 
-                                                { id: "B2" }, 
-                                                { id: "B3" }, 
-                                                { id: "B4" }
-                                            ] 
-                        },
-                        { 
-                            id          : "C", 
-                            label       : "C", 
-                            layout      : LayoutTypes.Radial, 
-                            children    :   [
-                                                { id: "C1" }, 
-                                                { id: "C2" }, 
-                                                { id: "C3" }, 
-                                                { id: "C4" }
-                                            ] 
-                        },
-                    ],
+const DEMO_MIXED: NodeConfig = {
+  id: "root",
+  label: "Root",
+  position: new Vector(200, 60),
+  layout: LayoutTypes.Grid,
+  children: [
+    { id: "A", label: "A", layout: LayoutTypes.Radial, children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", label: "B", layout: LayoutTypes.Grid, children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", label: "C", layout: LayoutTypes.Radial, children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
 };
 Object.freeze(DEMO_MIXED);
-/* -------------------------------------------
- * Helpers
- * ------------------------------------------- */
+
 type LayoutOverrideMap = Record<string, LayoutTypes | undefined>;
-type NodeIndex = 
-{ 
-    id      : string; 
-    label   : string 
+type NodeIndex = { id: string; label: string };
+
+const flattenNodes = (n: NodeConfig): NodeIndex[] => {
+  const out: NodeIndex[] = [{ id: n.id, label: n.label ?? n.id }];
+  for (const c of n.children ?? []) out.push(...flattenNodes(c));
+  return out;
+};
+const findNode = (root: NodeConfig, id: string): NodeConfig | undefined => {
+  if (root.id === id) return root;
+  for (const c of root.children ?? []) {
+    const hit: NodeConfig | undefined = findNode(c, id);
+    if (hit) return hit;
+  }
+  return undefined;
+};
+const subtreeIds = (root: NodeConfig, startId: string): string[] => {
+  const node: NodeConfig | undefined = findNode(root, startId);
+  if (!node) return [];
+  return flattenNodes(node).map((n) => n.id);
+};
+const idsInScope = (root: NodeConfig, scope: "all" | string, applyToSubtree: boolean): string[] => {
+  const all: string[] = [];
+  (function () {
+    const walk = (n: NodeConfig): void => {
+      all.push(n.id);
+      (n.children ?? []).forEach(walk);
+    };
+    walk(root);
+  })();
+  if (scope === "all") return all;
+  if (!applyToSubtree) return [scope];
+  const res: string[] = [];
+  (function () {
+    const walk = (n: NodeConfig): void => {
+      res.push(n.id);
+      (n.children ?? []).forEach(walk);
+    };
+    walk(findNode(root, scope)!);
+  })();
+  return res;
 };
 
-const flattenNodes =    (
-                            n : NodeConfig
-                        ) : NodeIndex[] => 
-{
-    const out : NodeIndex[] =   [
-                                    { 
-                                        id      : n.id, 
-                                        label   : n.label ?? n.id 
-                                    }
-                                ];
-    for (const c of n.children ?? []) 
-    {
-        out.push(...flattenNodes(c));
+export type ParentChildLayoutsDemoProps = { config?: NodeConfig };
+
+export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayoutsDemoProps): JSX.Element => {
+  const [adapter, setAdapter] = useState<Target.DOM | Target.Canvas | Target.ReactFlow>(Target.DOM);
+  const [spacing, setSpacing] = useState(24);
+  const [nodeW, setNodeW] = useState(110);
+  const [nodeH, setNodeH] = useState(54);
+  const LIMITS = {
+    spacing: { min: 0, max: 80 },
+    nodeW: { min: 40, max: 240 },
+    nodeH: { min: 30, max: 180 },
+  };
+
+  const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
+  const [modes, setModes] = useState<ModeMap>({
+    root: LayoutChildrenMode.GRAPH,
+    A: LayoutChildrenMode.NESTED,
+    B: LayoutChildrenMode.GRAPH,
+    C: LayoutChildrenMode.NESTED,
+  });
+  const [scope, setScope] = useState<"all" | string>("all");
+  const [applyToSubtree, setApplyToSubtree] = useState(true);
+
+  const effectiveConfig = useMemo<NodeConfig>(() => {
+    const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
+    const copy: NodeConfig = clone(config);
+    const setLayout = (n: NodeConfig): void => {
+      if (scope === "all" || n.id === scope) n.layout = layoutName;
+      if (applyToSubtree || scope === "all") (n.children ?? []).forEach(setLayout);
+    };
+    setLayout(copy);
+    return copy;
+  }, [config, layoutName, scope, applyToSubtree]);
+
+  const nodeSize: Vector = useMemo(
+    () => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)).asSize(),
+    [nodeW, nodeH]
+  );
+
+  const engine = useMemo(() => new LayoutEngine({ collectOverlaps: false }), []);
+
+  const result: LayoutResultEx = useMemo(
+    () => engine.compute({ root: effectiveConfig, modes, nodeSize, spacing }),
+    [engine, effectiveConfig, modes, nodeSize, spacing]
+  );
+
+  const scopedIds: string[] = useMemo(() => idsInScope(config, scope, applyToSubtree), [config, scope, applyToSubtree]);
+  const nestedGridActive: boolean = useMemo(
+    () => layoutName === LayoutTypes.Grid && scopedIds.some((id) => (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED),
+    [layoutName, scopedIds, modes]
+  );
+
+  useEffect(() => {
+    if (nestedGridActive) {
+      setSpacing(LIMITS.spacing.min);
+      setNodeW(LIMITS.nodeW.max);
+      setNodeH(LIMITS.nodeH.max);
     }
-    return out;
-}
-const findNode =    (
-                        root    : NodeConfig, 
-                        id      : string
-                    ) : NodeConfig | undefined => 
-{
-    if (root.id === id) 
-    {
-        return root;
-    }
-    for (const c of root.children ?? []) 
-    {
-        const hit : NodeConfig | undefined = findNode(c, id);
-        if (hit) 
-        {
-            return hit;
-        }
-    }
-    return undefined;
-}
-const subtreeIds =  (
-                        root    : NodeConfig, 
-                        startId : string
-                    ) : string[] => 
-{
-    const node : NodeConfig | undefined = findNode(root, startId);
-    if (!node) 
-    {
-        return [];
-    }
-    return  flattenNodes(node)
-                .map(n => n.id);
-}
-const applyLayoutOverrides =    (
-                                    node        : NodeConfig, 
-                                    overrides   : LayoutOverrideMap
-                                ) : NodeConfig => 
-{
-    const overridden : NodeConfig = { 
-                                        ...node, 
-                                        layout  : overrides[node.id] ?? node.layout 
-                                    };
-    if (node.children?.length) 
-    {
-        overridden.children = node.children.map(c => applyLayoutOverrides(c, overrides));
-    }
-    return overridden;
-}
+  }, [nestedGridActive]);
 
-const idsInScope =  (
-                        root            : NodeConfig, 
-                        scope           : "all" | string, 
-                        applyToSubtree  : boolean
-                    ) : string[] =>
-{
-    const all : string[] = [];
+  const LayoutViewStyle: React.CSSProperties = { position: "absolute", inset: 0 };
 
-    (() => {
-        const walk = (n : NodeConfig) : void =>
-        { 
-            all.push(n.id); 
-            (n.children ?? []).forEach(walk); 
-        };
-        walk(root);
-    })();
-    
-    if (scope === "all") 
-    {
-        return all;
-    }
-    if (!applyToSubtree) 
-    {
-        return [scope];
-    }
-    const res: string[] = [];
-    (() => {
-        const walk = (n : NodeConfig) : void => 
-        { 
-            res.push(n.id); 
-            (n.children ?? []).forEach(walk); 
-        };
-        walk(findNode(root, scope)!);
-    })();
-    return res;
-}
+  return (
+    <div style={Shell.outer}>
+      <div style={Shell.bar}>
+        <Segmented<Target.DOM | Target.Canvas | Target.ReactFlow>
+          label="Right Pane"
+          value={adapter}
+          onChange={setAdapter}
+          options={[
+            { label: "DOM", value: Target.DOM },
+            { label: "Canvas", value: Target.Canvas },
+            { label: "ReactFlow", value: Target.ReactFlow },
+          ]}
+        />
+        <Configurator
+          root={config}
+          modes={modes}
+          setModes={setModes}
+          layout={layoutName}
+          setLayout={setLayoutName}
+          scope={scope}
+          setScope={setScope}
+          applyToSubtree={applyToSubtree}
+          setApplyToSubtree={setApplyToSubtree}
+        />
 
-/* -------------------------------------------
- * Main demo
- * ------------------------------------------- */
-type RightPaneKind =        Target.DOM 
-                        |   Target.Canvas 
-                        |   Target.ReactFlow;
-export type ParentChildLayoutsDemoProps = 
-{ 
-    config?: NodeConfig 
-};
+        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
+      </div>
 
-export const ParentChildLayoutsDemo =   (
-                                            { 
-                                                config = DEMO_MIXED 
-                                            } : ParentChildLayoutsDemoProps
-                                        ) : JSX.Element => 
-{
-    const [adapter  , setAdapter] = useState<RightPaneKind>(Target.DOM);
-    const [spacing  , setSpacing] = useState(24);
-    const [nodeW    , setNodeW  ] = useState(110);
-    const [nodeH    , setNodeH  ] = useState(54);
-    const LIMITS =  { 
-                        spacing :   { 
-                                        min : 0, 
-                                        max : 80 
-                                    }, 
-                        nodeW   :   { 
-                                        min : 40, 
-                                        max : 240 
-                                    }, 
-                        nodeH   :   { 
-                                        min : 30, 
-                                        max : 180 
-                                    } 
-                    };
-    // NEW: layout scope + mode map
-    const [layoutName   , setLayoutName ] = useState<LayoutTypes>(LayoutTypes.Grid);
-    const [modes        , setModes      ] = useState<ModeMap>   (
-                                                                    { 
-                                                                        root    : LayoutChildrenMode.GRAPH, 
-                                                                        A       : LayoutChildrenMode.NESTED, 
-                                                                        B       : LayoutChildrenMode.GRAPH, 
-                                                                        C       : LayoutChildrenMode.NESTED 
-                                                                    }
-                                                                );
-    const [scope            , setScope          ] = useState<"all" | string>("all");
-    const [applyToSubtree   , setApplyToSubtree ] = useState(true);
-
-    // apply layout to scope by mutating a *derived* config (never the frozen constants)
-    const effectiveConfig = useMemo<NodeConfig> (
-                                                    () : NodeConfig => 
-                                                    {
-                                                        const clone =   ( 
-                                                                            n   : NodeConfig
-                                                                        ) : NodeConfig => 
-                                                                        {
-                                                                            return  { 
-                                                                                        ...n, 
-                                                                                        children : (n.children ?? [])
-                                                                                                    .map(clone) 
-                                                                                    };
-                                                                        }
-                                                        const copy : NodeConfig = clone(config);
-                                                        const setLayout =   (
-                                                                                n   : NodeConfig
-                                                                            ) : void => 
-                                                                            {
-                                                                                if  (
-                                                                                            scope === "all" 
-                                                                                        ||  n.id === scope
-                                                                                    ) 
-                                                                                {
-                                                                                    n.layout = layoutName;
-                                                                                }
-                                                                                if  (
-                                                                                            applyToSubtree 
-                                                                                        ||  scope === "all"
-                                                                                    ) 
-                                                                                {
-                                                                                    (n.children ?? [])
-                                                                                        .forEach(setLayout);
-                                                                                }
-                                                                            }
-                                                        setLayout(copy);
-                                                        return copy;
-                                                    }, 
-                                                    [
-                                                        config, 
-                                                        layoutName, 
-                                                        scope, 
-                                                        applyToSubtree
-                                                    ]
-                                                );
-
-    const nodeSize  : Vector =  useMemo (
-                                            () : Vector => 
-                                                new Vector  (
-                                                                Math.max(
-                                                                            20, 
-                                                                            nodeW
-                                                                        ), 
-                                                                Math.max(
-                                                                            20, 
-                                                                            nodeH
-                                                                        )
-                                                            ), 
-                                            [
-                                                nodeW, 
-                                                nodeH
-                                            ]
-                                        );
-    /* KEY LAYOUT COMPUTATION */
-    const result    : LayoutResult  =   useMemo (
-                                                    () : LayoutResult => 
-                                                        computeLayout   (
-                                                                            effectiveConfig, 
-                                                                            modes, 
-                                                                            nodeSize, 
-                                                                            spacing
-                                                                        ), 
-                                                    [
-                                                        effectiveConfig, 
-                                                        modes, 
-                                                        nodeSize, 
-                                                        spacing
-                                                    ]
-                                                );
-    const scopedIds :   string[]    =   useMemo (
-                                                    () => 
-                                                        idsInScope  (
-                                                                        config, 
-                                                                        scope, 
-                                                                        applyToSubtree
-                                                                    ), 
-                                                                    [
-                                                                        config, 
-                                                                        scope, 
-                                                                        applyToSubtree
-                                                                    ]
-                                                );
-    const nestedGridActive  :   boolean =   useMemo (
-                                                        () => 
-                                                                layoutName === LayoutTypes.Grid 
-                                                            &&  scopedIds
-                                                                    .some   (
-                                                                                id => 
-                                                                                    (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED
-                                                                            ),
-                                                        [
-                                                            layoutName, 
-                                                            scopedIds, 
-                                                            modes
-                                                        ]
-                                                    );
-    
-    // When "Nested + Grid" is active, snap to the stable setting:
-    // Spacing = MIN, NodeW = MAX, NodeH = MAX.
-    useEffect   (   
-                    () : void => 
-                    {
-                        if (nestedGridActive) 
-                        {
-                            setSpacing  (LIMITS.spacing.min);
-                            setNodeW    (LIMITS.nodeW.max);
-                            setNodeH    (LIMITS.nodeH.max);
-                        }
-                    }, 
-                    [
-                        nestedGridActive
-                    ]
-                );
-
-    const LayoutViewStyle : React.CSSProperties = 
-    {
-        position    : "absolute",
-        inset       : 0
-    }
-
-    return (
-        <div style = {Shell.outer}>
-            <div style = {Shell.bar}>
-                <Segmented<RightPaneKind>
-                    label       =   "Right Pane"
-                    value       =   {adapter    }
-                    onChange    =   {setAdapter }
-                    options     =   {
-                                        [
-                                            { label: "DOM",       value: Target.DOM         },
-                                            { label: "Canvas",    value: Target.Canvas      },
-                                            { label: "ReactFlow", value: Target.ReactFlow   },
-                                        ]
-                                    }
-                />
-                <Configurator
-                    root                =   {config             }
-                    modes               =   {modes              }
-                    setModes            =   {setModes           }
-                    layout              =   {layoutName         }
-                    setLayout           =   {setLayoutName      }
-                    scope               =   {scope              }
-                    setScope            =   {setScope           }
-                    applyToSubtree      =   {applyToSubtree     } 
-                    setApplyToSubtree   =   {setApplyToSubtree  }
-                />
-                
-                <LabeledSlider 
-                    label       =   "Spacing" 
-                    value       =   {spacing            } 
-                    min         =   {LIMITS.spacing.min } 
-                    max         =   {LIMITS.spacing.max } 
-                    onChange    =   {setSpacing         } 
-                />
-                <LabeledSlider 
-                    label       =   "Node W" 
-                    value       =   {nodeW              }   
-                    min         =   {LIMITS.nodeW.min   }  
-                    max         =   {LIMITS.nodeW.max   }  
-                    onChange    =   {setNodeW           } 
-                    disabled    =   {nestedGridActive   } 
-                />
-                <LabeledSlider 
-                    label       =   "Node H"  
-                    value       =   {nodeH              }   
-                    min         =   {LIMITS.nodeH.min   }  
-                    max         =   {LIMITS.nodeH.max   }  
-                    onChange    =   {setNodeH           } 
-                    disabled    =   {nestedGridActive   } 
-                />
-
-            </div>
-
-            <div style = {Shell.left}>
-                <div style = {Shell.title}>
-                    Graph (Edges)
-                </div>
-                <div style = {Shell.rf}>
-                    <LayoutView 
-                        kind    =   {Target.ReactFlow   } 
-                        result  =   {result             } 
-                    />
-                </div>
-            </div>
-
-            <div style = {Shell.right}>
-                <div style = {Shell.title}>
-                    Right Pane: {adapter}
-                </div>
-                <div style = {LayoutViewStyle}>
-                    <LayoutView 
-                        kind    =   {adapter} 
-                        result  =   {result } 
-                    />
-                </div>
-            </div>
+      <div style={Shell.left}>
+        <div style={Shell.title}>Graph (Edges)</div>
+        <div style={Shell.rf}>
+          <LayoutView kind={Target.ReactFlow} result={result} />
         </div>
-    );
+      </div>
+
+      <div style={Shell.right}>
+        <div style={Shell.title}>Right Pane: {adapter}</div>
+        <div style={LayoutViewStyle}>
+          <LayoutView kind={adapter} result={result} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+```
+
+### src/components/playground/controller.ts
+
+``` ts
+import { NodeConfig } from "../graph";
+import { Target } from "../adapters/env";
+import { LayoutTypes } from "../layout/layout.enum";
+import { LayoutEngine, LayoutResultEx, ModeMap } from "../layout/engine/layout.engine";
+import { Vector } from "../geometry";
+
+export type PlaygroundState = {
+  adapter: Target;
+  spacing: number;
+  nodeW: number;
+  nodeH: number;
+  layout: LayoutTypes;
+  scope: "all" | string;
+  applyToSubtree: boolean;
+  modes: ModeMap;
+};
+
+export type PlaygroundController = {
+  compute(config: NodeConfig, s: PlaygroundState): LayoutResultEx;
+  deriveOverrides(config: NodeConfig, s: PlaygroundState): NodeConfig;
+};
+
+export function makePlaygroundController(engine = new LayoutEngine()): PlaygroundController {
+  const deriveOverrides = (root: NodeConfig, s: PlaygroundState): NodeConfig => {
+    const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
+    const copy = clone(root);
+    const apply = (n: NodeConfig): void => {
+      if (s.scope === "all" || n.id === s.scope) n.layout = s.layout;
+      if (s.applyToSubtree || s.scope === "all") (n.children ?? []).forEach(apply);
+    };
+    apply(copy);
+    return copy;
+  };
+
+  const compute = (config: NodeConfig, s: PlaygroundState): LayoutResultEx => {
+    const nodeSize = new Vector(s.nodeW, s.nodeH).asSize();
+    return engine.compute({
+      root: config,
+      modes: s.modes,
+      nodeSize,
+      spacing: s.spacing,
+    });
+  };
+
+  return { compute, deriveOverrides };
 }
+
 ```
 
 ### src/components/ui/Configurator.tsx
@@ -3474,9 +3006,7 @@ import {
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../layout/layout.enum";
-import { 
-  ModeMap 
-} from "../engine/layout.engine";
+import { ModeMap } from "../layout/engine/layout.engine";
 
 type Scope = "all" | string;
 

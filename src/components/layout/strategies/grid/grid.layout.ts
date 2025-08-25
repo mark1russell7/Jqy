@@ -1,41 +1,16 @@
-import { 
-    Vector, 
-    Shapes 
-} from "../../../geometry";
+import { Vector, Shapes } from "../../../geometry";
 import {
-    Layout, 
-    NestedFrameParam, 
-    PlaceChildrenReturn, 
-    PreferredSizeParam,
-    NestedFramesReturn, 
-    PreferredSizeReturn, 
-    PlaceChildrenParam
+  Layout, NestedFrameParam, PlaceChildrenReturn, PreferredSizeParam,
+  NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam
 } from "../../layout";
-import { 
-    LayoutChildrenMode, 
-    LayoutTypes
-} from "../../layout.enum";
-import { 
-    MappedGrid, 
-    MappedGridItemData 
-} from "./grid.mapped";
-import { 
-    GridItem 
-} from "./grid";
-import { 
-    Config 
-} from "../../../config";
-import { 
-    LayoutTuning, 
-    LayoutTuningConfig 
-} from "../../layout.tuning";
-import { 
-    IteratorsConfig, 
-    IteratorsSet 
-} from "../../iterator/layout.iterators";
-import { 
-    mapIndex 
-} from "../radial/radial.layout";
+import { LayoutChildrenMode, LayoutTypes } from "../../layout.enum";
+import { MappedGrid, MappedGridItemData } from "./grid.mapped";
+import { GridItem } from "./grid";
+import { Config } from "../../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
+import { IteratorsConfig, IteratorsSet } from "../../iterator/iterator.registry";
+import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
+import { IterationConfig } from "../../../iteration/iteration.limits";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */
@@ -101,164 +76,80 @@ export const rcSquare = (
                         );
 };
 
+export class GridLayout extends Layout {
+  constructor(
+    private tuning: Config<LayoutTuning> = LayoutTuningConfig,
+    private iters: Config<IteratorsSet> = IteratorsConfig
+  ) { super(); }
 
-export  class   GridLayout 
-        extends Layout 
-{
-    constructor(
-        private tuning : Config<LayoutTuning> = LayoutTuningConfig,
-        private iters  : Config<IteratorsSet> = IteratorsConfig
-    ) 
-    { 
-        super(); 
+  nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = sliceBound(children, maxPer, policy);
+
+    const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const content: Vector = parentSize.round().clamp(1, Infinity);
+
+    const X = splitEven(content.x, gridSize.x);
+    const Y = splitEven(content.y, gridSize.y);
+
+    const grid: MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(gridSize, () => ({ id: "" }));
+
+    for (let i = 0; i < safeChildren.length; i++) {
+      const cell = new Vector(i % gridSize.x, Math.floor(i / gridSize.x));
+      const position = new Vector(X.offs[cell.x], Y.offs[cell.y]);
+      const size = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
+      grid.set(cell, new GridItem<MappedGridItemData>(cell, new Shapes.Rectangle(size, position), { id: safeChildren[i].id }));
     }
-    nestedFrames =  (
-                        { 
-                            children, 
-                            parentSize, 
-                            spacing 
-                        } : NestedFrameParam
-                    ) 
-                    : NestedFramesReturn => 
-    {
-        const gridSize : Vector = this.tuning.get("rowCol" )(children.length); // Vector(cols, rows)
-        const ip       : number = this.tuning.get("itemPad")(spacing);
 
-        // Inner content (tessellated space)
-        const content : Vector = 
-            parentSize
-                .round   ()
-                .clamp   (1, Infinity);
+    return { ip, content, grid };
+  };
 
-        // Perfect integer subdivision with remainder distribution
-        const X : SplitEvenReturn = splitEven(content.x, gridSize.x);
-        const Y : SplitEvenReturn = splitEven(content.y, gridSize.y);
+  placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn => {
+    const { children, nodeSize, spacing, origin, parentSize, mode } = args;
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = sliceBound(children, maxPer, policy);
 
-        const grid : MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(
-            gridSize,
-            () => ({ id: '' })
+    const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const anchor: Vector = this.iters.get(LayoutTypes.Grid).anchorOffset({ mode, parentSize, spacing });
+
+    switch (mode) {
+      case LayoutChildrenMode.GRAPH: {
+        const cell = nodeSize.add(Vector.scalar(2 * ip));
+        const total = rowCol.multiply(cell);
+        const topLeft = origin.add(anchor).subtract(total.halve());
+        return Object.fromEntries(
+          mapIndexBounded(
+            safeChildren.length,
+            safeChildren.length, // already bounded
+            "truncate",
+            (i: number) => [
+              safeChildren[i].id,
+              topLeft
+                .add(cell.multiply(new Vector(i % rowCol.x, Math.floor(i / rowCol.x))))
+                .add(cell.halve())
+                .round(),
+            ]
+          )
         );
-        for (let i : number = 0; i < children.length; i++) 
-        {
-            const cell : Vector = new Vector(
-                i % gridSize.x,
-                Math.floor(i / gridSize.x)
-            );
-            const position : Vector = new Vector(X.offs [cell.x], Y.offs [cell.y]);
-            const size     : Vector = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
-            grid.set(
-                cell, 
-                new GridItem<MappedGridItemData>(
-                    cell, 
-                    new Shapes.Rectangle(size, position), 
-                    { 
-                        id : children[i].id 
-                    }
-                )
-            );
-        }
-        return  {
-                    ip,
-                    content,
-                    grid, // outer grid cells
-                };
+      }
+      case LayoutChildrenMode.NESTED: {
+        const rect = new Shapes.Rectangle(parentSize, new Vector(0, 0));
+        const centers = this.iters.get(LayoutTypes.Grid).centersInRect(safeChildren.length, rowCol, rect);
+        return Object.fromEntries(safeChildren.map((c, i) => [c.id, centers[i]]));
+      }
     }
+  };
 
-    placeChildren = (
-                        args : PlaceChildrenParam
-                    ) 
-                    : PlaceChildrenReturn => 
-    {
-        const   { 
-                    children, 
-                    nodeSize, 
-                    spacing, 
-                    origin, 
-                    parentSize, 
-                    mode
-                } : PlaceChildrenParam = args;
-        const rowCol : Vector = this.tuning.get("rowCol")(children.length);
-        const ip     : number = this.tuning.get("itemPad")(spacing);
-        const anchor : Vector = this.iters
-                                    .get(LayoutTypes.Grid)
-                                    .anchorOffset   (
-                                                        { 
-                                                            mode, 
-                                                            parentSize, 
-                                                            spacing 
-                                                        }
-                                                    );
-        switch(args.mode)
-        {
-            case LayoutChildrenMode.GRAPH:
-                // GRAPH: logical cell = node + 2*itemPad; anchor below parent
-                const cell    : Vector = nodeSize.add(Vector.scalar(2 * ip));
-                const total   : Vector = rowCol.multiply(cell);
-                const topLeft : Vector = origin
-                                            .add(anchor)
-                                            .subtract(total.halve());
-                return Object
-                        .fromEntries(
-                            mapIndex(
-                                children.length,
-                                (i : number) => [
-                                    children[i].id,
-                                    topLeft
-                                        .add    (
-                                                    cell
-                                                        .multiply   (
-                                                                        new Vector  (
-                                                                                        i % rowCol.x, 
-                                                                                        Math.floor(i / rowCol.x)
-                                                                                    )
-                                                                    )
-                                                )
-                                        .add    (cell.halve())
-                                        .round  ()
-                                ]
-                            )
-                        );
-            case LayoutChildrenMode.NESTED:
-                const rect = new Shapes.Rectangle   (
-                                                        parentSize, 
-                                                        new Vector(0,0)
-                                                    );
-                const centers = this.iters
-                                    .get(LayoutTypes.Grid)
-                                    .centersInRect  (
-                                                        children.length, 
-                                                        rowCol, 
-                                                        rect
-                                                    );
-                return Object
-                        .fromEntries(
-                                        children
-                                        .map(
-                                                (c, i) => 
-                                                    [
-                                                        c.id, 
-                                                        centers[i]
-                                                    ]
-                                            )
-                                    );
-        }
-    };
-    preferredSize = (
-                        { 
-                            count, 
-                            nodeSize, 
-                            spacing, 
-                            mode 
-                        } : PreferredSizeParam
-                    ) : PreferredSizeReturn => 
-    {
-        // grid preferred size = exact cells for nodeSize + itemPad, plus outerPad
-        const rowCol    : Vector = this.tuning.get("rowCol")(count);
-        const ip        : number = this.tuning.get("itemPad")(spacing);
-        const pad       : number = this.tuning.get("outerPad")(spacing);
-        const cell      : Vector = nodeSize.add(Vector.scalar(2 * ip));
-        const inner     : Vector = rowCol.multiply(cell);
-        return inner.add(Vector.scalar(2 * pad));
-    };
-    
+  preferredSize = ({ count, nodeSize, spacing }: PreferredSizeParam): PreferredSizeReturn => {
+    const rowCol: Vector = this.tuning.get("rowCol")(count);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const pad: number = this.tuning.get("outerPad")(spacing);
+    const cell: Vector = nodeSize.add(Vector.scalar(2 * ip));
+    const inner: Vector = rowCol.multiply(cell);
+    return inner.add(Vector.scalar(2 * pad));
+  };
 }

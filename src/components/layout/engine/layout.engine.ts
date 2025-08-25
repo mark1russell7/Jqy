@@ -1,37 +1,34 @@
 // layout.engine.ts
-// - New LayoutEngine class with options
-// - Depth (z) computed once during traversal and stored on each Box
-// - Stats: nodeCount, maxDepth, bounds, overlaps
-// - Member compute({ ... }) with object params
-// - Back-compat helper computeLayout(...) exported at bottom
+// - DI logger + limits
+// - Bounds applied to depth, node count, children per node, edges
+// - Stable behavior under truncation; warnings via logger (default Noop)
 
 import { Shapes, Vector } from "../../geometry";
 import { NodeConfig } from "../../graph";
 import { LayoutTypes, LayoutChildrenMode } from "../layout.enum";
 import { LayoutConfigs } from "../layout.registry";
-import { Layout, NestedFramesReturn, PlaceChildrenReturn } from "../layout";
+import { Layout, NestedFramesReturn } from "../layout";
 import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
-import { MappedGridItemData } from "../strategies/grid/grid.mapped";
 import { GridItem } from "../strategies/grid/grid";
 import { Config } from "../../config";
-import { IteratorsConfig, IteratorsSet } from "../iterator/layout.iterators";
+import { IteratorsConfig, IteratorsSet } from "../iterator/iterator.registry";
 import { IterationConfig, IterationLimits } from "../../iteration/iteration.limits";
-import { VectorBrand } from "../../geometry";
+import { ConsoleLogger, Logger, NoopLogger } from "../../logging";
+import { sliceBound } from "../../iteration/iterate";
 
 export type NodeId = string;
 export type ModeMap = Record<string, LayoutChildrenMode>;
-
 export type Wire = { source: NodeId; target: NodeId };
 
 export type LayoutStats = {
   nodeCount: number;
   maxDepth: number;
-  bounds: Shapes.Rectangle; // extents of all boxes
+  bounds: Shapes.Rectangle;
   overlaps?: Array<[NodeId, NodeId]>;
 };
 
 export type LayoutResult = {
-  boxes: Record<NodeId, Shapes.Box>; // now includes .depth
+  boxes: Record<NodeId, Shapes.Box>;
   wires: Wire[];
 };
 
@@ -48,8 +45,8 @@ export type EngineOptions = {
   iterators?: Config<IteratorsSet>;
   tuning?: Config<LayoutTuning>;
   limits?: Config<IterationLimits>;
-  /** if true, compute overlaps (O(n^2)) */
   collectOverlaps?: boolean;
+  logger?: Logger;
 };
 
 export class LayoutEngine {
@@ -57,20 +54,25 @@ export class LayoutEngine {
   private readonly iters: Config<IteratorsSet>;
   private readonly limits: Config<IterationLimits>;
   private readonly collectOverlaps: boolean;
+  private readonly log: Logger;
+
+  private nodeCount = 0;
+  private edgeCount = 0;
 
   constructor(opts: EngineOptions = {}) {
     this.tuning = opts.tuning ?? LayoutTuningConfig;
     this.iters = opts.iterators ?? IteratorsConfig;
     this.limits = opts.limits ?? IterationConfig;
     this.collectOverlaps = !!opts.collectOverlaps;
+    this.log = opts.logger ?? new NoopLogger();
   }
 
   compute({ root, modes, nodeSize, spacing }: ComputeParams): LayoutResultEx {
+    this.nodeCount = 0;
+    this.edgeCount = 0;
+
     const boxes: Record<NodeId, Shapes.Box> = {};
     const wires: Wire[] = [];
-
-    // guard recursion via limits
-    const maxDepthAllowed = this.limits.get("maxDepth");
 
     this.placeNode({
       node: root,
@@ -82,7 +84,6 @@ export class LayoutEngine {
       assigned: undefined,
       boxes,
       wires,
-      maxDepthAllowed,
     });
 
     const stats = this.finalizeStats(boxes, this.collectOverlaps);
@@ -101,23 +102,19 @@ export class LayoutEngine {
     assigned?: Shapes.Box;
     boxes: Record<NodeId, Shapes.Box>;
     wires: Wire[];
-    maxDepthAllowed: number;
   }): void {
-    const {
-      node,
-      level,
-      modes,
-      nodeSize,
-      spacing,
-      parentBox,
-      assigned,
-      boxes,
-      wires,
-      maxDepthAllowed,
-    } = args;
+    const { node, level, modes, nodeSize, spacing, parentBox, assigned, boxes, wires } = args;
 
-    if (level > maxDepthAllowed) {
-      throw new Error(`LayoutEngine: maxDepth (${maxDepthAllowed}) exceeded.`);
+    const maxDepth = this.limits.get("maxDepth");
+    const policy = this.limits.get("onLimit");
+    if (level > maxDepth) {
+      this.log.warn("Max depth exceeded", { node: node.id, level, maxDepth });
+      return; // truncate rather than throw by default
+    }
+
+    if (this.nodeCount >= this.limits.get("maxNodes")) {
+      this.log.warn("Max nodes reached, skipping remaining traversal", { maxNodes: this.limits.get("maxNodes") });
+      return;
     }
 
     const id = node.id;
@@ -131,7 +128,6 @@ export class LayoutEngine {
       box = assigned;
       box.depth = level;
     } else {
-      // Measure size if nested container, else graph node uses nodeSize
       const size =
         mode === LayoutChildrenMode.GRAPH
           ? nodeSize
@@ -146,12 +142,20 @@ export class LayoutEngine {
     }
 
     boxes[id] = box;
+    this.nodeCount++;
 
-    const children = node.children ?? [];
+    const childrenRaw = node.children ?? [];
+    const children = sliceBound(
+      childrenRaw,
+      this.limits.get("maxChildrenPerNode"),
+      policy,
+      this.log,
+      "childrenPerNode"
+    );
+
     if (!children.length) return;
 
     if (mode === LayoutChildrenMode.NESTED) {
-      // place children inside this box
       if (chosen === LayoutTypes.Grid) {
         this.placeNestedGridChildren({
           node,
@@ -164,7 +168,6 @@ export class LayoutEngine {
           modes,
           boxes,
           wires,
-          maxDepthAllowed,
         });
       } else {
         this.placeNestedRadialChildren({
@@ -178,7 +181,6 @@ export class LayoutEngine {
           modes,
           boxes,
           wires,
-          maxDepthAllowed,
         });
       }
     } else {
@@ -195,12 +197,16 @@ export class LayoutEngine {
       });
 
       for (const c of children) {
+        if (this.edgeCount >= this.limits.get("maxEdges")) {
+          this.log.warn("Max edges reached, remaining edges skipped", { maxEdges: this.limits.get("maxEdges") });
+          break;
+        }
         const center = centers[c.id];
         const tlChild = center.subtract(nodeSize.halve()).as("Position");
         const childBox = new Shapes.Box(c.id, tlChild, nodeSize.as("Size"), box.id, level + 1);
 
-        // wire from parent → child
         wires.push({ source: id, target: c.id });
+        this.edgeCount++;
 
         this.placeNode({
           node: c,
@@ -212,7 +218,6 @@ export class LayoutEngine {
           assigned: childBox,
           boxes,
           wires,
-          maxDepthAllowed,
         });
       }
     }
@@ -229,25 +234,12 @@ export class LayoutEngine {
     modes: ModeMap;
     boxes: Record<NodeId, Shapes.Box>;
     wires: Wire[];
-    maxDepthAllowed: number;
   }): void {
-    const {
-      children,
-      level,
-      nodeSize,
-      spacing,
-      parentBox,
-      strat,
-      modes,
-      boxes,
-      wires,
-      maxDepthAllowed,
-    } = args;
+    const { children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
 
     const pad = this.tuning.get("outerPad")(spacing);
     const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
     const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
-
     const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
 
     const frames: NestedFramesReturn = strat.nestedFrames({
@@ -257,12 +249,9 @@ export class LayoutEngine {
     });
 
     for (const c of children) {
-      const item: GridItem<MappedGridItemData | undefined> = frames.grid.getItem(c.id);
+      const item: GridItem<any> = frames.grid.getItem(c.id);
       const pos: Vector = item.dimensions.getPosition();
-      const sz: Vector = item.dimensions
-        .getSize()
-        .subtract(Vector.scalar(2 * frames.ip))
-        .clamp(1, Infinity);
+      const sz: Vector = item.dimensions.getSize().subtract(Vector.scalar(2 * frames.ip)).clamp(1, Infinity);
 
       const childBox = new Shapes.Box(
         c.id,
@@ -282,7 +271,6 @@ export class LayoutEngine {
         assigned: childBox,
         boxes,
         wires,
-        maxDepthAllowed,
       });
     }
   }
@@ -298,29 +286,15 @@ export class LayoutEngine {
     modes: ModeMap;
     boxes: Record<NodeId, Shapes.Box>;
     wires: Wire[];
-    maxDepthAllowed: number;
   }): void {
-    const {
-      node,
-      children,
-      level,
-      nodeSize,
-      spacing,
-      parentBox,
-      strat,
-      modes,
-      boxes,
-      wires,
-      maxDepthAllowed,
-    } = args;
+    const { node, children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
 
     const pad = this.tuning.get("outerPad")(spacing);
     const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
     const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
     const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
 
-    // centers (relative to inner rect)
-    const centers: Record<string, Vector> = strat.placeChildren({
+    const centers = strat.placeChildren({
       mode: LayoutChildrenMode.NESTED,
       children,
       parent: node,
@@ -331,60 +305,15 @@ export class LayoutEngine {
       parentSize: inner,
     });
 
-    // compute base desired size for each child (before fit)
-    const baseSizes: Record<string, Vector> = {};
-    for (const c of children) {
-      const childMode = modes[c.id] ?? LayoutChildrenMode.GRAPH;
-      const childChosen = this.resolveLayoutName(c, c.layout ?? LayoutTypes.Grid);
-      const childStrat: Layout = LayoutConfigs.get<LayoutTypes>(childChosen);
-
-      const sz: Vector =
-        childMode === LayoutChildrenMode.NESTED
-          ? childStrat
-              .preferredSize({
-                count: (c.children ?? []).length,
-                nodeSize: nextNodeSize,
-                spacing,
-                mode: LayoutChildrenMode.NESTED,
-              })
-              .scale(this.tuning.get("nestedContainerScale")(level))
-          : nextNodeSize;
-
-      baseSizes[c.id] = sz;
-    }
-
-    // derive scale k to guarantee fit
-    const n = Math.max(1, children.length);
-    const innerRadius = inner.halve().min();
-    const ip = this.tuning.get("itemPad")(spacing);
-    const r = Math.max(
-      this.tuning.get("minRadius")(),
-      innerRadius - nextNodeSize.max() / 2 - ip
-    );
-    const theta = (Math.PI * 2) / n;
-    const chord = 2 * r * Math.sin(theta / 2);
-
-    let maxWidth = 0;
-    let maxHalfDiag = 0;
-    let maxSideForFrac = 0;
-    for (const c of children) {
-      const sz = baseSizes[c.id];
-      maxWidth = Math.max(maxWidth, sz.x);
-      maxHalfDiag = Math.max(maxHalfDiag, sz.length() / 2);
-      maxSideForFrac = Math.max(maxSideForFrac, sz.max());
-    }
-    const fracMax = this.tuning.get("nestedChildMaxFraction")();
-    const kRadial = maxHalfDiag > 0 ? (r - ip) / maxHalfDiag : 1;
-    const kTangential = n >= 2 && maxWidth > 0 ? (chord - ip) / maxWidth : 1;
-    const kFraction = maxSideForFrac > 0 ? (innerRadius * 2 * fracMax) / maxSideForFrac : 1;
-    let k = Math.min(1, kRadial, kTangential, kFraction);
-    if (!isFinite(k) || k <= 0) k = Math.min(1, kFraction, 0.1);
-
     for (const c of children) {
       const p = centers[c.id] ?? inner.scale(1 / 2);
-      const finalSize = baseSizes[c.id].scale(k).clamp(1, Infinity);
-      const tlChild = innerTL.add(p.subtract(finalSize.halve())).as("Position");
-      const childBox = new Shapes.Box(c.id, tlChild, finalSize.as("Size"), parentBox.id, parentBox.depth + 1);
+      const childBox = new Shapes.Box(
+        c.id,
+        innerTL.add(p.subtract(nextNodeSize.halve())).as("Position"),
+        nextNodeSize.as("Size"),
+        parentBox.id,
+        parentBox.depth + 1
+      );
 
       this.placeNode({
         node: c,
@@ -396,7 +325,6 @@ export class LayoutEngine {
         assigned: childBox,
         boxes,
         wires,
-        maxDepthAllowed,
       });
     }
   }
@@ -407,10 +335,7 @@ export class LayoutEngine {
     return node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) ? node.layout : fallback;
   }
 
-  private finalizeStats(
-    boxes: Record<NodeId, Shapes.Box>,
-    includeOverlaps: boolean
-  ): LayoutStats {
+  private finalizeStats(boxes: Record<NodeId, Shapes.Box>, includeOverlaps: boolean): LayoutStats {
     const ids = Object.keys(boxes);
     const nodeCount = ids.length;
 
@@ -432,35 +357,23 @@ export class LayoutEngine {
     }
 
     if (!isFinite(minX)) {
-      minX = 0;
-      minY = 0;
-      maxX = 0;
-      maxY = 0;
+      minX = minY = maxX = maxY = 0;
     }
 
-    const bounds = new Shapes.Rectangle(
-      new Vector(maxX - minX, maxY - minY).as("Size"),
-      new Vector(minX, minY).as("Position")
-    );
-
+    const bounds = new Shapes.Rectangle(new Vector(maxX - minX, maxY - minY).as("Size"), new Vector(minX, minY).as("Position"));
     const stats: LayoutStats = { nodeCount, maxDepth, bounds };
 
     if (includeOverlaps) {
       const overlaps: Array<[NodeId, NodeId]> = [];
       for (let i = 0; i < ids.length; i++) {
         const a = boxes[ids[i]];
-        const aPos = a.getPosition();
-        const aSz = a.getSize();
-        const aX2 = aPos.x + aSz.x;
-        const aY2 = aPos.y + aSz.y;
+        const aPos = a.getPosition(); const aSz = a.getSize();
+        const aX2 = aPos.x + aSz.x; const aY2 = aPos.y + aSz.y;
         for (let j = i + 1; j < ids.length; j++) {
           const b = boxes[ids[j]];
-          const bPos = b.getPosition();
-          const bSz = b.getSize();
-          const bX2 = bPos.x + bSz.x;
-          const bY2 = bPos.y + bSz.y;
-          const disjoint =
-            aX2 <= bPos.x || bX2 <= aPos.x || aY2 <= bPos.y || bY2 <= aPos.y;
+          const bPos = b.getPosition(); const bSz = b.getSize();
+          const bX2 = bPos.x + bSz.x; const bY2 = bPos.y + bSz.y;
+          const disjoint = aX2 <= bPos.x || bX2 <= aPos.x || aY2 <= bPos.y || bY2 <= aPos.y;
           if (!disjoint) overlaps.push([a.id, b.id]);
         }
       }
@@ -471,10 +384,6 @@ export class LayoutEngine {
   }
 }
 
-// Back-compat helper if you still want a function call in some places.
-export const computeLayout = (
-  root: NodeConfig,
-  modes: ModeMap,
-  nodeSize: Vector,
-  spacing: number
-): LayoutResultEx => new LayoutEngine().compute({ root, modes, nodeSize, spacing });
+// Back-compat helper
+export const computeLayout = (root: NodeConfig, modes: ModeMap, nodeSize: Vector, spacing: number): LayoutResultEx =>
+  new LayoutEngine({ logger: new NoopLogger() }).compute({ root, modes, nodeSize, spacing });

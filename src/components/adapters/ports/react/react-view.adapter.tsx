@@ -1,11 +1,11 @@
 import { JSX, useMemo } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
-import { LayoutResultEx } from "../layout/engine/layout.engine";
-import { toReactFlow } from "./react-flow.adapter";
-import { AbsoluteDOM } from "./react-dom.adapter";
-import { Canvas2D } from "./canvas.adapter";
-import { Theme, defaultTheme } from "./theme";
-import { Target } from "./env";
+import { Target } from "../../env";
+import { LayoutResultEx } from "../../../layout/engine/layout.engine";
+import { defaultTheme, Theme } from "../../theme";
+import { toReactFlow } from "./react-flow.react.adapter";
+import { Canvas2D } from "./canvas.react.adapter";
+import { AbsoluteDOM } from "./dom.react.adapter";
 
 export type ReactAdapterProps = {
   kind: Target;

@@ -3,12 +3,12 @@ import { JSX, useEffect, useMemo, useState } from "react";
 import { NodeConfig } from "./graph";
 import { Vector } from "./geometry";
 import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
-import { LayoutView } from "./adapters/react-view.adapter";
 import { LayoutEngine, LayoutResultEx, ModeMap } from "./layout/engine/layout.engine";
 import { LabeledSlider, Segmented } from "./ui/controls";
 import { Shell } from "./ui/styles";
 import { Configurator } from "./ui/Configurator";
 import { Target } from "./adapters/env";
+import { LayoutView } from "./adapters/ports/react/react-view.adapter";
 
 const DEMO: NodeConfig = {
   id: "root",

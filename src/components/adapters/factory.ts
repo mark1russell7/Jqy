@@ -4,14 +4,14 @@
 
 import React, { JSX, ReactElement } from "react";
 import { AdapterConfig, Framework, Target } from "./env";
-import { runLayoutAPI, RunLayoutApiInput } from "./api.adapter";
-import { Canvas2D, Canvas2DProps } from "./canvas.adapter";
-import { AbsoluteDOM, AbsoluteDOMProps } from "./react-dom.adapter";
-import { LayoutView, ReactAdapterProps } from "./react-view.adapter";
-import { CanvasMount, mountCanvas2D } from "./canvas.vanilla";
-import { DOMMount, mountAbsoluteDOM } from "./vanilla-dom.adapter";
+import { runLayoutAPI, RunLayoutApiInput } from "./ports/api/api.adapter";
+import { Canvas2D, Canvas2DProps } from "./ports/react/canvas.react.adapter";
+import { AbsoluteDOM, AbsoluteDOMProps } from "./ports/react/dom.react.adapter";
+import { LayoutView, ReactAdapterProps } from "./ports/react/react-view.adapter";
+import { CanvasMount, mountCanvas2D } from "./ports/vanilla/canvas.vanilla";
+import { DOMMount, mountAbsoluteDOM } from "./ports/vanilla/dom.vanilla.adapter";
 import { LayoutResultEx } from "../layout/engine/layout.engine";
-import { PortKind, TargetAdapter as NewTargetAdapter } from "./ports";
+import { PortKind, TargetAdapter as NewTargetAdapter } from "./ports/ports";
 
 // --- legacy Renderer + factories (unchanged API) -----------------------------
 

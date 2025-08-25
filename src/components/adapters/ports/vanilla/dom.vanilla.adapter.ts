@@ -1,5 +1,5 @@
-import { LayoutResult, LayoutResultEx } from "../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "./theme";
+import { LayoutResult, LayoutResultEx } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
 
 export type DOMMount = {
   update: (r: LayoutResultEx) => void;

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Node, Edge } from "reactflow";
-import { LayoutResultEx } from "../layout/engine/layout.engine";
-import { Vector } from "../geometry";
+import { Vector } from "../../../geometry";
+import { LayoutResultEx } from "../../../layout/engine/layout.engine";
 
 const nodeStyle = (v: Vector): CSSProperties => ({
   width: v.x,

@@ -14,9 +14,7 @@ import {
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../layout/layout.enum";
-import { 
-  ModeMap 
-} from "../engine/layout.engine";
+import { ModeMap } from "../layout/engine/layout.engine";
 
 type Scope = "all" | string;
 

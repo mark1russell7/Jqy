@@ -1,6 +1,6 @@
 import { JSX } from "react/jsx-dev-runtime";
-import { LayoutResult } from "../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "./theme";
+import { LayoutResult } from "../../../layout/engine/layout.engine";
+import { Theme, defaultTheme } from "../../theme";
 
 export type AbsoluteDOMProps = {
   result: LayoutResult;

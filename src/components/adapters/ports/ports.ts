@@ -3,9 +3,9 @@
 // - No magic string literals in your codebase
 
 import React from "react";
-import { RunLayoutApiInput } from "./api.adapter";
-import { LayoutResultEx } from "../layout/engine/layout.engine";
-import { Target } from "./env";
+import { RunLayoutApiInput } from "./api/api.adapter";
+import { LayoutResultEx } from "../../layout/engine/layout.engine";
+import { Target } from "../env";
 
 export enum PortKind {
   API = "api",

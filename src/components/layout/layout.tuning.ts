@@ -4,9 +4,7 @@ import {
 import { 
     Vector 
 } from "../geometry";
-import { 
-    AnchorIteratorParams 
-} from "./iterator.types";
+import { AnchorIteratorParams } from "./iterator/iterator.types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";
