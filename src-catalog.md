@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T01:50:00.046Z
+Generated on 2025-08-25T04:23:31.440Z
 
 ## Directory structure (src)
 
@@ -9,35 +9,66 @@ Generated on 2025-08-25T01:50:00.046Z
 
 ├── components/
 │   ├── adapters/
-│   │   ├── ports/
-│   │   │   ├── api/
-│   │   │   │   └── api.adapter.ts
-│   │   │   ├── react/
-│   │   │   │   ├── canvas.react.adapter.tsx
-│   │   │   │   ├── dom.react.adapter.tsx
-│   │   │   │   ├── react-flow.react.adapter.ts
-│   │   │   │   ├── react-three-fiber.react.adapter.tsx
-│   │   │   │   └── react-view.adapter.tsx
-│   │   │   ├── vanilla/
-│   │   │   │   ├── canvas.vanilla.ts
-│   │   │   │   ├── dom.vanilla.adapter.ts
-│   │   │   │   └── threejs.vanilla.adapter.ts
-│   │   │   └── ports.ts
 │   │   ├── targets/
 │   │   │   └── canvas.core.ts
 │   │   ├── env.ts
-│   │   ├── factory.ts
 │   │   └── theme.ts
+│   ├── core/
+│   │   ├── config/
+
+│   │   ├── geometry/
+│   │   │   ├── geometry.sanity.test.ts
+│   │   │   └── index.ts
+│   │   ├── ids-branding/
+│   │   │   └── brand.ts
+│   │   ├── logging/
+│   │   │   └── logger.ts
+│   │   ├── math/
+│   │   │   └── index.ts
+│   │   ├── result-error/
+
+│   │   └── utils/
+
+│   ├── graph/
+│   │   ├── builders/
+│   │   │   └── tree.ts
+│   │   ├── model.ts
+│   │   ├── types.ts
+│   │   └── validate.ts
 │   ├── iteration/
 │   │   ├── iterate.ts
 │   │   └── iteration.limits.ts
 │   ├── layout/
+│   │   ├── api/
+│   │   │   ├── contracts.ts
+│   │   │   └── index.ts
+│   │   ├── constraints/
+
 │   │   ├── engine/
-│   │   │   └── layout.engine.ts
+│   │   │   ├── phases/
+│   │   │   │   ├── contracts.ts
+│   │   │   │   ├── parse.ts
+│   │   │   │   ├── place.ts
+│   │   │   │   ├── plan.ts
+│   │   │   │   ├── post.ts
+│   │   │   │   ├── route.ts
+│   │   │   │   └── validate.ts
+│   │   │   ├── context.ts
+│   │   │   └── engine.ts
 │   │   ├── iterator/
 │   │   │   ├── iterator.registry.ts
 │   │   │   ├── iterator.types.ts
 │   │   │   └── layout.iterators.ts
+│   │   ├── limits/
+│   │   │   └── index.ts
+│   │   ├── metrics/
+│   │   │   └── metrics.ts
+│   │   ├── registries/
+│   │   │   ├── layout.registry.ts
+│   │   │   └── router.registry.ts
+│   │   ├── routers/
+│   │   │   ├── line.router.ts
+│   │   │   └── ortho.router.ts
 │   │   ├── strategies/
 │   │   │   ├── grid/
 │   │   │   │   ├── grid.layout.ts
@@ -45,25 +76,45 @@ Generated on 2025-08-25T01:50:00.046Z
 │   │   │   │   └── grid.ts
 │   │   │   └── radial/
 │   │   │       └── radial.layout.ts
+│   │   ├── tunings/
+
 │   │   ├── layout.enum.ts
-│   │   ├── layout.registry.ts
 │   │   ├── layout.ts
-│   │   └── layout.tuning.ts
-│   ├── playground/
-│   │   └── controller.ts
+│   │   ├── layout.tuning.ts
+│   │   └── types.ts
+│   ├── render/
+│   │   ├── ports/
+│   │   │   ├── canvas.port.ts
+│   │   │   ├── dom.port.ts
+│   │   │   └── types.ts
+│   │   ├── theme/
+
+│   │   └── views/
+│   │       └── LayoutView.tsx
+│   ├── tooling/
+│   │   ├── diagnostics/
+
+│   │   ├── exporters/
+│   │   │   ├── reactflow.ts
+│   │   │   └── svg.ts
+│   │   ├── importers/
+
+│   │   ├── testkit/
+
+│   │   └── workers/
+
 │   ├── ui/
+│   │   ├── controls/
+
+│   │   ├── playground/
+
+│   │   ├── styles/
+
 │   │   ├── Configurator.tsx
 │   │   ├── controls.tsx
 │   │   └── styles.ts
-│   ├── brand.ts
-│   ├── class.types.ts
 │   ├── config.ts
 │   ├── errors.ts
-│   ├── geometry.sanity.test.ts
-│   ├── geometry.ts
-│   ├── graph.ts
-│   ├── logging.ts
-│   ├── math.ts
 │   └── ParentChildFlow.tsx
 └── App.tsx
 ```
@@ -130,679 +181,33 @@ export type AdapterConfig =
 
 ```
 
-### src/components/adapters/factory.ts
-
-``` ts
-// factory.ts
-// - Adds makeTargetAdapter returning the new TargetAdapter using PortKind
-// - Keeps existing getAdapter/makeRenderer exports for backwards-compat
-
-import React, { JSX, ReactElement } from "react";
-import { AdapterConfig, Framework, Target } from "./env";
-import { runLayoutAPI, RunLayoutApiInput } from "./ports/api/api.adapter";
-import { Canvas2D, Canvas2DProps } from "./ports/react/canvas.react.adapter";
-import { AbsoluteDOM, AbsoluteDOMProps } from "./ports/react/dom.react.adapter";
-import { LayoutView, ReactAdapterProps } from "./ports/react/react-view.adapter";
-import { CanvasMount, mountCanvas2D } from "./ports/vanilla/canvas.vanilla";
-import { DOMMount, mountAbsoluteDOM } from "./ports/vanilla/dom.vanilla.adapter";
-import { LayoutResultEx } from "../layout/engine/layout.engine";
-import { PortKind, TargetAdapter as NewTargetAdapter } from "./ports/ports";
-
-// --- legacy Renderer + factories (unchanged API) -----------------------------
-
-export type Renderer =
-  | { kind: Target.API }
-  | { kind: Target.DOM }
-  | { kind: Target.Canvas }
-  | { kind: Framework.React; Component: React.ComponentType<any> }
-  | { kind: Target.ReactFlow; Component: React.ComponentType<any> };
-
-export const makeRenderer = (target: Target): Renderer => {
-  switch (target) {
-    case Target.API:
-      return { kind: Target.API };
-    case Target.DOM:
-      return { kind: Target.DOM };
-    case Target.Canvas:
-      return { kind: Target.Canvas };
-    case Target.ReactFlow:
-      return { kind: Target.ReactFlow, Component: LayoutView };
-    case Target.ThreeJS:
-    default:
-      return { kind: Framework.React, Component: LayoutView };
-  }
-};
-
-export type GetAdapterReturnRunLayoutAPI = {
-  kind: Target.API;
-  run: (input: RunLayoutApiInput) => LayoutResultEx;
-};
-
-export type GetAdapterReturnReact = {
-  kind: Framework.React;
-  render: (props: Canvas2DProps) => ReactElement;
-};
-
-export type GetAdapterReturnVanillaCanvas = {
-  kind: Target.Canvas;
-  mount: (container: HTMLElement, initial: LayoutResultEx) => CanvasMount;
-};
-
-export type GetAdapterReturnVanillaDOM = {
-  kind: Target.DOM;
-  mount: (container: HTMLElement, initial: LayoutResultEx) => DOMMount;
-};
-
-export type GetAdapterReturnReactFlow = {
-  kind: Target.ReactFlow;
-  render: (props: ReactAdapterProps) => ReactElement;
-};
-
-export type GetAdapterReturn =
-  | GetAdapterReturnRunLayoutAPI
-  | GetAdapterReturnReact
-  | GetAdapterReturnVanillaCanvas
-  | GetAdapterReturnVanillaDOM
-  | GetAdapterReturnReactFlow;
-
-export const getAdapter = (cfg: AdapterConfig): GetAdapterReturn => {
-  switch (cfg.target) {
-    case Target.API:
-      return { kind: Target.API, run: runLayoutAPI };
-
-    case Target.Canvas:
-      if (cfg.framework === Framework.React) {
-        return {
-          kind: Framework.React,
-          render: (props: Canvas2DProps): ReactElement => React.createElement(Canvas2D, props),
-        };
-      } else {
-        return { kind: Target.Canvas, mount: mountCanvas2D };
-      }
-
-    case Target.DOM:
-      if (cfg.framework === Framework.React) {
-        return {
-          kind: Framework.React,
-          render: (props: AbsoluteDOMProps): JSX.Element => React.createElement(AbsoluteDOM, props),
-        };
-      } else {
-        return { kind: Target.DOM, mount: mountAbsoluteDOM };
-      }
-
-    case Target.ReactFlow:
-      return {
-        kind: Target.ReactFlow,
-        render: (props: ReactAdapterProps): JSX.Element =>
-          React.createElement(LayoutView, { ...props, kind: Target.ReactFlow }),
-      };
-
-    case Target.ThreeJS:
-      throw new Error("ThreeJS adapter not implemented yet.");
-
-    default:
-      throw new Error(`Unsupported target: ${cfg.target}`);
-  }
-};
-
-// --- NEW: clean TargetAdapter using PortKind --------------------------------
-
-export function makeTargetAdapter(cfg: AdapterConfig): NewTargetAdapter {
-  switch (cfg.target) {
-    case Target.API:
-      return {
-        target: Target.API,
-        port: { kind: PortKind.API, run: runLayoutAPI },
-      };
-    case Target.DOM:
-      if (cfg.framework === Framework.React) {
-        return {
-          target: Target.DOM,
-          port: { kind: PortKind.React, component: AbsoluteDOM },
-        };
-      } else {
-        return {
-          target: Target.DOM,
-          port: {
-            kind: PortKind.Vanilla,
-            mount: (container, initial) => mountAbsoluteDOM(container, initial),
-          },
-        };
-      }
-    case Target.Canvas:
-      if (cfg.framework === Framework.React) {
-        return {
-          target: Target.Canvas,
-          port: { kind: PortKind.React, component: Canvas2D },
-        };
-      } else {
-        return {
-          target: Target.Canvas,
-          port: {
-            kind: PortKind.Vanilla,
-            mount: (container, initial) => mountCanvas2D(container, initial),
-          },
-        };
-      }
-    case Target.ReactFlow:
-      return {
-        target: Target.ReactFlow,
-        port: { kind: PortKind.React, component: LayoutView },
-      };
-    default:
-      throw new Error(`Unsupported target: ${cfg.target}`);
-  }
-}
-
-```
-
-### src/components/adapters/ports/api/api.adapter.ts
-
-``` ts
-import { LayoutResultEx, ModeMap, LayoutEngine } from "../../../layout/engine/layout.engine";
-import { Vector } from "../../../geometry";
-import { NodeConfig } from "../../../graph";
-
-export type RunLayoutApiInput = {
-  root: NodeConfig;
-  modes: ModeMap;
-  nodeSize: Vector;
-  spacing: number;
-};
-
-const engine = new LayoutEngine();
-
-export const runLayoutAPI = ({ root, modes, nodeSize, spacing }: RunLayoutApiInput): LayoutResultEx =>
-  engine.compute({ root, modes, nodeSize, spacing });
-
-```
-
-### src/components/adapters/ports/ports.ts
-
-``` ts
-// ports.ts
-// - Cleanly separates PortKind from Target
-// - No magic string literals in your codebase
-
-import React from "react";
-import { RunLayoutApiInput } from "./api/api.adapter";
-import { LayoutResultEx } from "../../layout/engine/layout.engine";
-import { Target } from "../env";
-
-export enum PortKind {
-  API = "api",
-  React = "react",
-  Vanilla = "vanilla",
-}
-
-export type ApiPort = { kind: PortKind.API; run: (input: RunLayoutApiInput) => LayoutResultEx };
-export type ReactPort = { kind: PortKind.React; component: React.ComponentType<any> };
-export type VanillaPort = {
-  kind: PortKind.Vanilla;
-  mount: (
-    container: HTMLElement,
-    initial: LayoutResultEx
-  ) => { update(r: LayoutResultEx): void; destroy(): void };
-};
-
-export type Port = ApiPort | ReactPort | VanillaPort;
-
-export type TargetAdapter =
-  | { target: Target.API; port: ApiPort }
-  | { target: Target.DOM | Target.Canvas | Target.ReactFlow; port: ReactPort | VanillaPort };
-
-```
-
-### src/components/adapters/ports/react/canvas.react.adapter.tsx
-
-``` tsx
-import { JSX, useEffect, useRef } from "react";
-import { LayoutResult } from "../../../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "../../theme";
-import { CanvasRenderer2D } from "../../targets/canvas.core";
-
-export type Canvas2DProps = {
-  result: LayoutResult;
-  theme?: Theme;
-  /** enable partial redraw when new results come in */
-  partial?: boolean;
-};
-
-export const Canvas2D = ({ result, theme = defaultTheme, partial = true }: Canvas2DProps): JSX.Element => {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  const rendererRef = useRef<CanvasRenderer2D | null>(null);
-
-  const resizeAndRedraw = (parent: HTMLElement, cvs: HTMLCanvasElement): void => {
-    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
-    const rect = parent.getBoundingClientRect();
-    const w = Math.max(1, Math.round(rect.width * dpr));
-    const h = Math.max(1, Math.round(rect.height * dpr));
-    if (cvs.width !== w || cvs.height !== h) {
-      cvs.width = w; cvs.height = h;
-      const ctx = cvs.getContext("2d")!;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // after size change, do a full draw to avoid artifacts
-      rendererRef.current?.fullDraw(result);
-    }
-  };
-
-  useEffect(() => {
-    const cvs = ref.current!;
-    const parent = cvs.parentElement!;
-    // initial DPR + renderer
-    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
-    const rect = parent.getBoundingClientRect();
-    cvs.width = Math.max(1, Math.round(rect.width * dpr));
-    cvs.height = Math.max(1, Math.round(rect.height * dpr));
-    const ctx = cvs.getContext("2d")!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    rendererRef.current = new CanvasRenderer2D(cvs, theme);
-    rendererRef.current.fullDraw(result);
-
-    const ro = new ResizeObserver(() => resizeAndRedraw(parent, cvs));
-    ro.observe(parent);
-
-    return () => {
-      ro.disconnect();
-      rendererRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount once
-
-  // theme/result updates
-  useEffect(() => {
-    if (!rendererRef.current) return;
-    rendererRef.current.setTheme(theme);
-    rendererRef.current.update(result, { partial });
-  }, [result, theme, partial]);
-
-  return (
-    <canvas
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
-      ref={ref}
-    />
-  );
-};
-
-```
-
-### src/components/adapters/ports/react/dom.react.adapter.tsx
-
-``` tsx
-import { JSX } from "react/jsx-dev-runtime";
-import { LayoutResult } from "../../../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "../../theme";
-
-export type AbsoluteDOMProps = {
-  result: LayoutResult;
-  theme?: Theme;
-};
-
-export function AbsoluteDOM({ result, theme = defaultTheme }: AbsoluteDOMProps): JSX.Element {
-  const all = result.boxes;
-  const boxes = Object.values(all).sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id));
-
-  const lines = result.wires.map((w) => {
-    const a = result.boxes[w.source];
-    const b = result.boxes[w.target];
-    if (!a || !b) return null;
-    const A = a.getPosition().add(a.getSize().halve());
-    const B = b.getPosition().add(b.getSize().halve());
-    return (
-      <line
-        key={`${w.source}-${w.target}`}
-        x1={A.x}
-        y1={A.y}
-        x2={B.x}
-        y2={B.y}
-        stroke={theme.wire.stroke}
-        strokeWidth={theme.wire.width}
-      />
-    );
-  });
-
-  return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <svg style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{lines}</svg>
-      {boxes.map((b) => (
-        <div
-          key={b.id}
-          data-parent={b.parentId ?? ""}
-          style={{
-            position: "absolute",
-            left: b.getPosition().x,
-            top: b.getPosition().y,
-            width: b.getSize().x,
-            height: b.getSize().y,
-            border: `1px solid ${theme.node.border}`,
-            borderRadius: theme.node.radius,
-            background: theme.node.bg,
-            boxSizing: "border-box",
-            fontSize: theme.node.fontSize,
-            color: theme.node.text,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            userSelect: "none",
-          }}
-        >
-          {b.id}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-```
-
-### src/components/adapters/ports/react/react-flow.react.adapter.ts
-
-``` ts
-import type { CSSProperties } from "react";
-import type { Node, Edge } from "reactflow";
-import { Vector } from "../../../geometry";
-import { LayoutResultEx } from "../../../layout/engine/layout.engine";
-
-const nodeStyle = (v: Vector): CSSProperties => ({
-  width: v.x,
-  height: v.y,
-  border: "1px solid #cbd5e1",
-  borderRadius: 10,
-  background: "#fff",
-  fontSize: 12,
-  boxSizing: "border-box" as const,
-});
-
-export type toReactFlowReturn = { nodes: Node[]; edges: Edge[] };
-
-export function toReactFlow({ boxes, wires }: LayoutResultEx): toReactFlowReturn {
-  const nodes: Node[] = Object.values(boxes).map((b) => {
-    const rel: Vector = b.parentId ? b.getPosition().subtract(boxes[b.parentId].getPosition()) : b.getPosition();
-
-    const base: Node = {
-      id: b.id,
-      position: rel,
-      data: { label: b.id },
-      style: nodeStyle(b.size),
-    };
-
-    return b.parentId ? { ...base, parentNode: b.parentId, extent: "parent" } : base;
-  });
-
-  const edges: Edge[] = wires.map((w) => ({ id: `${w.source}-${w.target}`, source: w.source, target: w.target }));
-  return { nodes, edges };
-}
-
-```
-
-### src/components/adapters/ports/react/react-three-fiber.react.adapter.tsx
-
-``` tsx
-// TODO: Implement React-Three-Fiber <Canvas> wrapper and map boxes->meshes.
-export function R3FView() 
-{
-    throw new Error("R3F adapter not implemented yet.");
-}
-
-```
-
-### src/components/adapters/ports/react/react-view.adapter.tsx
-
-``` tsx
-import { JSX, useMemo } from "react";
-import ReactFlow, { Background, Controls } from "reactflow";
-import { Target } from "../../env";
-import { LayoutResultEx } from "../../../layout/engine/layout.engine";
-import { defaultTheme, Theme } from "../../theme";
-import { toReactFlow } from "./react-flow.react.adapter";
-import { Canvas2D } from "./canvas.react.adapter";
-import { AbsoluteDOM } from "./dom.react.adapter";
-
-export type ReactAdapterProps = {
-  kind: Target;
-  result: LayoutResultEx;
-  theme?: Theme;
-};
-
-export const LayoutView = ({ kind, result, theme = defaultTheme }: ReactAdapterProps): JSX.Element => {
-  if (kind === Target.ReactFlow) {
-    const { nodes, edges } = useMemo(() => toReactFlow(result), [result]);
-    return (
-      <div style={{ position: "absolute", inset: 0 }}>
-        <ReactFlow nodes={nodes} edges={edges} fitView>
-          <Background gap={16} />
-          <Controls />
-        </ReactFlow>
-      </div>
-    );
-  }
-  if (kind === Target.Canvas) return <Canvas2D result={result} theme={theme} />;
-  return <AbsoluteDOM result={result} theme={theme} />;
-};
-
-```
-
-### src/components/adapters/ports/vanilla/canvas.vanilla.ts
-
-``` ts
-import { LayoutResultEx } from "../../../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "../../theme";
-import { CanvasRenderer2D } from "../../targets/canvas.core";
-
-export type CanvasMount = {
-  update: (r: LayoutResultEx, opts?: { partial?: boolean }) => void;
-  destroy: () => void;
-};
-
-export const mountCanvas2D = (
-  container: HTMLElement,
-  initial: LayoutResultEx,
-  theme: Theme = defaultTheme
-): CanvasMount => {
-  const canvas: HTMLCanvasElement = document.createElement("canvas");
-  Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
-  container.appendChild(canvas);
-
-  // initial sizing + DPR
-  const dpr: number = Math.max(1, (window.devicePixelRatio as number) || 1);
-  const rect: DOMRect = container.getBoundingClientRect();
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  const ctx = canvas.getContext("2d")!;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  const renderer = new CanvasRenderer2D(canvas, theme);
-  renderer.fullDraw(initial);
-
-  const ro: ResizeObserver = new ResizeObserver(() => {
-    const rr = container.getBoundingClientRect();
-    const w = Math.max(1, Math.round(rr.width * dpr));
-    const h = Math.max(1, Math.round(rr.height * dpr));
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w; canvas.height = h;
-      const c = canvas.getContext("2d")!;
-      c.setTransform(dpr, 0, 0, dpr, 0, 0);
-      renderer.fullDraw(initial);
-    }
-  });
-  ro.observe(container);
-
-  return {
-    update: (r, opts) => renderer.update(r, { partial: opts?.partial ?? true }),
-    destroy: () => {
-      ro.disconnect();
-      container.removeChild(canvas);
-    },
-  };
-};
-
-```
-
-### src/components/adapters/ports/vanilla/dom.vanilla.adapter.ts
-
-``` ts
-import { LayoutResult, LayoutResultEx } from "../../../layout/engine/layout.engine";
-import { Theme, defaultTheme } from "../../theme";
-
-export type DOMMount = {
-  update: (r: LayoutResultEx) => void;
-  destroy: () => void;
-};
-
-const draw =    (
-                    {
-                        r,
-                        root,
-                        svg,
-                        svgNS,
-                        theme
-                    } : {
-                        r : LayoutResult,
-                        root : HTMLElement,
-                        svg : SVGElement,
-                        svgNS : string,
-                        theme : Theme,
-                    }
-                ) : void => 
-{
-    // clear
-    root
-        .querySelectorAll("[data-node]")
-        .forEach(n => n.remove());
-    
-    while (svg.firstChild) 
-    {
-        svg.removeChild(svg.firstChild);
-    }
-
-    // wires
-    for (const w of r.wires) 
-    {
-        const a = r.boxes[w.source];
-        const b = r.boxes[w.target];
-        if (!a || !b) 
-        {
-            continue;
-        }
-        const A = a.getPosition().add(a.getSize().halve());
-        const B = b.getPosition().add(b.getSize().halve());
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", String(A.x));
-        line.setAttribute("y1", String(A.y));
-        line.setAttribute("x2", String(B.x));
-        line.setAttribute("y2", String(B.y));
-        line.setAttribute("stroke", theme.wire.stroke);
-        line.setAttribute("stroke-width", String(theme.wire.width));
-        svg.appendChild(line);
-    }
-
-    // nodes
-    for (const box of Object.values(r.boxes)) 
-    {
-        const element               = document.createElement("div");
-        element.dataset.node        = box.id;
-        const style                 = element.style;
-        style.position              = "absolute";
-        style.left                  = `${box.getPosition().x}px`;
-        style.top                   = `${box.getPosition().y}px`;
-        style.width                 = `${box.getSize().x}px`;
-        style.height                = `${box.getSize().y}px`;
-        style.border                = `1px solid ${theme.node.border}`;
-        style.borderRadius          = `${theme.node.radius}px`;
-        style.background            = theme.node.bg;
-        style.boxSizing             = "border-box";
-        style.fontSize              = `${theme.node.fontSize}px`;
-        style.color                 = theme.node.text;
-        style.display               = "flex";
-        style.alignItems            = "center";
-        style.justifyContent        = "center";
-        (style as any).userSelect   = "none"; // TS dom lib sometimes misses this
-        element.textContent         = box.id;
-        root.appendChild(element);
-    }
-};
-
-export const mountAbsoluteDOM = (
-                                    container   : HTMLElement,
-                                    initial     : LayoutResult,
-                                    theme       : Theme = defaultTheme
-                                ) : DOMMount => 
-{
-    const root          : HTMLDivElement = document.createElement("div");
-    root.style.position = "relative";
-    root.style.width    = "100%";
-    root.style.height   = "100%";
-    container.appendChild(root);
-
-    const svgNS : string        = "http://www.w3.org/2000/svg";
-    const svg   : SVGElement    = document.createElementNS(svgNS, "svg") as SVGElement;
-    Object.assign   (
-                        svg.style, 
-                        { 
-                            position        : "absolute", 
-                            inset           : "0", 
-                            pointerEvents   : "none" 
-                        }
-                    );
-    root.appendChild(svg);
-
-    draw(
-            {
-                r: initial,
-                root,
-                svg,
-                svgNS,
-                theme
-            }
-        );
-
-    return  {
-                update  :   (r : LayoutResult) => 
-                                draw(
-                                        {
-                                            r,
-                                            root,
-                                            svg,
-                                            svgNS,
-                                            theme
-                                        }
-                                    ),
-                destroy :   () => 
-                                container.removeChild(root),
-            };
-}
-
-```
-
-### src/components/adapters/ports/vanilla/threejs.vanilla.adapter.ts
-
-``` ts
-// TODO: Implement Three.js scene graph binding for boxes + wires.
-// Placeholder to keep the target shape consistent.
-export function mountThreeJS() 
-{
-    throw new Error("Three.js adapter not implemented yet.");
-}
-
-```
-
 ### src/components/adapters/targets/canvas.core.ts
 
 ``` ts
 // canvas.core.ts
 // - full draw (kept): drawLayoutToCanvas
-// - new: CanvasRenderer2D with dirty-rect partial redraw (clip wires + boxes)
-// - stable z-order via (depth,id)
+// - CanvasRenderer2D with dirty-rect partial redraw
+// - supports polylines on wires
+// - no legacy imports
 
-import { LayoutResult } from "../../layout/engine/layout.engine";
-import { Shapes, Vector } from "../../geometry";
+import { Shapes, Vector } from "../../core/geometry";
 import { Theme, defaultTheme } from "../theme";
 
-/* ----------------------- public full draw (unchanged api) ------------------ */
+/* ----- local layout shape expected by the canvas drawer ----- */
+type LegacyBox = {
+  id: string;
+  getPosition(): Vector;
+  getSize(): Vector;
+  parentId?: string;
+  depth: number;
+};
+type LegacyWire = { id?: string; source: string; target: string; polyline?: Vector[] };
+export type CanvasLayout = { boxes: Record<string, LegacyBox>; wires: LegacyWire[] };
+
+/* ----------------------- public full draw ------------------ */
 export const drawLayoutToCanvas = (
   ctx: CanvasRenderingContext2D,
-  result: LayoutResult,
+  result: CanvasLayout,
   theme: Theme = defaultTheme
 ): void => {
   const { width, height } = ctx.canvas;
@@ -817,7 +222,7 @@ type Rect = { x: number; y: number; w: number; h: number };
 
 export class CanvasRenderer2D {
   private ctx: CanvasRenderingContext2D;
-  private prev: LayoutResult | null = null;
+  private prev: CanvasLayout | null = null;
   private theme: Theme;
 
   constructor(private canvas: HTMLCanvasElement, theme: Theme = defaultTheme) {
@@ -827,42 +232,26 @@ export class CanvasRenderer2D {
     this.theme = theme;
   }
 
-  setTheme(theme: Theme): void {
-    this.theme = theme;
-  }
+  setTheme(theme: Theme): void { this.theme = theme; }
 
-  /** Ensure DPR/size; call this after you size+transform the canvas in your adapter. */
-  fullDraw(result: LayoutResult): void {
+  fullDraw(result: CanvasLayout): void {
     drawLayoutToCanvas(this.ctx, result, this.theme);
     this.prev = result;
   }
 
-  update(next: LayoutResult, opts: { partial?: boolean } = {}): void {
+  update(next: CanvasLayout, opts: { partial?: boolean } = {}): void {
     const partial = opts.partial ?? true;
-    if (!partial || !this.prev) {
-      this.fullDraw(next);
-      return;
-    }
+    if (!partial || !this.prev) { this.fullDraw(next); return; }
 
     const dirty = diffDirtyRect(this.prev, next, 2); // 2px pad
-    if (!dirty) {
-      // nothing material changed
-      this.prev = next;
-      return;
-    }
+    if (!dirty) { this.prev = next; return; }
 
     const area = this.canvas.width * this.canvas.height;
     const dirtyArea = dirty.w * dirty.h;
-    // heuristic: large changes → cheaper to full redraw
-    if (dirtyArea / Math.max(1, area) > 0.6) {
-      this.fullDraw(next);
-      return;
-    }
+    if (dirtyArea / Math.max(1, area) > 0.6) { this.fullDraw(next); return; }
 
-    // clear + background for dirty region
     paintBackground(this.ctx, this.theme, dirty.x, dirty.y, dirty.w, dirty.h);
 
-    // redraw wires clipped to dirty rect
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.rect(dirty.x, dirty.y, dirty.w, dirty.h);
@@ -870,39 +259,38 @@ export class CanvasRenderer2D {
     drawWires(this.ctx, next, this.theme);
     this.ctx.restore();
 
-    // redraw boxes intersecting dirty rect in correct z-order
     drawBoxesInRect(this.ctx, next, this.theme, dirty);
-
     this.prev = next;
   }
 }
 
 /* ----------------------------- drawing helpers ----------------------------- */
 
-function paintBackground(
-  ctx: CanvasRenderingContext2D,
-  theme: Theme,
-  x: number,
-  y: number,
-  w: number,
-  h: number
-): void {
+function paintBackground(ctx: CanvasRenderingContext2D, theme: Theme, x: number, y: number, w: number, h: number): void {
   ctx.save();
   ctx.fillStyle = theme.canvas.bg;
   ctx.fillRect(x, y, Math.max(0, w), Math.max(0, h));
   ctx.restore();
 }
 
-function drawWires(ctx: CanvasRenderingContext2D, result: LayoutResult, theme: Theme): void {
+function drawWires(ctx: CanvasRenderingContext2D, result: CanvasLayout, theme: Theme): void {
   ctx.save();
   ctx.strokeStyle = theme.wire.stroke;
   ctx.lineWidth = theme.wire.width;
+
   for (const w of result.wires) {
+    if (w.polyline && w.polyline.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(w.polyline[0].x, w.polyline[0].y);
+      for (let i = 1; i < w.polyline.length; i++) ctx.lineTo(w.polyline[i].x, w.polyline[i].y);
+      ctx.stroke();
+      continue;
+    }
     const a = result.boxes[w.source];
     const b = result.boxes[w.target];
     if (!a || !b) continue;
-    const va: Vector = a.size.halve().add(a.getPosition());
-    const vb: Vector = b.size.halve().add(b.getPosition());
+    const va: Vector = a.getSize().halve().add(a.getPosition());
+    const vb: Vector = b.getSize().halve().add(b.getPosition());
     ctx.beginPath();
     ctx.moveTo(va.x, va.y);
     ctx.lineTo(vb.x, vb.y);
@@ -911,48 +299,27 @@ function drawWires(ctx: CanvasRenderingContext2D, result: LayoutResult, theme: T
   ctx.restore();
 }
 
-function drawBoxes(ctx: CanvasRenderingContext2D, result: LayoutResult, theme: Theme): void {
-  const sorted = Object.values(result.boxes).sort(
-    (A, B) => A.depth - B.depth || A.id.localeCompare(B.id)
-  );
-
+function drawBoxes(ctx: CanvasRenderingContext2D, result: CanvasLayout, theme: Theme): void {
+  const sorted = Object.values(result.boxes).sort((A, B) => A.depth - B.depth || A.id.localeCompare(B.id));
   ctx.save();
   ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
-  for (const b of sorted) {
-    drawOneBox(ctx, b, theme);
-  }
+  for (const b of sorted) drawOneBox(ctx, b, theme);
   ctx.restore();
 }
 
-function drawBoxesInRect(
-  ctx: CanvasRenderingContext2D,
-  result: LayoutResult,
-  theme: Theme,
-  r: Rect
-): void {
-  const sorted = Object.values(result.boxes).sort(
-    (A, B) => A.depth - B.depth || A.id.localeCompare(B.id)
-  );
-
+function drawBoxesInRect(ctx: CanvasRenderingContext2D, result: CanvasLayout, theme: Theme, r: Rect): void {
+  const sorted = Object.values(result.boxes).sort((A, B) => A.depth - B.depth || A.id.localeCompare(B.id));
   ctx.save();
   ctx.font = `${theme.node.fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
-  for (const b of sorted) {
-    if (intersects(rectOfBox(b), r)) drawOneBox(ctx, b, theme);
-  }
+  for (const b of sorted) if (intersects(rectOfBox(b), r)) drawOneBox(ctx, b, theme);
   ctx.restore();
 }
 
-function drawOneBox(
-  ctx: CanvasRenderingContext2D,
-  b: Shapes.Box,
-  theme: Theme
-): void {
+function drawOneBox(ctx: CanvasRenderingContext2D, b: LegacyBox, theme: Theme): void {
   const r = theme.node.radius;
   const rectangle = new Shapes.Rectangle(b.getSize(), b.getPosition());
   const center: Vector = b.getPosition().add(b.getSize().halve());
@@ -984,22 +351,18 @@ function roundedRect(ctx: CanvasRenderingContext2D, rectangle: Shapes.Rectangle,
 
 /* ------------------------------- diff helpers ------------------------------ */
 
-function rectOfBox(b: Shapes.Box): Rect {
+function rectOfBox(b: LegacyBox): Rect {
   const p = b.getPosition();
   const s = b.getSize();
   return { x: p.x, y: p.y, w: s.x, h: s.y };
 }
 function union(a: Rect | null, b: Rect): Rect {
   if (!a) return { ...b };
-  const x1 = Math.min(a.x, b.x);
-  const y1 = Math.min(a.y, b.y);
-  const x2 = Math.max(a.x + a.w, b.x + b.w);
-  const y2 = Math.max(a.y + a.h, b.y + b.h);
+  const x1 = Math.min(a.x, b.x), y1 = Math.min(a.y, b.y);
+  const x2 = Math.max(a.x + a.w, b.x + b.w), y2 = Math.max(a.y + a.h, b.y + b.h);
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 }
-function inflate(r: Rect, pad: number): Rect {
-  return { x: r.x - pad, y: r.y - pad, w: r.w + 2 * pad, h: r.h + 2 * pad };
-}
+function inflate(r: Rect, pad: number): Rect { return { x: r.x - pad, y: r.y - pad, w: r.w + 2 * pad, h: r.h + 2 * pad }; }
 function intersects(a: Rect, b: Rect): boolean {
   return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
 }
@@ -1009,26 +372,22 @@ function lineBounds(a: Vector, b: Vector, pad = 1): Rect {
   return inflate({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, pad);
 }
 
-function diffDirtyRect(prev: LayoutResult, next: LayoutResult, pad = 0): Rect | null {
+function diffDirtyRect(prev: CanvasLayout, next: CanvasLayout, pad = 0): Rect | null {
   let dirty: Rect | null = null;
   const ids = new Set<string>([...Object.keys(prev.boxes), ...Object.keys(next.boxes)]);
 
-  // box moves/resizes/add/removes
   for (const id of ids) {
-    const A = prev.boxes[id];
-    const B = next.boxes[id];
+    const A = prev.boxes[id]; const B = next.boxes[id];
     if (!A && B) { dirty = union(dirty, inflate(rectOfBox(B), pad)); continue; }
     if (A && !B) { dirty = union(dirty, inflate(rectOfBox(A), pad)); continue; }
     if (A && B) {
-      const ra = rectOfBox(A);
-      const rb = rectOfBox(B);
+      const ra = rectOfBox(A), rb = rectOfBox(B);
       if (ra.x !== rb.x || ra.y !== rb.y || ra.w !== rb.w || ra.h !== rb.h) {
         dirty = union(union(dirty, inflate(ra, pad)), inflate(rb, pad));
       }
     }
   }
 
-  // wire changes due to moved endpoints (cheap superset: any wire connected to a changed box)
   if (dirty) {
     const changed = new Set<string>();
     for (const id of ids) {
@@ -1040,11 +399,14 @@ function diffDirtyRect(prev: LayoutResult, next: LayoutResult, pad = 0): Rect | 
       }
     }
     for (const w of next.wires) {
-      if (changed.has(w.source) || changed.has(w.target)) {
+      if (w.polyline && w.polyline.length >= 2) {
+        // conservative: union all segments
+        for (let i = 1; i < w.polyline.length; i++) dirty = union(dirty, lineBounds(w.polyline[i - 1], w.polyline[i], pad + 1));
+      } else if (changed.has(w.source) || changed.has(w.target)) {
         const a = next.boxes[w.source]; const b = next.boxes[w.target];
         if (a && b) {
-          const ca = a.size.halve().add(a.getPosition());
-          const cb = b.size.halve().add(b.getPosition());
+          const ca = a.getSize().halve().add(a.getPosition());
+          const cb = b.getSize().halve().add(b.getPosition());
           dirty = union(dirty, lineBounds(ca, cb, pad + 1));
         }
       }
@@ -1096,48 +458,6 @@ export const defaultTheme : Theme = {
 
 ```
 
-### src/components/brand.ts
-
-``` ts
-// brand.ts
-// Generic, reusable branding for ANY type (Vector, ids, enums, etc.)
-
-export const kBrand = Symbol("brand");
-
-export type Brand<Name extends string> = { readonly [kBrand]: Name };
-export type Branded<T, Name extends string> = T & Brand<Name>;
-
-// Attach a non-enumerable runtime brand for debugging; erases at type-level into an opaque type.
-export function brand<T, Name extends string>(value: T, name: Name): Branded<T, Name> {
-    try { Object.defineProperty(value as object, kBrand, { value: name, enumerable: false }); } catch {}
-    return value as Branded<T, Name>;
-}
-export function brandOf(v: unknown): string | undefined {
-    try { return (v as any)?.[kBrand] as string | undefined; } catch { return undefined; }
-}
-export function isBranded<Name extends string>(v: unknown, name: Name): boolean {
-    return brandOf(v) === name;
-}
-
-// Common opaque aliases you can adopt progressively (no breaking changes required)
-export type NodeId   = Branded<string, "NodeId">;
-export type EdgeId   = Branded<string, "EdgeId">;
-export type LayoutId = Branded<string, "LayoutId">;
-
-export const asNodeId   = (s: string): NodeId   => brand(s, "NodeId");
-export const asEdgeId   = (s: string): EdgeId   => brand(s, "EdgeId");
-export const asLayoutId = (s: string): LayoutId => brand(s, "LayoutId");
-
-```
-
-### src/components/class.types.ts
-
-``` ts
-
-export type ClassOf<T> = { new(...args: any[]): T };
-
-```
-
 ### src/components/config.ts
 
 ``` ts
@@ -1181,35 +501,10 @@ export class Config<T extends Record<string, any>>
 }
 ```
 
-### src/components/errors.ts
+### src/components/core/geometry/geometry.sanity.test.ts
 
 ``` ts
-// errors.ts
-export type ErrorCode =
-    | "LIMIT_MAX_DEPTH"
-    | "LIMIT_MAX_NODES"
-    | "LIMIT_MAX_CHILDREN"
-    | "LIMIT_MAX_EDGES"
-    | "INVALID_CONFIG";
-
-export class LayoutError extends Error {
-    constructor(public code: ErrorCode, message: string, public readonly details?: Record<string, unknown>) {
-        super(message);
-        this.name = "LayoutError";
-    }
-}
-export class LimitError extends LayoutError {
-    constructor(code: Exclude<ErrorCode, "INVALID_CONFIG">, message: string, details?: Record<string, unknown>) {
-        super(code, message, details);
-        this.name = "LimitError";
-    }
-}
-```
-
-### src/components/geometry.sanity.test.ts
-
-``` ts
-import { Vector } from "./geometry";
+import { Vector } from "./index";
 
 
 console.log(new Vector(3, 4).length()); // 5
@@ -1218,14 +513,12 @@ console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
 
 ```
 
-### src/components/geometry.ts
+### src/components/core/geometry/index.ts
 
 ``` ts
-// geometry.ts
-// Vector now uses the generic brand system (brand.ts). Brands are reusable globally.
+import { add, multiply, divide, subtract } from "../math";
+import { Branded, brand } from "../ids-branding/brand";
 
-import { add, divide, multiply, subtract } from "./math";
-import { brand, Branded } from "./brand";
 
 export type VectorBrand = "Any" | "Position" | "Size" | "Offset" | "Center";
 
@@ -1237,16 +530,16 @@ export type FoldWith = (value1: number, value2: number) => number;
 export type Reduce = (x: number, y: number) => number;
 
 export class Vector {
-  constructor(public readonly x: number, public readonly y: number) {}
+  constructor(public readonly x: number, public readonly y: number) { }
 
   public as<B extends VectorBrand>(b: B): Branded<Vector, B> {
     // keep a debug runtime brand
     return brand(this, b);
   }
   public asPosition() { return this.as("Position"); }
-  public asSize()     { return this.as("Size"); }
-  public asOffset()   { return this.as("Offset"); }
-  public asCenter()   { return this.as("Center"); }
+  public asSize() { return this.as("Size"); }
+  public asOffset() { return this.as("Offset"); }
+  public asCenter() { return this.as("Center"); }
 
   public reflect = (axis: Dimension) => (axis === Dimension.X ? new Vector(this.x, -this.y) : new Vector(-this.x, this.y));
   public scale = (factor: number) => this.multiply(Vector.scalar(factor));
@@ -1271,17 +564,14 @@ export class Vector {
   public negate = () => this.scale(-1);
   public halve = () => this.scale(1 / 2);
   public dotProduct = (vector: Vector) => this.multiply(vector).sum();
-  public rotate = (radians: number) =>
-    Vector.scalar(radians).trig().nestFold(
-      (v: Vector) => v.reflect(Dimension.X).multiply(this).sum(),
-      (v: Vector) => v.swap().multiply(this).sum()
-    );
-  public clamp = (min: number = -Infinity, max: number = Infinity) =>
-    this.map((x: number) => Math.min(Math.max(x, min), max));
+  public rotate = (radians: number) => Vector.scalar(radians).trig().nestFold(
+    (v: Vector) => v.reflect(Dimension.X).multiply(this).sum(),
+    (v: Vector) => v.swap().multiply(this).sum()
+  );
+  public clamp = (min: number = -Infinity, max: number = Infinity) => this.map((x: number) => Math.min(Math.max(x, min), max));
   public nestFold = (left: NestFold, right: NestFold) => new Vector(left(this), right(this));
   public mapWith = (f: FoldWith, vector: Vector) => this.foldWith(f, f, vector);
-  public foldWith = (left: FoldWith, right: FoldWith, vector: Vector) =>
-    new Vector(left(this.x, vector.x), right(this.y, vector.y));
+  public foldWith = (left: FoldWith, right: FoldWith, vector: Vector) => new Vector(left(this.x, vector.x), right(this.y, vector.y));
   public fold = (left: Fold, right: Fold) => new Vector(left(this.x), right(this.y));
 }
 
@@ -1311,53 +601,211 @@ export namespace Shapes {
 
 ```
 
-### src/components/graph.ts
+### src/components/core/ids-branding/brand.ts
+
+``` ts
+// brand.ts
+// Generic, reusable branding for ANY type (Vector, ids, enums, etc.)
+
+export const kBrand = Symbol("brand");
+
+export type Brand<Name extends string> = { readonly [kBrand]: Name };
+export type Branded<T, Name extends string> = T & Brand<Name>;
+
+// Attach a non-enumerable runtime brand for debugging; erases at type-level into an opaque type.
+export function brand<T, Name extends string>(value: T, name: Name): Branded<T, Name> {
+    try { Object.defineProperty(value as object, kBrand, { value: name, enumerable: false }); } catch {}
+    return value as Branded<T, Name>;
+}
+export function brandOf(v: unknown): string | undefined {
+    try { return (v as any)?.[kBrand] as string | undefined; } catch { return undefined; }
+}
+export function isBranded<Name extends string>(v: unknown, name: Name): boolean {
+    return brandOf(v) === name;
+}
+
+// Common opaque aliases you can adopt progressively (no breaking changes required)
+export type NodeId   = Branded<string, "NodeId">;
+export type EdgeId   = Branded<string, "EdgeId">;
+export type LayoutId = Branded<string, "LayoutId">;
+
+export const asNodeId   = (s: string): NodeId   => brand(s, "NodeId");
+export const asEdgeId   = (s: string): EdgeId   => brand(s, "EdgeId");
+export const asLayoutId = (s: string): LayoutId => brand(s, "LayoutId");
+
+```
+
+### src/components/core/logging/logger.ts
 
 ``` ts
 
-/**
- * Generalized abstractions
- * -------------------------------------------------------
- * - NodeConfig: declarative tree of nodes (id, label, children, optional layout override)
- * - LayoutStrategy: computes child positions given a parent position
- * - Renderer: two modes
- *     (A) Graph mode: render each node as a ReactFlow node with edges
- *     (B) Nested mode: project each child inside its parent DOM box
- */
+// logging.ts
+export enum LogLevel { Debug = 10, Info = 20, Warn = 30, Error = 40, Off = 99 }
+export type LogCtx = Record<string, unknown>;
 
-import { 
-    Vector 
-} from "./geometry";
-import { 
-    LayoutTypes 
-} from "./layout/layout.enum";
+export interface Logger {
+    level: LogLevel;
+    child(bindings: LogCtx): Logger;
+    debug(msg: string, ctx?: LogCtx): void;
+    info(msg: string, ctx?: LogCtx): void;
+    warn(msg: string, ctx?: LogCtx): void;
+    error(msg: string, ctx?: LogCtx): void;
+}
 
+export class NoopLogger implements Logger {
+    level = LogLevel.Off;
+    child(): Logger { return this; }
+    debug(): void { } info(): void { } warn(): void { } error(): void { }
+}
 
-export type NodeConfig = 
-{
-    id          : string;
-    label?      : string;
-    position?   : Vector;
-    children?   : NodeConfig[];
-    layout?     : LayoutTypes;
+export class ConsoleLogger implements Logger {
+    constructor(public level: LogLevel = LogLevel.Warn, private readonly bindings: LogCtx = {}) { }
+    child(bindings: LogCtx): Logger { return new ConsoleLogger(this.level, { ...this.bindings, ...bindings }); }
+    private out(kind: "debug" | "info" | "warn" | "error", msg: string, ctx?: LogCtx): void {
+        // eslint-disable-next-line no-console
+        console[kind]({ msg, ...this.bindings, ...(ctx ?? {}) });
+    }
+    debug(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Debug) this.out("debug", msg, ctx); }
+    info(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Info) this.out("info", msg, ctx); }
+    warn(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Warn) this.out("warn", msg, ctx); }
+    error(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Error) this.out("error", msg, ctx); }
+}
+
+```
+
+### src/components/core/math/index.ts
+
+``` ts
+
+/* ---------- Functional helpers ---------- */
+export const ceilSqrt = (n: number): number => Math.ceil(Math.sqrt(Math.max(1, n)));
+export const add = (a: number, b: number): number => a + b;
+export const subtract = (a: number, b: number): number => a - b;
+export const multiply = (a: number, b: number): number => a * b;
+export const divide = (a: number, b: number): number => a / b;
+
+```
+
+### src/components/errors.ts
+
+``` ts
+// errors.ts
+export type ErrorCode =
+    | "LIMIT_MAX_DEPTH"
+    | "LIMIT_MAX_NODES"
+    | "LIMIT_MAX_CHILDREN"
+    | "LIMIT_MAX_EDGES"
+    | "INVALID_CONFIG";
+
+export class LayoutError extends Error {
+    constructor(public code: ErrorCode, message: string, public readonly details?: Record<string, unknown>) {
+        super(message);
+        this.name = "LayoutError";
+    }
+}
+export class LimitError extends LayoutError {
+    constructor(code: Exclude<ErrorCode, "INVALID_CONFIG">, message: string, details?: Record<string, unknown>) {
+        super(code, message, details);
+        this.name = "LimitError";
+    }
+}
+```
+
+### src/components/graph/builders/tree.ts
+
+``` ts
+
+import type { Graph } from "../model";
+import type { NodeAttrs, Edge } from "../../layout/api/contracts";
+import { NodeConfig } from "../types";
+
+/** Build a normalized Graph from your existing NodeConfig tree. */
+export function fromTree(root: NodeConfig): Graph {
+  const nodes: Record<string, NodeAttrs> = {};
+  const edges: Edge[] = [];
+  const parents: Record<string, string | undefined> = {};
+
+  const walk = (n: NodeConfig, parent?: NodeConfig) => {
+    nodes[n.id] = {
+      label: n.label ?? n.id,
+      position: n.position,
+      layout: n.layout,
+      mode: n.mode, // NEW
+    };
+    if (parent) {
+      parents[n.id] = parent.id;
+      edges.push({ source: parent.id, target: n.id });
+    } else {
+      parents[n.id] = undefined;
+    }
+    (n.children ?? []).forEach((c) => walk(c, n));
+  };
+  walk(root, undefined);
+
+  return { nodes, edges, parents, rootId: root.id };
+}
+
+```
+
+### src/components/graph/model.ts
+
+``` ts
+import type { NodeAttrs, Edge } from "../layout/api/contracts";
+
+export type Graph = {
+  nodes: Record<string, NodeAttrs>;
+  edges: Edge[];
+  /** parent map derived from tree or heuristics (optional for general graphs) */
+  parents?: Record<string, string | undefined>;
+  rootId?: string;
 };
 
-export type Node = 
-{
-    id       : string, 
-    data     :  {
-                    label : string
-                }, 
-    position : Vector, 
-    style    : React.CSSProperties
+```
+
+### src/components/graph/types.ts
+
+``` ts
+import { Vector } from "../core/geometry";
+import { LayoutTypes, LayoutChildrenMode } from "../layout/layout.enum";
+
+
+export type NodeConfig = {
+    id: string;
+    label?: string;
+    position?: Vector;
+    children?: NodeConfig[];
+    layout?: LayoutTypes;
+    mode?: LayoutChildrenMode; // NEW
 };
 
-export type Edge = 
-{
-    id     : string;
-    source : string;
-    target : string;
+```
+
+### src/components/graph/validate.ts
+
+``` ts
+import type { Graph } from "./model";
+
+export type ValidationIssue = {
+  code: "DUPLICATE_NODE" | "MISSING_NODE" | "SELF_LOOP";
+  message: string;
+  nodeId?: string;
+  edge?: { source: string; target: string };
 };
+
+export function validateGraph(g: Graph): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const ids = new Set<string>();
+  for (const id of Object.keys(g.nodes)) {
+    if (ids.has(id)) issues.push({ code: "DUPLICATE_NODE", message: `Duplicate node id ${id}`, nodeId: id });
+    ids.add(id);
+  }
+  for (const e of g.edges) {
+    if (e.source === e.target) issues.push({ code: "SELF_LOOP", message: `Self-loop ${e.source}`, edge: e });
+    if (!g.nodes[e.source]) issues.push({ code: "MISSING_NODE", message: `Missing source ${e.source}`, edge: e });
+    if (!g.nodes[e.target]) issues.push({ code: "MISSING_NODE", message: `Missing target ${e.target}`, edge: e });
+  }
+  return issues;
+}
 
 ```
 
@@ -1365,7 +813,7 @@ export type Edge =
 
 ``` ts
 // iteration/iterate.ts
-import { Logger } from "../logging";
+import { Logger } from "../core/logging/logger";
 
 export type LimitAction = "throw" | "truncate" | "warn";
 
@@ -1441,28 +889,6 @@ export function forEachBounded<T>(
 ``` ts
 // iteration/limits.ts
 // Hard bounds + policy everywhere (depth, nodes, children, edges, ops)
-import { Config } from "../config";
-import type { LimitAction } from "./iterate";
-
-export type IterationLimits = {
-  maxDepth: number;
-  maxNodes: number;
-  maxChildrenPerNode: number;
-  maxEdges: number;
-  maxOpsPerPass: number; // coarse fuse for any while/for you add later
-  onLimit: LimitAction;  // "throw" | "truncate" | "warn"
-};
-
-export const defaultIterationLimits: IterationLimits = {
-  maxDepth: 1000,
-  maxNodes: 5000,
-  maxChildrenPerNode: 1000,
-  maxEdges: 10000,
-  maxOpsPerPass: 100_000,
-  onLimit: "warn",
-};
-
-export const IterationConfig = new Config<IterationLimits>(defaultIterationLimits);
 
 /** Simple guardable loop if you need it somewhere ad-hoc. */
 export function boundedLoop(limit: number, body: (i: number) => boolean): void {
@@ -1473,430 +899,587 @@ export function boundedLoop(limit: number, body: (i: number) => boolean): void {
 
 ```
 
-### src/components/layout/engine/layout.engine.ts
+### src/components/layout/api/contracts.ts
 
 ``` ts
-// layout.engine.ts
-// - DI logger + limits
-// - Bounds applied to depth, node count, children per node, edges
-// - Stable behavior under truncation; warnings via logger (default Noop)
+import { Vector } from "../../core/geometry";
+import { NodeConfig } from "../../graph/types";
+import { IterationLimits } from "../limits";
+import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
+import { LayoutTuning } from "../layout.tuning";
 
-import { Shapes, Vector } from "../../geometry";
-import { NodeConfig } from "../../graph";
-import { LayoutTypes, LayoutChildrenMode } from "../layout.enum";
-import { LayoutConfigs } from "../layout.registry";
-import { Layout, NestedFramesReturn } from "../layout";
-import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
-import { GridItem } from "../strategies/grid/grid";
-import { Config } from "../../config";
-import { IteratorsConfig, IteratorsSet } from "../iterator/iterator.registry";
-import { IterationConfig, IterationLimits } from "../../iteration/iteration.limits";
-import { ConsoleLogger, Logger, NoopLogger } from "../../logging";
-import { sliceBound } from "../../iteration/iterate";
-
-export type NodeId = string;
-export type ModeMap = Record<string, LayoutChildrenMode>;
-export type Wire = { source: NodeId; target: NodeId };
-
-export type LayoutStats = {
-  nodeCount: number;
-  maxDepth: number;
-  bounds: Shapes.Rectangle;
-  overlaps?: Array<[NodeId, NodeId]>;
+/** Minimal attrs we may get for a node (graph-agnostic). */
+export type NodeAttrs = {
+  label?: string;
+  position?: Vector;
+  size?: Vector;           // optional: if provided, preferred box
+  layout?: LayoutTypes;    // preferred layout strategy for this node
+  mode?: LayoutChildrenMode; // GRAPH | NESTED
+  data?: unknown;
 };
 
-export type LayoutResult = {
-  boxes: Record<NodeId, Shapes.Box>;
-  wires: Wire[];
-};
+export type Edge = { id?: string; source: string; target: string; data?: unknown };
 
-export type LayoutResultEx = LayoutResult & { stats: LayoutStats };
 
-export type ComputeParams = {
-  root: NodeConfig;
-  modes: ModeMap;
-  nodeSize: Vector; // treat as Size (caller may brand)
-  spacing: number;
-};
+/** Unified input contract for the pipeline. */
+export type GraphInput =
+  | { kind: "tree"; root: NodeConfig }
+  | { kind: "graph"; nodes: Record<string, NodeAttrs>; edges: Edge[] };
 
-export type EngineOptions = {
-  iterators?: Config<IteratorsSet>;
-  tuning?: Config<LayoutTuning>;
-  limits?: Config<IterationLimits>;
+/** Engine options (all optional & shallow-merged with defaults). */
+export type ComputeOptions = {
+  nodeSize?: Vector;
+  spacing?: number;
   collectOverlaps?: boolean;
-  logger?: Logger;
+  limitsOverride?: Partial<IterationLimits>;
+  tuningOverride?: Partial<LayoutTuning>;
+  routerName?: "line" | "ortho";          // NEW
 };
 
-export class LayoutEngine {
-  private readonly tuning: Config<LayoutTuning>;
-  private readonly iters: Config<IteratorsSet>;
-  private readonly limits: Config<IterationLimits>;
-  private readonly collectOverlaps: boolean;
-  private readonly log: Logger;
+```
 
-  private nodeCount = 0;
-  private edgeCount = 0;
+### src/components/layout/api/index.ts
 
-  constructor(opts: EngineOptions = {}) {
-    this.tuning = opts.tuning ?? LayoutTuningConfig;
-    this.iters = opts.iterators ?? IteratorsConfig;
-    this.limits = opts.limits ?? IterationConfig;
-    this.collectOverlaps = !!opts.collectOverlaps;
-    this.log = opts.logger ?? new NoopLogger();
-  }
+``` ts
+import type { GraphInput, ComputeOptions } from "./contracts";
+import { PipelineEngine } from "../engine/engine";
+import type { SystemContext } from "../engine/context";
+import { createDefaultSystem } from "../engine/context";
+import type { LayoutSnapshot } from "../types";
+import { toReactFlow } from "../../tooling/exporters/reactflow";
+import { snapshotToSVG } from "../../tooling/exporters/svg";
 
-  compute({ root, modes, nodeSize, spacing }: ComputeParams): LayoutResultEx {
-    this.nodeCount = 0;
-    this.edgeCount = 0;
+export interface LayoutAPI {
+  compute(input: GraphInput, options?: ComputeOptions): LayoutSnapshot;
+  toReactFlow(snapshot: LayoutSnapshot): ReturnType<typeof toReactFlow>;
+  toSVG(snapshot: LayoutSnapshot): string;
+}
 
-    const boxes: Record<NodeId, Shapes.Box> = {};
-    const wires: Wire[] = [];
+export function createLayoutAPI(ctx: SystemContext = createDefaultSystem()): LayoutAPI {
+  const engine = new PipelineEngine(ctx);
+  return {
+    compute: (input, options) => {
+      const res = engine.run(input, options);
+      if (!res.ok) throw new Error(JSON.stringify(res.issues));
+      return res.snapshot;
+    },
+    toReactFlow,
+    toSVG: snapshotToSVG,
+  };
+}
 
-    this.placeNode({
-      node: root,
-      level: 0,
-      modes,
+export type { GraphInput, ComputeOptions } from "./contracts";
+export type { LayoutSnapshot } from "../types";
+
+```
+
+### src/components/layout/engine/context.ts
+
+``` ts
+import { Config } from "../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../../layout/layout.tuning";
+import { IterationConfig, IterationLimits } from "../limits";
+import { Logger, NoopLogger } from "../../core/logging/logger";
+import { InMemoryLayoutRegistry } from "../registries/layout.registry";
+import { InMemoryRouterRegistry } from "../registries/router.registry";
+import { GridLayout } from "../strategies/grid/grid.layout";
+import { RadialLayout } from "../strategies/radial/radial.layout";
+import { LineRouter } from "../routers/line.router";
+import type { LayoutRegistry } from "../registries/layout.registry";
+import type { RouterRegistry } from "../registries/router.registry";
+import { LayoutTypes } from "../layout.enum";
+import { OrthoRouter } from "../routers/ortho.router";
+
+export type SystemContext = {
+  log: Logger;
+  tunings: Config<LayoutTuning>;
+  limits: Config<IterationLimits>;
+  layouts: LayoutRegistry;
+  routers: RouterRegistry;
+};
+
+export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
+  const layouts = new InMemoryLayoutRegistry();
+  layouts.register(LayoutTypes.Grid, new GridLayout());
+  layouts.register(LayoutTypes.Radial, new RadialLayout());
+
+  const routers = new InMemoryRouterRegistry();
+  routers.register("line", new LineRouter());
+  routers.register("ortho", new OrthoRouter());
+  return {
+    log: overrides?.log ?? new NoopLogger(),
+    tunings: overrides?.tunings ?? LayoutTuningConfig,
+    limits: overrides?.limits ?? IterationConfig,
+    layouts: overrides?.layouts ?? layouts,
+    routers: overrides?.routers ?? routers,
+  };
+}
+
+```
+
+### src/components/layout/engine/engine.ts
+
+``` ts
+import type { GraphInput, ComputeOptions } from "../api/contracts";
+import { parse } from "./phases/parse";
+import { validate } from "./phases/validate";
+import { plan } from "./phases/plan";
+import { place } from "./phases/place";
+import { route } from "./phases/route";
+import { post } from "./phases/post";
+import type { SystemContext } from "./context";
+import { createDefaultSystem } from "./context";
+import type { LayoutSnapshot } from "../types";
+import { Vector } from "../../core/geometry";
+import { IterationConfig } from "../limits";
+import { LayoutTuningConfig } from "../../layout/layout.tuning";
+
+export type ComputeResult = { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
+                         | { ok: false; issues: ReturnType<typeof validate>["issues"] };
+
+export class PipelineEngine {
+  constructor(private ctx: SystemContext = createDefaultSystem()) {}
+
+  run(input: GraphInput, opts: ComputeOptions = {}): ComputeResult {
+    const parsed = parse(input);
+    const { issues } = validate(parsed);
+    // Prepare effective knobs
+    const nodeSize = opts.nodeSize ?? new Vector(110, 54);
+    const spacing = opts.spacing ?? 24;
+
+    const prevLimits: Record<string, unknown> = {};
+    const prevTuning: Record<string, unknown> = {};
+    try {
+      if (opts.limitsOverride) {
+        for (const [k, v] of Object.entries(opts.limitsOverride)) {
+          prevLimits[k] = IterationConfig.get(k as any);
+          IterationConfig.set(k as any, v as any);
+        }
+      }
+      if (opts.tuningOverride) {
+        for (const [k, v] of Object.entries(opts.tuningOverride)) {
+          prevTuning[k] = LayoutTuningConfig.get(k as any);
+          LayoutTuningConfig.set(k as any, v as any);
+        }
+      }
+
+    const pln = plan(parsed);
+    const placed = place(parsed, pln, this.ctx, {
       nodeSize,
       spacing,
-      parentBox: undefined,
-      assigned: undefined,
-      boxes,
-      wires,
+      collectOverlaps: !!opts.collectOverlaps,
     });
-
-    const stats = this.finalizeStats(boxes, this.collectOverlaps);
-    return { boxes, wires, stats };
-  }
-
-  // --- Internal traversal ----------------------------------------------------
-
-  private placeNode(args: {
-    node: NodeConfig;
-    level: number;
-    modes: ModeMap;
-    nodeSize: Vector;
-    spacing: number;
-    parentBox?: Shapes.Box;
-    assigned?: Shapes.Box;
-    boxes: Record<NodeId, Shapes.Box>;
-    wires: Wire[];
-  }): void {
-    const { node, level, modes, nodeSize, spacing, parentBox, assigned, boxes, wires } = args;
-
-    const maxDepth = this.limits.get("maxDepth");
-    const policy = this.limits.get("onLimit");
-    if (level > maxDepth) {
-      this.log.warn("Max depth exceeded", { node: node.id, level, maxDepth });
-      return; // truncate rather than throw by default
-    }
-
-    if (this.nodeCount >= this.limits.get("maxNodes")) {
-      this.log.warn("Max nodes reached, skipping remaining traversal", { maxNodes: this.limits.get("maxNodes") });
-      return;
-    }
-
-    const id = node.id;
-    const mode: LayoutChildrenMode = modes[id] ?? LayoutChildrenMode.GRAPH;
-    const chosen: LayoutTypes = this.resolveLayoutName(node, node.layout ?? LayoutTypes.Grid);
-    const strat: Layout = LayoutConfigs.get<LayoutTypes>(chosen);
-
-    // Resolve this node's box (and set depth once)
-    let box: Shapes.Box;
-    if (assigned) {
-      box = assigned;
-      box.depth = level;
-    } else {
-      const size =
-        mode === LayoutChildrenMode.GRAPH
-          ? nodeSize
-          : strat.preferredSize({
-              count: (node.children ?? []).length,
-              nodeSize,
-              spacing,
-              mode: LayoutChildrenMode.NESTED,
-            });
-      const tl = (node.position ?? Vector.scalar(0)).as("Position");
-      box = new Shapes.Box(id, tl, size.as("Size"), parentBox?.id, level);
-    }
-
-    boxes[id] = box;
-    this.nodeCount++;
-
-    const childrenRaw = node.children ?? [];
-    const children = sliceBound(
-      childrenRaw,
-      this.limits.get("maxChildrenPerNode"),
-      policy,
-      this.log,
-      "childrenPerNode"
-    );
-
-    if (!children.length) return;
-
-    if (mode === LayoutChildrenMode.NESTED) {
-      if (chosen === LayoutTypes.Grid) {
-        this.placeNestedGridChildren({
-          node,
-          children,
-          level,
-          nodeSize,
-          spacing,
-          parentBox: box,
-          strat,
-          modes,
-          boxes,
-          wires,
-        });
-      } else {
-        this.placeNestedRadialChildren({
-          node,
-          children,
-          level,
-          nodeSize,
-          spacing,
-          parentBox: box,
-          strat,
-          modes,
-          boxes,
-          wires,
-        });
-      }
-    } else {
-      // GRAPH mode: children outside; add wires
-      const centers = strat.placeChildren({
-        mode: LayoutChildrenMode.GRAPH,
-        children,
-        parent: node,
-        origin: box.position.add(box.size.scale(1 / 2)),
-        level,
-        nodeSize,
-        spacing,
-        parentSize: box.size,
-      });
-
-      for (const c of children) {
-        if (this.edgeCount >= this.limits.get("maxEdges")) {
-          this.log.warn("Max edges reached, remaining edges skipped", { maxEdges: this.limits.get("maxEdges") });
-          break;
-        }
-        const center = centers[c.id];
-        const tlChild = center.subtract(nodeSize.halve()).as("Position");
-        const childBox = new Shapes.Box(c.id, tlChild, nodeSize.as("Size"), box.id, level + 1);
-
-        wires.push({ source: id, target: c.id });
-        this.edgeCount++;
-
-        this.placeNode({
-          node: c,
-          level: level + 1,
-          modes,
-          nodeSize,
-          spacing,
-          parentBox: box,
-          assigned: childBox,
-          boxes,
-          wires,
-        });
-      }
-    }
-  }
-
-  private placeNestedGridChildren(args: {
-    node: NodeConfig;
-    children: NodeConfig[];
-    level: number;
-    nodeSize: Vector;
-    spacing: number;
-    parentBox: Shapes.Box;
-    strat: Layout;
-    modes: ModeMap;
-    boxes: Record<NodeId, Shapes.Box>;
-    wires: Wire[];
-  }): void {
-    const { children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
-
-    const pad = this.tuning.get("outerPad")(spacing);
-    const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-    const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
-    const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
-
-    const frames: NestedFramesReturn = strat.nestedFrames({
-      children,
-      parentSize: inner,
-      spacing,
-    });
-
-    for (const c of children) {
-      const item: GridItem<any> = frames.grid.getItem(c.id);
-      const pos: Vector = item.dimensions.getPosition();
-      const sz: Vector = item.dimensions.getSize().subtract(Vector.scalar(2 * frames.ip)).clamp(1, Infinity);
-
-      const childBox = new Shapes.Box(
-        c.id,
-        innerTL.add(pos).add(Vector.scalar(frames.ip)).as("Position"),
-        sz.as("Size"),
-        parentBox.id,
-        parentBox.depth + 1
-      );
-
-      this.placeNode({
-        node: c,
-        level: parentBox.depth + 1,
-        modes,
-        nodeSize: nextNodeSize,
-        spacing,
-        parentBox,
-        assigned: childBox,
-        boxes,
-        wires,
-      });
-    }
-  }
-
-  private placeNestedRadialChildren(args: {
-    node: NodeConfig;
-    children: NodeConfig[];
-    level: number;
-    nodeSize: Vector;
-    spacing: number;
-    parentBox: Shapes.Box;
-    strat: Layout;
-    modes: ModeMap;
-    boxes: Record<NodeId, Shapes.Box>;
-    wires: Wire[];
-  }): void {
-    const { node, children, level, nodeSize, spacing, parentBox, strat, modes, boxes, wires } = args;
-
-    const pad = this.tuning.get("outerPad")(spacing);
-    const inner = parentBox.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-    const innerTL = parentBox.position.add(Vector.scalar(pad)).as("Position");
-    const nextNodeSize = nodeSize.scale(this.tuning.get("nestedNodeScale")(level));
-
-    const centers = strat.placeChildren({
-      mode: LayoutChildrenMode.NESTED,
-      children,
-      parent: node,
-      origin: inner.halve(),
-      level,
-      nodeSize: nextNodeSize,
-      spacing,
-      parentSize: inner,
-    });
-
-    for (const c of children) {
-      const p = centers[c.id] ?? inner.scale(1 / 2);
-      const childBox = new Shapes.Box(
-        c.id,
-        innerTL.add(p.subtract(nextNodeSize.halve())).as("Position"),
-        nextNodeSize.as("Size"),
-        parentBox.id,
-        parentBox.depth + 1
-      );
-
-      this.placeNode({
-        node: c,
-        level: parentBox.depth + 1,
-        modes,
-        nodeSize: nextNodeSize,
-        spacing,
-        parentBox,
-        assigned: childBox,
-        boxes,
-        wires,
-      });
-    }
-  }
-
-  // --- Helpers ---------------------------------------------------------------
-
-  private resolveLayoutName(node: NodeConfig, fallback: LayoutTypes): LayoutTypes {
-    return node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) ? node.layout : fallback;
-  }
-
-  private finalizeStats(boxes: Record<NodeId, Shapes.Box>, includeOverlaps: boolean): LayoutStats {
-    const ids = Object.keys(boxes);
-    const nodeCount = ids.length;
-
-    let maxDepth = 0;
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-
-    for (const id of ids) {
-      const b = boxes[id];
-      maxDepth = Math.max(maxDepth, b.depth);
-      const pos = b.getPosition();
-      const sz = b.getSize();
-      minX = Math.min(minX, pos.x);
-      minY = Math.min(minY, pos.y);
-      maxX = Math.max(maxX, pos.x + sz.x);
-      maxY = Math.max(maxY, pos.y + sz.y);
-    }
-
-    if (!isFinite(minX)) {
-      minX = minY = maxX = maxY = 0;
-    }
-
-    const bounds = new Shapes.Rectangle(new Vector(maxX - minX, maxY - minY).as("Size"), new Vector(minX, minY).as("Position"));
-    const stats: LayoutStats = { nodeCount, maxDepth, bounds };
-
-    if (includeOverlaps) {
-      const overlaps: Array<[NodeId, NodeId]> = [];
-      for (let i = 0; i < ids.length; i++) {
-        const a = boxes[ids[i]];
-        const aPos = a.getPosition(); const aSz = a.getSize();
-        const aX2 = aPos.x + aSz.x; const aY2 = aPos.y + aSz.y;
-        for (let j = i + 1; j < ids.length; j++) {
-          const b = boxes[ids[j]];
-          const bPos = b.getPosition(); const bSz = b.getSize();
-          const bX2 = bPos.x + bSz.x; const bY2 = bPos.y + bSz.y;
-          const disjoint = aX2 <= bPos.x || bX2 <= aPos.x || aY2 <= bPos.y || bY2 <= aPos.y;
-          if (!disjoint) overlaps.push([a.id, b.id]);
-        }
-      }
-      stats.overlaps = overlaps;
-    }
-
-    return stats;
+    const routed = route(placed, this.ctx, undefined, opts.routerName ?? "line");
+    const snapshot = post(routed);
+    return { ok: true, snapshot, issues };
+    
+  } finally {
+     for (const [k, v] of Object.entries(prevLimits)) IterationConfig.set(k as any, v as any);
+     for (const [k, v] of Object.entries(prevTuning)) LayoutTuningConfig.set(k as any, v as any);
+   }
   }
 }
 
-// Back-compat helper
-export const computeLayout = (root: NodeConfig, modes: ModeMap, nodeSize: Vector, spacing: number): LayoutResultEx =>
-  new LayoutEngine({ logger: new NoopLogger() }).compute({ root, modes, nodeSize, spacing });
+```
+
+### src/components/layout/engine/phases/contracts.ts
+
+``` ts
+export interface Phase<I, O> {
+  readonly name: string;
+  run(input: I): O;
+}
+export const makePhase = <I, O>(name: string, run: (i: I) => O): Phase<I, O> => ({ name, run });
+
+```
+
+### src/components/layout/engine/phases/parse.ts
+
+``` ts
+import type { GraphInput } from "../../api/contracts";
+import type { Graph } from "../../../graph/model";
+import { fromTree } from "../../../graph/builders/tree";
+import type { NodeConfig } from "../../../graph/types";
+import { makePhase, type Phase } from "./contracts";
+
+export type Parsed = {
+  graph: Graph;
+  /** If a faithful tree is available, we keep it for high-fidelity placement. */
+  tree?: NodeConfig;
+};
+
+export function parse(input: GraphInput): Parsed {
+  if (input.kind === "tree") {
+    const graph = fromTree(input.root);
+    return { graph, tree: input.root };
+  }
+  // Graph path: keep as-is; naive parents map if single inbound edge.
+  const parents: Record<string, string | undefined> = {};
+  const inbound = new Map<string, string[]>();
+  for (const id of Object.keys(input.nodes)) inbound.set(id, []);
+  for (const e of input.edges) {
+    const arr = inbound.get(e.target);
+    if (arr) arr.push(e.source);
+  }
+  for (const [k, v] of inbound.entries()) parents[k] = v.length > 0 ? v[0] : undefined;
+
+  return { graph: { nodes: input.nodes, edges: input.edges, parents } };
+}
+
+export const ParsePhase: Phase<GraphInput, Parsed> = makePhase("parse", parse);
+```
+
+### src/components/layout/engine/phases/place.ts
+
+``` ts
+import type { Parsed } from "./parse";
+import type { Plan } from "./plan";
+import type { SystemContext } from "../context";
+import { Vector } from "../../../core/geometry";
+import { LayoutChildrenMode, LayoutTypes } from "../../layout.enum";
+import type { LayoutSnapshot, Box, Wire } from "../../types";
+import type { NodeConfig } from "../../../graph/types";
+import { makePhase, type Phase } from "./contracts";
+import { boundsOf, overlapsOf } from "../../metrics/metrics";
+
+/**
+ * Pure placement for the new pipeline.
+ * - Tree path: uses registered Layout strategies (grid/radial) directly.
+ * - Graph path: minimal vertical stack (until general-graph placement lands).
+ */
+export function place(
+  parsed: Parsed,
+  plan: Plan,
+  ctx: SystemContext,
+  options: { nodeSize: Vector; spacing: number; collectOverlaps: boolean }
+): LayoutSnapshot {
+  if (parsed.tree) {
+    const tp = new TreePlacer(plan, ctx, options);
+    return tp.run(parsed.tree);
+  }
+
+  // Graph fallback (no tree): simple stacked layout
+  const ids = Object.keys(parsed.graph.nodes);
+  const boxes: Record<string, Box> = {};
+  let y = 0;
+  for (const id of ids) {
+    boxes[id] = {
+      id,
+      position: new Vector(0, y),
+      size: options.nodeSize,
+      depth: 0,
+    };
+    y += options.nodeSize.y + options.spacing;
+  }
+  const wires: Wire[] = parsed.graph.edges.map((e, i) => ({ id: e.id ?? String(i), source: e.source, target: e.target }));
+  const bounds = boundsOf(Object.values(boxes));
+  const stats = {
+    nodeCount: ids.length,
+    edgeCount: wires.length,
+    maxDepth: 0,
+    bounds,
+  };
+  return { boxes, wires, stats, version: Date.now() };
+}
+
+/* =========================== helpers / classes =========================== */
+
+class TreePlacer {
+  private boxes: Record<string, Box> = {};
+  private wires: Wire[] = [];
+  private maxDepth = 0;
+
+  constructor(
+    private plan: Plan,
+    private ctx: SystemContext,
+    private opts: { nodeSize: Vector; spacing: number; collectOverlaps: boolean }
+  ) {}
+
+  run(root: NodeConfig): LayoutSnapshot {
+    // decide root size based on its own mode
+    const rootMode = this.modeOf(root.id);
+    const rootSize = this.sizeForNode(root, rootMode);
+    const rootTopLeft = (root.position ?? new Vector(0, 0)).round();
+    const rootCenter = rootTopLeft.add(rootSize.halve());
+
+    this.placeNode({
+      node: root,
+      parentId: undefined,
+      level: 0,
+      centerAbs: rootCenter,
+      parentMode: LayoutChildrenMode.GRAPH, // irrelevant for root
+    });
+
+    const boxes = this.boxes;
+    const bounds = boundsOf(Object.values(boxes));
+    const overlaps = this.opts.collectOverlaps ? overlapsOf(Object.values(boxes)) : undefined;
+
+    return {
+      boxes,
+      wires: this.wires,
+      stats: {
+        nodeCount: Object.keys(boxes).length,
+        edgeCount: this.wires.length,
+        maxDepth: this.maxDepth,
+        bounds,
+        overlaps,
+      },
+      version: Date.now(),
+      meta: { source: "pipeline" },
+    };
+  }
+
+  private placeNode(args: {
+    node: NodeConfig;
+    parentId?: string;
+    level: number;
+    centerAbs: Vector;
+    parentMode: LayoutChildrenMode;
+    forceSize?: Vector;                     // NEW: allow caller to override size
+  }): void {
+    const { node, parentId, level, centerAbs, forceSize } = args;
+    const myMode = this.modeOf(node.id);
+    const myLayout = this.layoutOf(node.id);
+
+    // Size: either override (from parent), or our own “preferred”
+    const size = (forceSize ?? this.sizeForNode(node, myMode)).round();
+    const topLeft = centerAbs.subtract(size.halve()).round();
+
+    const box: Box = {
+      id: node.id,
+      position: topLeft,
+      size,
+      parentId: args.parentMode === LayoutChildrenMode.NESTED ? parentId : undefined,
+      depth: level,
+    };
+    this.boxes[node.id] = box;
+    if (level > this.maxDepth) this.maxDepth = level;
+
+    const children = node.children ?? [];
+    if (children.length === 0) return;
+
+    const strat = this.ctx.layouts.get(myLayout);
+    const mapping = strat.placeChildren({
+      mode: myMode,
+      children,
+      parent: node,
+      origin: centerAbs,
+      level,
+      nodeSize: this.opts.nodeSize,
+      spacing: this.opts.spacing,
+      parentSize: size,
+    });
+
+    const needsLocalToAbs = myMode === LayoutChildrenMode.NESTED;
+    const localToAbsOffset = needsLocalToAbs ? topLeft : new Vector(0, 0);
+
+    // If I am a NESTED container, square-size my GRAPH-mode children to the grid/radial cell.
+    const childForcedSize = (childCount: number): Vector | undefined => {
+      if (myMode !== LayoutChildrenMode.NESTED) return undefined;
+
+      const padOuter = this.ctx.tunings.get("outerPad")(this.opts.spacing);
+      const inner = size.subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+
+      if (myLayout === LayoutTypes.Grid) {
+        const rowCol = this.ctx.tunings.get("rowCol")(childCount);
+        const ip = this.ctx.tunings.get("itemPad")(this.opts.spacing);
+        const cell = inner.divide(rowCol).subtract(Vector.scalar(2 * ip));
+        const side = Math.max(8, Math.floor(Math.min(cell.x, cell.y)));
+        return Vector.scalar(side);
+      }
+
+      if (myLayout === LayoutTypes.Radial) {
+        const maxFrac = this.ctx.tunings.get("nestedChildMaxFraction")();
+        const levelScale = this.ctx.tunings.get("nestedNodeScale")(level + 1);
+        const maxSide = Math.floor(inner.min() * maxFrac);
+        const baseSide = Math.floor(this.opts.nodeSize.max() * levelScale);
+        const side = Math.max(8, Math.min(maxSide, baseSide));
+        return Vector.scalar(side);
+      }
+      return undefined;
+    };
+
+    const forcedSizeForMyChildren = childForcedSize(children.length);
+
+    for (const child of children) {
+      // emit tree wire
+      this.wires.push({
+        id: `${node.id}->${child.id}#${this.wires.length}`,
+        source: node.id,
+        target: child.id,
+      });
+
+      const childCenter = (mapping[child.id] ?? centerAbs).add(localToAbsOffset);
+
+      // Only override size for GRAPH-mode children (containers size themselves)
+      const childMode = this.modeOf(child.id);
+      const passSize = childMode === LayoutChildrenMode.GRAPH ? forcedSizeForMyChildren : undefined;
+
+      this.placeNode({
+        node: child,
+        parentId: node.id,
+        level: level + 1,
+        centerAbs: childCenter,
+        parentMode: myMode,
+        forceSize: passSize,
+      });
+    }
+  }
+
+  private modeOf(id: string): LayoutChildrenMode {
+    return this.plan.modes[id] ?? LayoutChildrenMode.GRAPH;
+  }
+  private layoutOf(id: string): LayoutTypes {
+    return this.plan.layouts[id] ?? LayoutTypes.Grid;
+  }
+  private sizeForNode(node: NodeConfig, myMode: LayoutChildrenMode): Vector {
+    if (myMode === LayoutChildrenMode.NESTED) {
+      const strat = this.ctx.layouts.get(this.layoutOf(node.id));
+      return strat.preferredSize({
+        count: (node.children ?? []).length,
+        nodeSize: this.opts.nodeSize,
+        spacing: this.opts.spacing,
+        mode: LayoutChildrenMode.NESTED,
+      }).round();
+    }
+    // GRAPH: node renders as a “unit” box
+    return this.opts.nodeSize.round();
+  }
+}
+
+export const PlacePhase: Phase<{ parsed: Parsed; plan: Plan; ctx: SystemContext; options: { nodeSize: Vector; spacing: number; collectOverlaps: boolean } }, LayoutSnapshot> =
+  makePhase("place", (input) => place(input.parsed, input.plan, input.ctx, input.options));
+```
+
+### src/components/layout/engine/phases/plan.ts
+
+``` ts
+import type { Parsed } from "./parse";
+import { LayoutChildrenMode, LayoutTypes } from "../../../layout/layout.enum";
+import { makePhase, type Phase } from "./contracts";
+export type Plan = {
+  rootId?: string;
+  /** chosen layout per node (defaults to Grid) */
+  layouts: Record<string, LayoutTypes>;
+  /** chosen mode per node (defaults to GRAPH) */
+  modes: Record<string, LayoutChildrenMode>;
+};
+
+export function plan(p: Parsed): Plan {
+  const layouts: Record<string, LayoutTypes> = {};
+  const modes: Record<string, LayoutChildrenMode> = {};
+
+  for (const [id, attrs] of Object.entries(p.graph.nodes)) {
+    layouts[id] = attrs.layout ?? LayoutTypes.Grid;
+    modes[id] = attrs.mode ?? LayoutChildrenMode.GRAPH;
+  }
+  return { rootId: p.graph.rootId, layouts, modes };
+}
+
+export const PlanPhase: Phase<Parsed, Plan> = makePhase("plan", plan);
+
+```
+
+### src/components/layout/engine/phases/post.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../types";
+import { makePhase, type Phase } from "./contracts";
+
+/** Post-processing hook; we keep it as a pass-through while the legacy engine already computed stats. */
+export function post(s: LayoutSnapshot): LayoutSnapshot {
+  return { ...s, version: s.version ?? Date.now() };
+}
+export const PostPhase: Phase<LayoutSnapshot, LayoutSnapshot> = makePhase("post", post);
+
+```
+
+### src/components/layout/engine/phases/route.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../types";
+import type { SystemContext } from "../context";
+import type { Edge } from "../../api/contracts";
+import { makePhase, type Phase } from "./contracts";
+
+export function route(snapshot: LayoutSnapshot, ctx: SystemContext, _edges?: Edge[], routerName = "line"): LayoutSnapshot {
+  const router = ctx.routers.get(routerName);
+  const wires = snapshot.wires.map((w, i) => {
+    const routed = router.route({ id: w.id ?? String(i), source: w.source, target: w.target }, snapshot);
+    return routed?.polyline ? { ...w, polyline: routed.polyline } : w;
+  });
+  return { ...snapshot, wires };
+}
+// export const RoutePhase: Phase<LayoutSnapshot, LayoutSnapshot> = makePhase("route", (s) => route(s, {} as any));
+// (phase wrapper intentionally not exported; engine calls route(snapshot, ctx) directly)
+```
+
+### src/components/layout/engine/phases/validate.ts
+
+``` ts
+import type { Parsed } from "./parse";
+import { validateGraph } from "../../../graph/validate";
+import { makePhase, type Phase } from "./contracts";
+export type Validation = { issues: ReturnType<typeof validateGraph> };
+
+export function validate(p: Parsed): Validation {
+  return { issues: validateGraph(p.graph) };
+}
+
+export const ValidatePhase: Phase<Parsed, Validation> = makePhase("validate", validate);
 
 ```
 
 ### src/components/layout/iterator/iterator.registry.ts
 
 ``` ts
-import { Config } from "../../config";
-import { Iterator } from "./iterator.types";
+// src/components/layout/iterator/iterator.registry.ts
 import { LayoutTypes } from "../layout.enum";
-import { buildIterators, IteratorsSet } from "./layout.iterators";
+import { Iterator } from "./iterator.types";
+import { buildIterators } from "./layout.iterators";
+import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
+import { Config } from "../../config";
+
+export type LayoutIteratorKind = LayoutTypes;
 
 export interface IteratorRegistry {
-  [LayoutTypes.Grid]: Iterator;
-  [LayoutTypes.Radial]: Iterator;
+  has(kind: LayoutIteratorKind): boolean;
+  get(kind: LayoutIteratorKind): Iterator;
+  register(kind: LayoutIteratorKind, iterator: Iterator): void;
+  list(): LayoutIteratorKind[];
 }
-export const IteratorsConfig = new Config<Record<keyof IteratorRegistry, Iterator>>(buildIterators());
-export type { IteratorsSet }; // re-export for convenience
+
+export class InMemoryIteratorRegistry implements IteratorRegistry {
+  private map = new Map<LayoutIteratorKind, Iterator>();
+  has(kind: LayoutIteratorKind) { return this.map.has(kind); }
+  get(kind: LayoutIteratorKind) {
+    const v = this.map.get(kind);
+    if (!v) throw new Error(`Iterator not registered: ${kind}`);
+    return v;
+  }
+  register(kind: LayoutIteratorKind, it: Iterator) { this.map.set(kind, it); }
+  list() { return Array.from(this.map.keys()); }
+}
+
+/** Build a default registry from the current tuning config. */
+export function createDefaultIteratorRegistry(tuning: Config<LayoutTuning> = LayoutTuningConfig): IteratorRegistry {
+  const reg = new InMemoryIteratorRegistry();
+  const set = buildIterators(tuning);
+  reg.register(LayoutTypes.Grid, set.grid);
+  reg.register(LayoutTypes.Radial, set.radial);
+  return reg;
+}
 
 ```
 
 ### src/components/layout/iterator/iterator.types.ts
 
 ``` ts
-import { 
-    Vector 
-} from "../../geometry";
+import { Vector } from "../../core/geometry";
 import { 
     LayoutChildrenMode 
 } from "../layout.enum";
-import { 
-    Shapes 
-} from "../../geometry";
+import { Shapes } from "../../core/geometry";
 
 /** Unit point in [0,1]² (center-based for grid centers). */
 export type UnitPoint = Vector;
@@ -2026,7 +1609,7 @@ export class Iterator
 ### src/components/layout/iterator/layout.iterators.ts
 
 ``` ts
-import { Shapes, Vector } from "../../geometry";
+import { Shapes, Vector } from "../../core/geometry";
 import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterator.types";
 import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
 import { Config } from "../../config";
@@ -2093,39 +1676,11 @@ export enum LayoutChildrenMode
 
 ```
 
-### src/components/layout/layout.registry.ts
-
-``` ts
-// layout.registry.ts
-import { Config } from "../config";
-import { Layout } from "./layout";
-import { LayoutTypes } from "./layout.enum";
-import { GridLayout } from "./strategies/grid/grid.layout";
-import { RadialLayout } from "./strategies/radial/radial.layout";
-
-export interface LayoutRegistry {
-  [LayoutTypes.Grid]: import("./strategies/grid/grid.layout").GridLayout;
-  [LayoutTypes.Radial]: import("./strategies/radial/radial.layout").RadialLayout;
-}
-
-export type LayoutKind = keyof LayoutRegistry;
-
-export const LayoutConfigs = new Config<Record<LayoutKind, Layout>>({
-  [LayoutTypes.Grid]: new GridLayout(),
-  [LayoutTypes.Radial]: new RadialLayout(),
-});
-
-```
-
 ### src/components/layout/layout.ts
 
 ``` ts
-import { 
-    Vector 
-} from "../geometry";
-import { 
-    NodeConfig 
-} from "../graph";
+import { Vector } from "../core/geometry";
+import { NodeConfig } from "../graph/types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";
@@ -2189,9 +1744,7 @@ export abstract class Layout
 import { 
     Config 
 } from "../config";
-import { 
-    Vector 
-} from "../geometry";
+import { Vector } from "../core/geometry";
 import { AnchorIteratorParams } from "./iterator/iterator.types";
 import { 
     LayoutChildrenMode 
@@ -2301,10 +1854,238 @@ export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);
 
 ```
 
+### src/components/layout/limits/index.ts
+
+``` ts
+// layout/limits/index.ts
+import { Config } from "../../config";
+import type { LimitAction } from "../../iteration/iterate";
+
+export type LayoutLimits = {
+  maxDepth: number;
+  maxNodes: number;
+  maxChildrenPerNode: number;
+  maxEdges: number;
+  maxOpsPerPass: number;
+  onLimit: LimitAction; // "throw" | "truncate" | "warn"
+};
+
+export const defaultLayoutLimits: LayoutLimits = {
+  maxDepth: 1000,
+  maxNodes: 5000,
+  maxChildrenPerNode: 1000,
+  maxEdges: 10000,
+  maxOpsPerPass: 100_000,
+  onLimit: "warn",
+};
+
+export const LayoutLimitsConfig = new Config<LayoutLimits>(defaultLayoutLimits);
+
+// (Optional) temporary re-exports to minimize churn while you rename imports.
+export type IterationLimits = LayoutLimits;
+export const IterationConfig = LayoutLimitsConfig;
+```
+
+### src/components/layout/metrics/metrics.ts
+
+``` ts
+import { Vector } from "../../core/geometry";
+import type { Box, Wire, LayoutStats, LayoutSnapshot } from "../types";
+
+export type Bounds = { position: Vector; size: Vector };
+
+export function boundsOf(boxes: Iterable<Box>): Bounds {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let any = false;
+  for (const b of boxes) {
+    any = true;
+    minX = Math.min(minX, b.position.x);
+    minY = Math.min(minY, b.position.y);
+    maxX = Math.max(maxX, b.position.x + b.size.x);
+    maxY = Math.max(maxY, b.position.y + b.size.y);
+  }
+  if (!any) return { position: new Vector(0, 0), size: new Vector(0, 0) };
+  return { position: new Vector(minX, minY), size: new Vector(maxX - minX, maxY - minY) };
+}
+
+export function overlapsOf(boxes: readonly Box[]): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (let i = 0; i < boxes.length; i++) {
+    const A = boxes[i];
+    const ax2 = A.position.x + A.size.x, ay2 = A.position.y + A.size.y;
+    for (let j = i + 1; j < boxes.length; j++) {
+      const B = boxes[j];
+      const bx2 = B.position.x + B.size.x, by2 = B.position.y + B.size.y;
+      const separated = ax2 <= B.position.x || bx2 <= A.position.x || ay2 <= B.position.y || by2 <= A.position.y;
+      if (!separated) out.push([A.id, B.id]);
+    }
+  }
+  return out;
+}
+
+export function maxDepthOf(boxes: Iterable<Box>): number {
+  let md = 0;
+  for (const b of boxes) if (b.depth > md) md = b.depth;
+  return md;
+}
+
+export function edgeLengthStats(wires: readonly Wire[], boxes: Readonly<Record<string, Box>>): { total: number; mean: number; min: number; max: number } {
+  let total = 0, min = Infinity, max = -Infinity, count = 0;
+  for (const w of wires) {
+    let length = 0;
+    if (w.polyline && w.polyline.length >= 2) {
+      for (let i = 1; i < w.polyline.length; i++) {
+        const a = w.polyline[i - 1], b = w.polyline[i];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        length += Math.hypot(dx, dy);
+      }
+    } else {
+      const a = boxes[w.source], b = boxes[w.target];
+      if (!a || !b) continue;
+      const ac = a.position.add(a.size.halve()), bc = b.position.add(b.size.halve());
+      length = Math.hypot(bc.x - ac.x, bc.y - ac.y);
+    }
+    total += length; min = Math.min(min, length); max = Math.max(max, length); count++;
+  }
+  return { total, mean: count ? total / count : 0, min: isFinite(min) ? min : 0, max: isFinite(max) ? max : 0 };
+}
+
+/** Compute the built-in LayoutStats (bounds/overlaps/maxDepth/counts). */
+export function statsOfSnapshot(s: Pick<LayoutSnapshot, "boxes" | "wires">, opts: { collectOverlaps?: boolean } = {}): LayoutStats {
+  const arr = Object.values(s.boxes);
+  const bounds = boundsOf(arr);
+  const overlaps = opts.collectOverlaps ? overlapsOf(arr) : undefined;
+  const maxDepth = maxDepthOf(arr);
+  return {
+    nodeCount: arr.length,
+    edgeCount: s.wires.length,
+    maxDepth,
+    bounds,
+    overlaps,
+  };
+}
+
+```
+
+### src/components/layout/registries/layout.registry.ts
+
+``` ts
+import type { Layout } from "../layout";
+import { LayoutTypes } from "../layout.enum";
+
+export type LayoutKind = LayoutTypes;
+
+export interface LayoutRegistry {
+  has(kind: LayoutKind): boolean;
+  get(kind: LayoutKind): Layout;
+  register(kind: LayoutKind, strategy: Layout): void;
+  list(): LayoutKind[];
+}
+
+export class InMemoryLayoutRegistry implements LayoutRegistry {
+  private map = new Map<LayoutKind, Layout>();
+  has(kind: LayoutKind) { return this.map.has(kind); }
+  get(kind: LayoutKind) {
+    const v = this.map.get(kind);
+    if (!v) throw new Error(`Layout strategy not registered: ${kind}`);
+    return v;
+  }
+  register(kind: LayoutKind, strategy: Layout) { this.map.set(kind, strategy); }
+  list() { return Array.from(this.map.keys()); }
+}
+
+```
+
+### src/components/layout/registries/router.registry.ts
+
+``` ts
+import type { Edge } from "../api/contracts";
+import type { Vector } from "../../core/geometry";
+import type { LayoutSnapshot } from "../types";
+
+export interface RoutedEdge { id: string; source: string; target: string; polyline?: Vector[]; }
+
+export interface EdgeRouter {
+  /** Return polyline/segments for an edge, or undefined for straight center line by consumer. */
+  route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined;
+}
+
+export interface RouterRegistry {
+  get(name: string): EdgeRouter;
+  register(name: string, router: EdgeRouter): void;
+}
+
+export class InMemoryRouterRegistry implements RouterRegistry {
+  private map = new Map<string, EdgeRouter>();
+  get(name: string) {
+    const r = this.map.get(name);
+    if (!r) throw new Error(`Router not registered: ${name}`);
+    return r;
+  }
+  register(name: string, router: EdgeRouter) { this.map.set(name, router); }
+}
+
+```
+
+### src/components/layout/routers/line.router.ts
+
+``` ts
+import { Vector } from "../../core/geometry";
+import type { Edge } from "../api/contracts";
+import type { LayoutSnapshot } from "../types";
+import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+
+/** Simple center-to-center straight router. */
+export class LineRouter implements EdgeRouter {
+  route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
+    const a = snapshot.boxes[e.source]; const b = snapshot.boxes[e.target];
+    if (!a || !b) return undefined;
+    const ac = a.position.add(a.size.halve());
+    const bc = b.position.add(b.size.halve());
+    return { polyline: [ac, bc].map((v) => new Vector(v.x, v.y)) };
+  }
+}
+
+```
+
+### src/components/layout/routers/ortho.router.ts
+
+``` ts
+import { Vector } from "../../core/geometry";
+import type { Edge } from "../api/contracts";
+import type { LayoutSnapshot } from "../types";
+import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+
+/** Simple Manhattan "L" router: choose the shorter elbow. */
+export class OrthoRouter implements EdgeRouter {
+  route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
+    const a = snapshot.boxes[e.source];
+    const b = snapshot.boxes[e.target];
+    if (!a || !b) return undefined;
+
+    const ac = a.position.add(a.size.halve());
+    const bc = b.position.add(b.size.halve());
+
+    const turnHFirst = [ac, new Vector(bc.x, ac.y), bc];
+    const turnVFirst = [ac, new Vector(ac.x, bc.y), bc];
+
+    const len = (pts: Vector[]) => {
+      let t = 0;
+      for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      return t;
+    };
+
+    const path = len(turnHFirst) <= len(turnVFirst) ? turnHFirst : turnVFirst;
+    return { polyline: path };
+  }
+}
+
+```
+
 ### src/components/layout/strategies/grid/grid.layout.ts
 
 ``` ts
-import { Vector, Shapes } from "../../../geometry";
+import { Vector, Shapes } from "../../../core/geometry";
 import {
   Layout, NestedFrameParam, PlaceChildrenReturn, PreferredSizeParam,
   NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam
@@ -2314,9 +2095,10 @@ import { MappedGrid, MappedGridItemData } from "./grid.mapped";
 import { GridItem } from "./grid";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IteratorsConfig, IteratorsSet } from "../../iterator/iterator.registry";
 import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
-import { IterationConfig } from "../../../iteration/iteration.limits";
+import { IterationConfig } from "../../limits";
+import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
+import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */
@@ -2385,7 +2167,8 @@ export const rcSquare = (
 export class GridLayout extends Layout {
   constructor(
     private tuning: Config<LayoutTuning> = LayoutTuningConfig,
-    private iters: Config<IteratorsSet> = IteratorsConfig
+    private iters: IteratorRegistry = createDefaultIteratorRegistry(LayoutTuningConfig)
+
   ) { super(); }
 
   nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
@@ -2395,7 +2178,9 @@ export class GridLayout extends Layout {
 
     const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
     const ip: number = this.tuning.get("itemPad")(spacing);
-    const content: Vector = parentSize.round().clamp(1, Infinity);
+    const pad: number = this.tuning.get("outerPad")(spacing);
+    const content: Vector = parentSize.round().clamp(1, Infinity).subtract(Vector.scalar(2 * pad));
+    const contentTopLeft = Vector.scalar(pad);
 
     const X = splitEven(content.x, gridSize.x);
     const Y = splitEven(content.y, gridSize.y);
@@ -2404,7 +2189,7 @@ export class GridLayout extends Layout {
 
     for (let i = 0; i < safeChildren.length; i++) {
       const cell = new Vector(i % gridSize.x, Math.floor(i / gridSize.x));
-      const position = new Vector(X.offs[cell.x], Y.offs[cell.y]);
+      const position = contentTopLeft.add(new Vector(X.offs[cell.x], Y.offs[cell.y]));
       const size = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
       grid.set(cell, new GridItem<MappedGridItemData>(cell, new Shapes.Rectangle(size, position), { id: safeChildren[i].id }));
     }
@@ -2443,7 +2228,11 @@ export class GridLayout extends Layout {
         );
       }
       case LayoutChildrenMode.NESTED: {
-        const rect = new Shapes.Rectangle(parentSize, new Vector(0, 0));
+        const pad = this.tuning.get("outerPad")(spacing);
+        const rect = new Shapes.Rectangle(
+          parentSize.subtract(Vector.scalar(2 * pad)),
+          new Vector(pad, pad)
+        );
         const centers = this.iters.get(LayoutTypes.Grid).centersInRect(safeChildren.length, rowCol, rect);
         return Object.fromEntries(safeChildren.map((c, i) => [c.id, centers[i]]));
       }
@@ -2464,10 +2253,10 @@ export class GridLayout extends Layout {
 ### src/components/layout/strategies/grid/grid.mapped.ts
 
 ``` ts
-import { 
-    Shapes,
-    Vector 
-} from "../../../geometry";
+import {
+  Shapes,
+  Vector
+} from "../../../core/geometry";
 import { 
     Grid, 
     GridItem 
@@ -2542,10 +2331,10 @@ export  class   MappedGrid<T extends MappedGridItemDataType = MappedGridItemData
 ### src/components/layout/strategies/grid/grid.ts
 
 ``` ts
-import { 
-    Vector, 
-    Shapes 
-} from "../../../geometry";
+import {
+  Vector,
+  Shapes
+} from "../../../core/geometry";
 export class GridItem<T> 
 {
     constructor(
@@ -2619,7 +2408,7 @@ export class Grid<T>
 ### src/components/layout/strategies/radial/radial.layout.ts
 
 ``` ts
-import { Vector } from "../../../geometry";
+import { Vector } from "../../../core/geometry";
 import {
   PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
 } from "../../layout";
@@ -2627,7 +2416,7 @@ import { LayoutChildrenMode } from "../../layout.enum";
 import { MappedGrid } from "../grid/grid.mapped";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IterationConfig } from "../../../iteration/iteration.limits";
+import { IterationConfig } from "../../limits";
 import { mapIndexBounded } from "../../../iteration/iterate";
 
 export class RadialLayout extends Layout {
@@ -2650,14 +2439,22 @@ export const nestedRadialCenters = (
   tuning: Config<LayoutTuning>,
   { children, parentSize, nodeSize, spacing }: PlaceChildrenParam
 ): PlaceChildrenReturn => {
-  const maxPer = IterationConfig.get("maxChildrenPerNode");
+ const maxPer = IterationConfig.get("maxChildrenPerNode");
   const policy = IterationConfig.get("onLimit");
 
-  const inner: Vector = parentSize.round().clamp(1, Infinity);
+  // use content box (outer pad)
+  const padOuter = tuning.get("outerPad")(spacing);
+  const inner: Vector = parentSize
+    .round()
+    .subtract(Vector.scalar(2 * padOuter))
+    .clamp(1, Infinity);
+
   const c: Vector = inner.scale(1 / 2);
   const start = tuning.get("startAngle")();
   const cw = tuning.get("clockwise")();
-  const baseR = inner.min() / 2 - nodeSize.max() / 2 - tuning.get("itemPad")(spacing);
+  const ip = tuning.get("itemPad")(spacing);
+
+  const baseR = inner.min() / 2 - Math.max(0, nodeSize.max() / 2 + ip);
   const r = Math.max(tuning.get("minRadius")(), baseR);
 
   return Object.fromEntries(
@@ -2693,52 +2490,37 @@ export const graphRadialCenters = (
 
 ```
 
-### src/components/logging.ts
+### src/components/layout/types.ts
 
 ``` ts
-// logging.ts
-export enum LogLevel { Debug = 10, Info = 20, Warn = 30, Error = 40, Off = 99 }
-export type LogCtx = Record<string, unknown>;
+import { Vector } from "../core/geometry";
 
-export interface Logger {
-    level: LogLevel;
-    child(bindings: LogCtx): Logger;
-    debug(msg: string, ctx?: LogCtx): void;
-    info (msg: string, ctx?: LogCtx): void;
-    warn (msg: string, ctx?: LogCtx): void;
-    error(msg: string, ctx?: LogCtx): void;
-}
+export type Box = {
+  id: string;
+  position: Vector;  // top-left
+  size: Vector;
+  parentId?: string;
+  depth: number;
+};
 
-export class NoopLogger implements Logger {
-    level = LogLevel.Off;
-    child(): Logger { return this; }
-    debug(): void {} info(): void {} warn(): void {} error(): void {}
-}
+export type Wire = { id: string; source: string; target: string; polyline?: Vector[] };
 
-export class ConsoleLogger implements Logger {
-    constructor(public level: LogLevel = LogLevel.Warn, private readonly bindings: LogCtx = {}) {}
-    child(bindings: LogCtx): Logger { return new ConsoleLogger(this.level, { ...this.bindings, ...bindings }); }
-    private out(kind: "debug"|"info"|"warn"|"error", msg: string, ctx?: LogCtx): void {
-        // eslint-disable-next-line no-console
-        console[kind]({ msg, ...this.bindings, ...(ctx ?? {}) });
-    }
-    debug(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Debug) this.out("debug", msg, ctx); }
-    info (msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Info ) this.out("info" , msg, ctx); }
-    warn (msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Warn ) this.out("warn" , msg, ctx); }
-    error(msg: string, ctx?: LogCtx) { if (this.level <= LogLevel.Error) this.out("error", msg, ctx); }
-}
+export type LayoutStats = {
+  nodeCount: number;
+  edgeCount: number;
+  maxDepth: number;
+  bounds: { position: Vector; size: Vector };
+  overlaps?: Array<[string, string]>;
+};
 
-```
+export type LayoutSnapshot = Readonly<{
+  boxes: Readonly<Record<string, Box>>;
+  wires: ReadonlyArray<Wire>;
+  stats: LayoutStats;
+  version: number;
+  meta?: Record<string, unknown>;
+}>;
 
-### src/components/math.ts
-
-``` ts
-/* ---------- Functional helpers ---------- */
-export const ceilSqrt   = (n : number            ) : number => Math.ceil(Math.sqrt(Math.max(1, n)));
-export const add        = (a : number, b : number) : number => a + b;
-export const subtract   = (a : number, b : number) : number => a - b;
-export const multiply   = (a : number, b : number) : number => a * b;
-export const divide     = (a : number, b : number) : number => a / b;
 ```
 
 ### src/components/ParentChildFlow.tsx
@@ -2746,15 +2528,16 @@ export const divide     = (a : number, b : number) : number => a / b;
 ``` tsx
 import "reactflow/dist/style.css";
 import { JSX, useEffect, useMemo, useState } from "react";
-import { NodeConfig } from "./graph";
-import { Vector } from "./geometry";
+import { NodeConfig } from "./graph/types";
+import { Vector } from "./core/geometry";
 import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
-import { LayoutEngine, LayoutResultEx, ModeMap } from "./layout/engine/layout.engine";
 import { LabeledSlider, Segmented } from "./ui/controls";
 import { Shell } from "./ui/styles";
 import { Configurator } from "./ui/Configurator";
 import { Target } from "./adapters/env";
-import { LayoutView } from "./adapters/ports/react/react-view.adapter";
+import { LayoutView } from "./render/views/LayoutView";
+import { createLayoutAPI } from "./layout/api";
+import type { GraphInput } from "./layout/api";
 
 const DEMO: NodeConfig = {
   id: "root",
@@ -2781,49 +2564,6 @@ const DEMO_MIXED: NodeConfig = {
 };
 Object.freeze(DEMO_MIXED);
 
-type LayoutOverrideMap = Record<string, LayoutTypes | undefined>;
-type NodeIndex = { id: string; label: string };
-
-const flattenNodes = (n: NodeConfig): NodeIndex[] => {
-  const out: NodeIndex[] = [{ id: n.id, label: n.label ?? n.id }];
-  for (const c of n.children ?? []) out.push(...flattenNodes(c));
-  return out;
-};
-const findNode = (root: NodeConfig, id: string): NodeConfig | undefined => {
-  if (root.id === id) return root;
-  for (const c of root.children ?? []) {
-    const hit: NodeConfig | undefined = findNode(c, id);
-    if (hit) return hit;
-  }
-  return undefined;
-};
-const subtreeIds = (root: NodeConfig, startId: string): string[] => {
-  const node: NodeConfig | undefined = findNode(root, startId);
-  if (!node) return [];
-  return flattenNodes(node).map((n) => n.id);
-};
-const idsInScope = (root: NodeConfig, scope: "all" | string, applyToSubtree: boolean): string[] => {
-  const all: string[] = [];
-  (function () {
-    const walk = (n: NodeConfig): void => {
-      all.push(n.id);
-      (n.children ?? []).forEach(walk);
-    };
-    walk(root);
-  })();
-  if (scope === "all") return all;
-  if (!applyToSubtree) return [scope];
-  const res: string[] = [];
-  (function () {
-    const walk = (n: NodeConfig): void => {
-      res.push(n.id);
-      (n.children ?? []).forEach(walk);
-    };
-    walk(findNode(root, scope)!);
-  })();
-  return res;
-};
-
 export type ParentChildLayoutsDemoProps = { config?: NodeConfig };
 
 export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayoutsDemoProps): JSX.Element => {
@@ -2831,14 +2571,10 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
   const [spacing, setSpacing] = useState(24);
   const [nodeW, setNodeW] = useState(110);
   const [nodeH, setNodeH] = useState(54);
-  const LIMITS = {
-    spacing: { min: 0, max: 80 },
-    nodeW: { min: 40, max: 240 },
-    nodeH: { min: 30, max: 180 },
-  };
+  const LIMITS = { spacing: { min: 0, max: 80 }, nodeW: { min: 40, max: 240 }, nodeH: { min: 30, max: 180 } };
 
   const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
-  const [modes, setModes] = useState<ModeMap>({
+  const [modes, setModes] = useState<Record<string, LayoutChildrenMode>>({
     root: LayoutChildrenMode.GRAPH,
     A: LayoutChildrenMode.NESTED,
     B: LayoutChildrenMode.GRAPH,
@@ -2850,41 +2586,55 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
   const effectiveConfig = useMemo<NodeConfig>(() => {
     const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
     const copy: NodeConfig = clone(config);
+
+    // apply layout selection to scope (existing behavior)
     const setLayout = (n: NodeConfig): void => {
       if (scope === "all" || n.id === scope) n.layout = layoutName;
       if (applyToSubtree || scope === "all") (n.children ?? []).forEach(setLayout);
     };
     setLayout(copy);
+
+    // NEW: apply modes map everywhere it’s provided
+    const applyMode = (n: NodeConfig): void => {
+      const m = modes[n.id];
+      if (m !== undefined) n.mode = m;
+      (n.children ?? []).forEach(applyMode);
+    };
+    applyMode(copy);
+
     return copy;
-  }, [config, layoutName, scope, applyToSubtree]);
+  }, [config, layoutName, scope, applyToSubtree, modes]);
 
-  const nodeSize: Vector = useMemo(
-    () => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)).asSize(),
-    [nodeW, nodeH]
+  const nodeSize: Vector = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
+
+  const api = useMemo(() => createLayoutAPI(), []);
+
+  const input: GraphInput = useMemo(() => ({ kind: "tree", root: effectiveConfig }), [effectiveConfig]);
+
+  const [routerName, setRouterName] = useState<"line" | "ortho">("line");
+  const snapshot = useMemo(
+    () =>
+      api.compute(input, {
+        nodeSize,
+        spacing,
+        collectOverlaps: false,
+        routerName,
+      }),
+    [api, input, nodeSize, spacing, routerName]
   );
 
-  const engine = useMemo(() => new LayoutEngine({ collectOverlaps: false }), []);
-
-  const result: LayoutResultEx = useMemo(
-    () => engine.compute({ root: effectiveConfig, modes, nodeSize, spacing }),
-    [engine, effectiveConfig, modes, nodeSize, spacing]
-  );
-
-  const scopedIds: string[] = useMemo(() => idsInScope(config, scope, applyToSubtree), [config, scope, applyToSubtree]);
-  const nestedGridActive: boolean = useMemo(
-    () => layoutName === LayoutTypes.Grid && scopedIds.some((id) => (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED),
-    [layoutName, scopedIds, modes]
+  const nestedGridActive = useMemo(
+    () => layoutName === LayoutTypes.Grid && Object.keys(modes).some((id) => (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED),
+    [layoutName, modes]
   );
 
   useEffect(() => {
     if (nestedGridActive) {
       setSpacing(LIMITS.spacing.min);
-      setNodeW(LIMITS.nodeW.max);
-      setNodeH(LIMITS.nodeH.max);
+      setNodeW(50);
+      setNodeH(50);
     }
   }, [nestedGridActive]);
-
-  const LayoutViewStyle: React.CSSProperties = { position: "absolute", inset: 0 };
 
   return (
     <div style={Shell.outer}>
@@ -2909,24 +2659,25 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
           setScope={setScope}
           applyToSubtree={applyToSubtree}
           setApplyToSubtree={setApplyToSubtree}
+          routerName={routerName}
+          setRouterName={setRouterName}
         />
-
         <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
-        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
-        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={false} />
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={false} />
       </div>
 
       <div style={Shell.left}>
         <div style={Shell.title}>Graph (Edges)</div>
         <div style={Shell.rf}>
-          <LayoutView kind={Target.ReactFlow} result={result} />
+          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} />
         </div>
       </div>
 
       <div style={Shell.right}>
         <div style={Shell.title}>Right Pane: {adapter}</div>
-        <div style={LayoutViewStyle}>
-          <LayoutView kind={adapter} result={result} />
+        <div style={{ position: "absolute", inset: 0 }}>
+          <LayoutView kind={adapter} snapshot={snapshot} />
         </div>
       </div>
     </div>
@@ -2935,54 +2686,346 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
 
 ```
 
-### src/components/playground/controller.ts
+### src/components/render/ports/canvas.port.ts
 
 ``` ts
-import { NodeConfig } from "../graph";
-import { Target } from "../adapters/env";
-import { LayoutTypes } from "../layout/layout.enum";
-import { LayoutEngine, LayoutResultEx, ModeMap } from "../layout/engine/layout.engine";
-import { Vector } from "../geometry";
+import type { RenderPort, RenderSession } from "./types";
+import type { LayoutSnapshot } from "../../layout/types";
+import type { Theme } from "../../adapters/theme";
+import { defaultTheme } from "../../adapters/theme";
+import { drawLayoutToCanvas } from "../../adapters/targets/canvas.core";
+// src/components/render/ports/canvas.port.ts
+export class CanvasPort implements RenderPort {
+  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
+    const canvas = document.createElement("canvas");
+    Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
+    container.appendChild(canvas);
 
-export type PlaygroundState = {
-  adapter: Target;
-  spacing: number;
-  nodeW: number;
-  nodeH: number;
-  layout: LayoutTypes;
-  scope: "all" | string;
-  applyToSubtree: boolean;
-  modes: ModeMap;
-};
+    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
+    const rect = container.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    const ctx = canvas.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-export type PlaygroundController = {
-  compute(config: NodeConfig, s: PlaygroundState): LayoutResultEx;
-  deriveOverrides(config: NodeConfig, s: PlaygroundState): NodeConfig;
-};
-
-export function makePlaygroundController(engine = new LayoutEngine()): PlaygroundController {
-  const deriveOverrides = (root: NodeConfig, s: PlaygroundState): NodeConfig => {
-    const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
-    const copy = clone(root);
-    const apply = (n: NodeConfig): void => {
-      if (s.scope === "all" || n.id === s.scope) n.layout = s.layout;
-      if (s.applyToSubtree || s.scope === "all") (n.children ?? []).forEach(apply);
-    };
-    apply(copy);
-    return copy;
-  };
-
-  const compute = (config: NodeConfig, s: PlaygroundState): LayoutResultEx => {
-    const nodeSize = new Vector(s.nodeW, s.nodeH).asSize();
-    return engine.compute({
-      root: config,
-      modes: s.modes,
-      nodeSize,
-      spacing: s.spacing,
+    const toLegacy = (s: LayoutSnapshot) => ({
+      boxes: Object.fromEntries(
+        Object.values(s.boxes).map((b) => [
+          b.id,
+          { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
+        ])
+      ),
+      wires: s.wires.map((w) => ({ source: w.source, target: w.target, polyline: w.polyline })),
     });
-  };
 
-  return { compute, deriveOverrides };
+    let last = initial;
+    const draw = (s: LayoutSnapshot) => {
+      last = s;
+      drawLayoutToCanvas(ctx, toLegacy(s), theme);
+    };
+    draw(initial);
+
+    const ro = new ResizeObserver(() => {
+      const rr = container.getBoundingClientRect();
+      const w = Math.max(1, Math.round(rr.width * dpr));
+      const h = Math.max(1, Math.round(rr.height * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        draw(last); // redraw after resize
+      }
+    });
+    ro.observe(container);
+
+    return {
+      draw,
+      destroy: () => {
+        try {
+          ro.disconnect();
+          if (canvas.parentNode === container) {
+            container.removeChild(canvas);
+          } else {
+            canvas.remove?.();
+          }
+        } catch { /* swallow */ }
+      },
+    };
+  }
+}
+
+```
+
+### src/components/render/ports/dom.port.ts
+
+``` ts
+import type { RenderPort, RenderSession } from "./types";
+import type { LayoutSnapshot } from "../../layout/types";
+import type { Theme } from "../../adapters/theme";
+import { defaultTheme } from "../../adapters/theme";
+
+export class DomPort implements RenderPort {
+  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
+    const root = document.createElement("div");
+    Object.assign(root.style, { position: "relative", width: "100%", height: "100%" });
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg: SVGElement = document.createElementNS(svgNS, "svg") as SVGElement;
+    Object.assign(svg.style, {
+      position: "absolute",
+      inset: "0",
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none",
+      zIndex: "0",
+    });
+    // Some browsers still prefer explicit attributes on <svg>
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+    container.appendChild(root);
+    root.appendChild(svg);
+
+    const draw = (s: LayoutSnapshot) => {
+      root.querySelectorAll("[data-node]").forEach((n) => n.remove());
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      for (const w of s.wires) {
+        if (w.polyline && w.polyline.length >= 2) {
+          const poly = document.createElementNS(svgNS, "polyline");
+          poly.setAttribute("points", w.polyline.map(p => `${p.x},${p.y}`).join(" "));
+          poly.setAttribute("fill", "none");
+          poly.setAttribute("stroke", theme.wire.stroke);
+          poly.setAttribute("stroke-width", String(theme.wire.width));
+          svg.appendChild(poly);
+          continue;
+        }
+        const a = s.boxes[w.source]; const b = s.boxes[w.target];
+        if (!a || !b) continue;
+        const A = a.position.add(a.size.halve());
+        const B = b.position.add(b.size.halve());
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", String(A.x));
+        line.setAttribute("y1", String(A.y));
+        line.setAttribute("x2", String(B.x));
+        line.setAttribute("y2", String(B.y));
+        line.setAttribute("stroke", theme.wire.stroke);
+        line.setAttribute("stroke-width", String(theme.wire.width));
+        svg.appendChild(line);
+      }
+
+
+      for (const b of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
+        const el = document.createElement("div");
+        el.dataset.node = b.id;
+        const style = el.style;
+        style.position = "absolute";
+        style.left = `${b.position.x}px`;
+        style.top = `${b.position.y}px`;
+        style.width = `${b.size.x}px`;
+        style.height = `${b.size.y}px`;
+        style.border = `1px solid ${theme.node.border}`;
+        style.borderRadius = `${theme.node.radius}px`;
+        style.background = theme.node.bg;
+        style.boxSizing = "border-box";
+        style.fontSize = `${theme.node.fontSize}px`;
+        style.color = theme.node.text;
+        style.display = "flex";
+        style.alignItems = "center";
+        style.justifyContent = "center";
+        (style as any).userSelect = "none";
+        el.textContent = b.id;
+        root.appendChild(el);
+      }
+    };
+
+    draw(initial);
+
+    return {
+      draw,
+      destroy: () => {
+        try {
+          if (root.parentNode === container) {
+            container.removeChild(root);
+          } else {
+            // if React already removed it, no-op
+            root.remove?.();
+          }
+        } catch { /* swallow */ }
+      },
+    };
+  }
+}
+
+```
+
+### src/components/render/ports/types.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../layout/types";
+import type { Theme } from "../../adapters/theme";
+
+export interface RenderSession {
+  draw(snapshot: LayoutSnapshot): void;  // full draw
+  destroy(): void;
+}
+
+export interface RenderPort {
+  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme): RenderSession;
+}
+
+```
+
+### src/components/render/views/LayoutView.tsx
+
+``` tsx
+// src/components/render/views/LayoutView.tsx
+import { JSX, useEffect, useMemo, useRef } from "react";
+import ReactFlow, { Background, Controls } from "reactflow";
+import type { LayoutSnapshot } from "../../layout/types";
+import { Target } from "../../adapters/env";
+import { defaultTheme, type Theme } from "../../adapters/theme";
+import { DomPort } from "../ports/dom.port";
+import { CanvasPort } from "../ports/canvas.port";
+import { toReactFlow } from "../../tooling/exporters/reactflow";
+import type { RenderSession } from "../ports/types";
+
+export type LayoutViewProps = {
+  kind: Target;
+  snapshot: LayoutSnapshot;
+  theme?: Theme;
+};
+
+export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewProps): JSX.Element => {
+  // Always call hooks – no early return.
+  const { nodes, edges } = useMemo(() => toReactFlow(snapshot), [snapshot]);
+
+  const ref = useRef<HTMLDivElement | null>(null);
+  const sessionRef = useRef<RenderSession | null>(null);
+
+  useEffect(() => {
+    // tear down any prior port session
+    sessionRef.current?.destroy();
+    sessionRef.current = null;
+
+    // for DOM/Canvas only, mount a port into ref container
+    if (ref.current && (kind === Target.DOM || kind === Target.Canvas)) {
+      sessionRef.current =
+        kind === Target.DOM
+          ? new DomPort().mount(ref.current, snapshot, theme)
+          : new CanvasPort().mount(ref.current, snapshot, theme);
+    }
+
+    // cleanup on kind/theme change or unmount
+    return () => {
+      sessionRef.current?.destroy();
+      sessionRef.current = null;
+    };
+  }, [kind, theme]); // initial draw happens inside mount
+
+  // push new frames to the active session
+  useEffect(() => {
+    sessionRef.current?.draw(snapshot);
+  }, [snapshot]);
+
+  // JSX branch only (hooks above are unconditional)
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      {kind === Target.ReactFlow ? (
+        <ReactFlow nodes={nodes} edges={edges} fitView>
+          <Background gap={16} />
+          <Controls />
+        </ReactFlow>
+      ) : (
+        <div ref={ref} style={{ position: "absolute", inset: 0 }} />
+      )}
+    </div>
+  );
+};
+
+```
+
+### src/components/tooling/exporters/reactflow.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../layout/types";
+import type { Node, Edge } from "reactflow";
+
+export function toReactFlow(snapshot: LayoutSnapshot): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = Object.values(snapshot.boxes).map((b) => {
+    const style: React.CSSProperties = {
+      width: b.size.x,
+      height: b.size.y,
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      background: "#fff",
+      fontSize: 12,
+      boxSizing: "border-box",
+    };
+    const rel = b.parentId
+      ? { x: b.position.x - (snapshot.boxes[b.parentId].position.x), y: b.position.y - (snapshot.boxes[b.parentId].position.y) }
+      : { x: b.position.x, y: b.position.y };
+    const base: Node = { id: b.id, position: rel, data: { label: b.id }, style };
+    return b.parentId ? { ...base, parentNode: b.parentId, extent: "parent" } : base;
+  });
+
+  const edges: Edge[] = (snapshot.wires ?? []).map((w) => ({
+    id: w.id,
+    source: w.source,
+    target: w.target,
+  }));
+
+  return { nodes, edges };
+}
+
+```
+
+### src/components/tooling/exporters/svg.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../layout/types";
+
+export function snapshotToSVG(s: LayoutSnapshot): string {
+  const minX = s.stats.bounds.position.x;
+  const minY = s.stats.bounds.position.y;
+  const w = s.stats.bounds.size.x;
+  const h = s.stats.bounds.size.y;
+
+  const lines = s.wires
+    .map((w) => {
+      if (w.polyline && w.polyline.length >= 2) {
+        const points = w.polyline.map(p => `${p.x},${p.y}`).join(" ");
+        return `<polyline points="${points}" fill="none" stroke="#94a3b8" stroke-width="1" />`;
+      }
+      const a = s.boxes[w.source]; const b = s.boxes[w.target];
+      if (!a || !b) return "";
+      const ac = a.position.add(a.size.halve());
+      const bc = b.position.add(b.size.halve());
+      return `<line x1="${ac.x}" y1="${ac.y}" x2="${bc.x}" y2="${bc.y}" stroke="#94a3b8" stroke-width="1" />`;
+    })
+    .join("");
+
+  const rects = Object.values(s.boxes)
+    .sort((A, B) => A.depth - B.depth || A.id.localeCompare(B.id))
+    .map(
+      (b) =>
+        `<rect x="${b.position.x}" y="${b.position.y}" width="${b.size.x}" height="${b.size.y}" rx="10" ry="10" fill="#fff" stroke="#cbd5e1" />`
+    )
+    .join("");
+
+  const labels = Object.values(s.boxes)
+    .map((b) => {
+      const cx = b.position.x + b.size.x / 2;
+      const cy = b.position.y + b.size.y / 2;
+      return `<text x="${cx}" y="${cy}" font-size="12" text-anchor="middle" dominant-baseline="middle" fill="#0f172a">${b.id}</text>`;
+    })
+    .join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${minX} ${minY} ${w} ${h}">
+    <rect x="${minX}" y="${minY}" width="${w}" height="${h}" fill="#ffffff"/>
+    ${lines}
+    ${rects}
+    ${labels}
+  </svg>`;
 }
 
 ```
@@ -2999,14 +3042,11 @@ import {
   Select, 
   SelectOption
 } from "./controls";
-import { 
-  NodeConfig 
-} from "../graph";
+import { NodeConfig } from "../graph/types";
 import { 
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../layout/layout.enum";
-import { ModeMap } from "../layout/engine/layout.engine";
 
 type Scope = "all" | string;
 
@@ -3057,14 +3097,16 @@ const subtreeIds =  (
 export type ConfiguratorProps = 
 {
     root                : NodeConfig;
-    modes               : ModeMap;
-    setModes            : (f: (prev: ModeMap) => ModeMap) => void;
+    modes               : Record<string, LayoutChildrenMode>;
+    setModes            : (f: (prev: Record<string, LayoutChildrenMode>) => Record<string, LayoutChildrenMode>) => void;
     layout              : LayoutTypes;
     setLayout           : (l: LayoutTypes) => void;
     scope               : Scope;
     setScope            : (s: Scope) => void;
     applyToSubtree      : boolean;
     setApplyToSubtree   : (v: boolean) => void;
+    routerName          : "line" | "ortho";
+    setRouterName       : (r: "line" | "ortho") => void;
 }
                         
 export const Configurator = (
@@ -3077,7 +3119,9 @@ export const Configurator = (
                                     scope, 
                                     setScope,
                                     applyToSubtree, 
-                                    setApplyToSubtree
+                                    setApplyToSubtree,
+                                    routerName,
+                                    setRouterName
                                 } : ConfiguratorProps
                             ) : JSX.Element => 
 {
@@ -3223,6 +3267,24 @@ export const Configurator = (
                                     : undefined }
                 options     =   {modeOptions    }
                 onChange    =   {onModeChange   }
+            />
+            <button
+                style={{ fontSize: 12, padding: "6px 8px", marginLeft: 8 }}
+                onClick={() => setModes((_) => Object.fromEntries(ids.map((id) => [id, LayoutChildrenMode.GRAPH])))}
+            >
+                All Graph
+            </button>
+            <button
+                style={{ fontSize: 12, padding: "6px 8px", marginLeft: 6 }}
+                onClick={() => setModes((_) => Object.fromEntries(ids.map((id) => [id, LayoutChildrenMode.NESTED])))}
+            >
+                All Nested
+            </button>
+            <Segmented<"line" | "ortho">
+                label="Router"
+                value={routerName}
+                options={[{ label: "Line", value: "line" }, { label: "Ortho", value: "ortho" }]}
+                onChange={setRouterName}
             />
         </div>
     );

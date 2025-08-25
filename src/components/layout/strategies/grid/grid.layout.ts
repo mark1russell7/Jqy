@@ -1,4 +1,4 @@
-import { Vector, Shapes } from "../../../geometry";
+import { Vector, Shapes } from "../../../core/geometry";
 import {
   Layout, NestedFrameParam, PlaceChildrenReturn, PreferredSizeParam,
   NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam
@@ -8,9 +8,10 @@ import { MappedGrid, MappedGridItemData } from "./grid.mapped";
 import { GridItem } from "./grid";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IteratorsConfig, IteratorsSet } from "../../iterator/iterator.registry";
 import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
-import { IterationConfig } from "../../../iteration/iteration.limits";
+import { IterationConfig } from "../../limits";
+import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
+import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */
@@ -79,7 +80,8 @@ export const rcSquare = (
 export class GridLayout extends Layout {
   constructor(
     private tuning: Config<LayoutTuning> = LayoutTuningConfig,
-    private iters: Config<IteratorsSet> = IteratorsConfig
+    private iters: IteratorRegistry = createDefaultIteratorRegistry(LayoutTuningConfig)
+
   ) { super(); }
 
   nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
@@ -89,7 +91,9 @@ export class GridLayout extends Layout {
 
     const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
     const ip: number = this.tuning.get("itemPad")(spacing);
-    const content: Vector = parentSize.round().clamp(1, Infinity);
+    const pad: number = this.tuning.get("outerPad")(spacing);
+    const content: Vector = parentSize.round().clamp(1, Infinity).subtract(Vector.scalar(2 * pad));
+    const contentTopLeft = Vector.scalar(pad);
 
     const X = splitEven(content.x, gridSize.x);
     const Y = splitEven(content.y, gridSize.y);
@@ -98,7 +102,7 @@ export class GridLayout extends Layout {
 
     for (let i = 0; i < safeChildren.length; i++) {
       const cell = new Vector(i % gridSize.x, Math.floor(i / gridSize.x));
-      const position = new Vector(X.offs[cell.x], Y.offs[cell.y]);
+      const position = contentTopLeft.add(new Vector(X.offs[cell.x], Y.offs[cell.y]));
       const size = new Vector(X.sizes[cell.x], Y.sizes[cell.y]);
       grid.set(cell, new GridItem<MappedGridItemData>(cell, new Shapes.Rectangle(size, position), { id: safeChildren[i].id }));
     }
@@ -137,7 +141,11 @@ export class GridLayout extends Layout {
         );
       }
       case LayoutChildrenMode.NESTED: {
-        const rect = new Shapes.Rectangle(parentSize, new Vector(0, 0));
+        const pad = this.tuning.get("outerPad")(spacing);
+        const rect = new Shapes.Rectangle(
+          parentSize.subtract(Vector.scalar(2 * pad)),
+          new Vector(pad, pad)
+        );
         const centers = this.iters.get(LayoutTypes.Grid).centersInRect(safeChildren.length, rowCol, rect);
         return Object.fromEntries(safeChildren.map((c, i) => [c.id, centers[i]]));
       }

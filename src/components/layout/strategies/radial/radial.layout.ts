@@ -1,4 +1,4 @@
-import { Vector } from "../../../geometry";
+import { Vector } from "../../../core/geometry";
 import {
   PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
 } from "../../layout";
@@ -6,7 +6,7 @@ import { LayoutChildrenMode } from "../../layout.enum";
 import { MappedGrid } from "../grid/grid.mapped";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IterationConfig } from "../../../iteration/iteration.limits";
+import { IterationConfig } from "../../limits";
 import { mapIndexBounded } from "../../../iteration/iterate";
 
 export class RadialLayout extends Layout {
@@ -29,14 +29,22 @@ export const nestedRadialCenters = (
   tuning: Config<LayoutTuning>,
   { children, parentSize, nodeSize, spacing }: PlaceChildrenParam
 ): PlaceChildrenReturn => {
-  const maxPer = IterationConfig.get("maxChildrenPerNode");
+ const maxPer = IterationConfig.get("maxChildrenPerNode");
   const policy = IterationConfig.get("onLimit");
 
-  const inner: Vector = parentSize.round().clamp(1, Infinity);
+  // use content box (outer pad)
+  const padOuter = tuning.get("outerPad")(spacing);
+  const inner: Vector = parentSize
+    .round()
+    .subtract(Vector.scalar(2 * padOuter))
+    .clamp(1, Infinity);
+
   const c: Vector = inner.scale(1 / 2);
   const start = tuning.get("startAngle")();
   const cw = tuning.get("clockwise")();
-  const baseR = inner.min() / 2 - nodeSize.max() / 2 - tuning.get("itemPad")(spacing);
+  const ip = tuning.get("itemPad")(spacing);
+
+  const baseR = inner.min() / 2 - Math.max(0, nodeSize.max() / 2 + ip);
   const r = Math.max(tuning.get("minRadius")(), baseR);
 
   return Object.fromEntries(

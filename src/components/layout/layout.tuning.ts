@@ -1,9 +1,7 @@
 import { 
     Config 
 } from "../config";
-import { 
-    Vector 
-} from "../geometry";
+import { Vector } from "../core/geometry";
 import { AnchorIteratorParams } from "./iterator/iterator.types";
 import { 
     LayoutChildrenMode 

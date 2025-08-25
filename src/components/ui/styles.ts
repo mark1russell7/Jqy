@@ -22,7 +22,7 @@ export const Shell : ShellStyles =
                     top             : 0, 
                     width           : "100%", 
                     height          : 72,
-                    background      : "#f6f8fa", 
+                    background      : "#242424", 
                     borderBottom    : "1px solid #d0d7de", 
                     zIndex          : 1000, 
                     padding         : 8, 

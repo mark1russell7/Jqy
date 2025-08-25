@@ -1,7 +1,7 @@
-import { 
-    Shapes,
-    Vector 
-} from "../../../geometry";
+import {
+  Shapes,
+  Vector
+} from "../../../core/geometry";
 import { 
     Grid, 
     GridItem 

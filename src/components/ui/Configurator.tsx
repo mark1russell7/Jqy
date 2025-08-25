@@ -7,14 +7,11 @@ import {
   Select, 
   SelectOption
 } from "./controls";
-import { 
-  NodeConfig 
-} from "../graph";
+import { NodeConfig } from "../graph/types";
 import { 
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../layout/layout.enum";
-import { ModeMap } from "../layout/engine/layout.engine";
 
 type Scope = "all" | string;
 
@@ -65,14 +62,16 @@ const subtreeIds =  (
 export type ConfiguratorProps = 
 {
     root                : NodeConfig;
-    modes               : ModeMap;
-    setModes            : (f: (prev: ModeMap) => ModeMap) => void;
+    modes               : Record<string, LayoutChildrenMode>;
+    setModes            : (f: (prev: Record<string, LayoutChildrenMode>) => Record<string, LayoutChildrenMode>) => void;
     layout              : LayoutTypes;
     setLayout           : (l: LayoutTypes) => void;
     scope               : Scope;
     setScope            : (s: Scope) => void;
     applyToSubtree      : boolean;
     setApplyToSubtree   : (v: boolean) => void;
+    routerName          : "line" | "ortho";
+    setRouterName       : (r: "line" | "ortho") => void;
 }
                         
 export const Configurator = (
@@ -85,7 +84,9 @@ export const Configurator = (
                                     scope, 
                                     setScope,
                                     applyToSubtree, 
-                                    setApplyToSubtree
+                                    setApplyToSubtree,
+                                    routerName,
+                                    setRouterName
                                 } : ConfiguratorProps
                             ) : JSX.Element => 
 {
@@ -231,6 +232,24 @@ export const Configurator = (
                                     : undefined }
                 options     =   {modeOptions    }
                 onChange    =   {onModeChange   }
+            />
+            <button
+                style={{ fontSize: 12, padding: "6px 8px", marginLeft: 8 }}
+                onClick={() => setModes((_) => Object.fromEntries(ids.map((id) => [id, LayoutChildrenMode.GRAPH])))}
+            >
+                All Graph
+            </button>
+            <button
+                style={{ fontSize: 12, padding: "6px 8px", marginLeft: 6 }}
+                onClick={() => setModes((_) => Object.fromEntries(ids.map((id) => [id, LayoutChildrenMode.NESTED])))}
+            >
+                All Nested
+            </button>
+            <Segmented<"line" | "ortho">
+                label="Router"
+                value={routerName}
+                options={[{ label: "Line", value: "line" }, { label: "Ortho", value: "ortho" }]}
+                onChange={setRouterName}
             />
         </div>
     );

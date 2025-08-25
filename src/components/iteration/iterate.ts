@@ -1,5 +1,5 @@
 // iteration/iterate.ts
-import { Logger } from "../logging";
+import { Logger } from "../core/logging/logger";
 
 export type LimitAction = "throw" | "truncate" | "warn";
 

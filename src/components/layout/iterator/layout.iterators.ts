@@ -1,4 +1,4 @@
-import { Shapes, Vector } from "../../geometry";
+import { Shapes, Vector } from "../../core/geometry";
 import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterator.types";
 import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
 import { Config } from "../../config";

@@ -1,9 +1,5 @@
-import { 
-    Vector 
-} from "../geometry";
-import { 
-    NodeConfig 
-} from "../graph";
+import { Vector } from "../core/geometry";
+import { NodeConfig } from "../graph/types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";

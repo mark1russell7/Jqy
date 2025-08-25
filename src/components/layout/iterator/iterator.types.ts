@@ -1,12 +1,8 @@
-import { 
-    Vector 
-} from "../../geometry";
+import { Vector } from "../../core/geometry";
 import { 
     LayoutChildrenMode 
 } from "../layout.enum";
-import { 
-    Shapes 
-} from "../../geometry";
+import { Shapes } from "../../core/geometry";
 
 /** Unit point in [0,1]² (center-based for grid centers). */
 export type UnitPoint = Vector;

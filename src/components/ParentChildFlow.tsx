@@ -1,14 +1,17 @@
 import "reactflow/dist/style.css";
 import { JSX, useEffect, useMemo, useState } from "react";
-import { NodeConfig } from "./graph";
-import { Vector } from "./geometry";
+import { NodeConfig } from "./graph/types";
+import { Vector } from "./core/geometry";
 import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
-import { LayoutEngine, LayoutResultEx, ModeMap } from "./layout/engine/layout.engine";
 import { LabeledSlider, Segmented } from "./ui/controls";
 import { Shell } from "./ui/styles";
 import { Configurator } from "./ui/Configurator";
 import { Target } from "./adapters/env";
-import { LayoutView } from "./adapters/ports/react/react-view.adapter";
+import { LayoutView } from "./render/views/LayoutView";
+import { createLayoutAPI } from "./layout/api";
+import type { GraphInput } from "./layout/api";
+import { ConsoleLogger, LogLevel } from "./core/logging/logger";
+import { createDefaultSystem } from "./layout/engine/context";
 
 const DEMO: NodeConfig = {
   id: "root",
@@ -35,49 +38,6 @@ const DEMO_MIXED: NodeConfig = {
 };
 Object.freeze(DEMO_MIXED);
 
-type LayoutOverrideMap = Record<string, LayoutTypes | undefined>;
-type NodeIndex = { id: string; label: string };
-
-const flattenNodes = (n: NodeConfig): NodeIndex[] => {
-  const out: NodeIndex[] = [{ id: n.id, label: n.label ?? n.id }];
-  for (const c of n.children ?? []) out.push(...flattenNodes(c));
-  return out;
-};
-const findNode = (root: NodeConfig, id: string): NodeConfig | undefined => {
-  if (root.id === id) return root;
-  for (const c of root.children ?? []) {
-    const hit: NodeConfig | undefined = findNode(c, id);
-    if (hit) return hit;
-  }
-  return undefined;
-};
-const subtreeIds = (root: NodeConfig, startId: string): string[] => {
-  const node: NodeConfig | undefined = findNode(root, startId);
-  if (!node) return [];
-  return flattenNodes(node).map((n) => n.id);
-};
-const idsInScope = (root: NodeConfig, scope: "all" | string, applyToSubtree: boolean): string[] => {
-  const all: string[] = [];
-  (function () {
-    const walk = (n: NodeConfig): void => {
-      all.push(n.id);
-      (n.children ?? []).forEach(walk);
-    };
-    walk(root);
-  })();
-  if (scope === "all") return all;
-  if (!applyToSubtree) return [scope];
-  const res: string[] = [];
-  (function () {
-    const walk = (n: NodeConfig): void => {
-      res.push(n.id);
-      (n.children ?? []).forEach(walk);
-    };
-    walk(findNode(root, scope)!);
-  })();
-  return res;
-};
-
 export type ParentChildLayoutsDemoProps = { config?: NodeConfig };
 
 export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayoutsDemoProps): JSX.Element => {
@@ -85,14 +45,10 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
   const [spacing, setSpacing] = useState(24);
   const [nodeW, setNodeW] = useState(110);
   const [nodeH, setNodeH] = useState(54);
-  const LIMITS = {
-    spacing: { min: 0, max: 80 },
-    nodeW: { min: 40, max: 240 },
-    nodeH: { min: 30, max: 180 },
-  };
+  const LIMITS = { spacing: { min: 0, max: 80 }, nodeW: { min: 40, max: 240 }, nodeH: { min: 30, max: 180 } };
 
   const [layoutName, setLayoutName] = useState<LayoutTypes>(LayoutTypes.Grid);
-  const [modes, setModes] = useState<ModeMap>({
+  const [modes, setModes] = useState<Record<string, LayoutChildrenMode>>({
     root: LayoutChildrenMode.GRAPH,
     A: LayoutChildrenMode.NESTED,
     B: LayoutChildrenMode.GRAPH,
@@ -104,30 +60,51 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
   const effectiveConfig = useMemo<NodeConfig>(() => {
     const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
     const copy: NodeConfig = clone(config);
+
+    // apply layout selection to scope (existing behavior)
     const setLayout = (n: NodeConfig): void => {
       if (scope === "all" || n.id === scope) n.layout = layoutName;
       if (applyToSubtree || scope === "all") (n.children ?? []).forEach(setLayout);
     };
     setLayout(copy);
+
+    // NEW: apply modes map everywhere it’s provided
+    const applyMode = (n: NodeConfig): void => {
+      const m = modes[n.id];
+      if (m !== undefined) n.mode = m;
+      (n.children ?? []).forEach(applyMode);
+    };
+    applyMode(copy);
+
     return copy;
-  }, [config, layoutName, scope, applyToSubtree]);
+  }, [config, layoutName, scope, applyToSubtree, modes]);
 
-  const nodeSize: Vector = useMemo(
-    () => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)).asSize(),
-    [nodeW, nodeH]
+  const nodeSize: Vector = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
+
+  const [logLevel, setLogLevel] = useState<LogLevel>(LogLevel.Warn);
+
+  const api = useMemo(() => {
+    const ctx = createDefaultSystem({ log: new ConsoleLogger(logLevel) });
+    return createLayoutAPI(ctx);
+  }, [logLevel]);
+
+  const input: GraphInput = useMemo(() => ({ kind: "tree", root: effectiveConfig }), [effectiveConfig]);
+
+  const [routerName, setRouterName] = useState<"line" | "ortho">("line");
+  const snapshot = useMemo(
+    () =>
+      api.compute(input, {
+        nodeSize,
+        spacing,
+        collectOverlaps: false,
+        routerName,
+      }),
+    [api, input, nodeSize, spacing, routerName]
   );
 
-  const engine = useMemo(() => new LayoutEngine({ collectOverlaps: false }), []);
-
-  const result: LayoutResultEx = useMemo(
-    () => engine.compute({ root: effectiveConfig, modes, nodeSize, spacing }),
-    [engine, effectiveConfig, modes, nodeSize, spacing]
-  );
-
-  const scopedIds: string[] = useMemo(() => idsInScope(config, scope, applyToSubtree), [config, scope, applyToSubtree]);
-  const nestedGridActive: boolean = useMemo(
-    () => layoutName === LayoutTypes.Grid && scopedIds.some((id) => (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED),
-    [layoutName, scopedIds, modes]
+  const nestedGridActive = useMemo(
+    () => layoutName === LayoutTypes.Grid && Object.keys(modes).some((id) => (modes[id] ?? LayoutChildrenMode.GRAPH) === LayoutChildrenMode.NESTED),
+    [layoutName, modes]
   );
 
   useEffect(() => {
@@ -138,11 +115,21 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
     }
   }, [nestedGridActive]);
 
-  const LayoutViewStyle: React.CSSProperties = { position: "absolute", inset: 0 };
-
   return (
     <div style={Shell.outer}>
       <div style={Shell.bar}>
+        <Segmented<LogLevel>
+          label="Log"
+          value={logLevel}
+          onChange={setLogLevel}
+          options={[
+            { label: "Off",  value: LogLevel.Off },
+            { label: "Warn", value: LogLevel.Warn },
+            { label: "Info", value: LogLevel.Info },
+            { label: "Debug",value: LogLevel.Debug },
+          ]}
+        />
+
         <Segmented<Target.DOM | Target.Canvas | Target.ReactFlow>
           label="Right Pane"
           value={adapter}
@@ -153,6 +140,9 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
             { label: "ReactFlow", value: Target.ReactFlow },
           ]}
         />
+        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
         <Configurator
           root={config}
           modes={modes}
@@ -163,24 +153,22 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
           setScope={setScope}
           applyToSubtree={applyToSubtree}
           setApplyToSubtree={setApplyToSubtree}
+          routerName={routerName}
+          setRouterName={setRouterName}
         />
-
-        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
-        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
-        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
       </div>
 
       <div style={Shell.left}>
         <div style={Shell.title}>Graph (Edges)</div>
         <div style={Shell.rf}>
-          <LayoutView kind={Target.ReactFlow} result={result} />
+          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} />
         </div>
       </div>
 
       <div style={Shell.right}>
         <div style={Shell.title}>Right Pane: {adapter}</div>
-        <div style={LayoutViewStyle}>
-          <LayoutView kind={adapter} result={result} />
+        <div style={{ position: "absolute", inset: 0 }}>
+          <LayoutView kind={adapter} snapshot={snapshot} />
         </div>
       </div>
     </div>
