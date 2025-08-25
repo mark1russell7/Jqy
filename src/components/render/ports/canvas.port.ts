@@ -2,8 +2,8 @@ import type { RenderPort, RenderSession } from "./types";
 import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
 import { defaultTheme } from "../../adapters/theme";
-import { drawLayoutToCanvas } from "../../adapters/targets/canvas.core";
-// src/components/render/ports/canvas.port.ts
+import { CanvasRenderer2D } from "../../adapters/targets/canvas.core";
+
 export class CanvasPort implements RenderPort {
   mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
     const canvas = document.createElement("canvas");
@@ -14,8 +14,12 @@ export class CanvasPort implements RenderPort {
     const rect = container.getBoundingClientRect();
     canvas.width = Math.max(1, Math.round(rect.width * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
+
+    // set the device-pixel transform before constructing the renderer (same context)
     const ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const renderer = new CanvasRenderer2D(canvas, theme);
 
     const toLegacy = (s: LayoutSnapshot) => ({
       boxes: Object.fromEntries(
@@ -24,15 +28,16 @@ export class CanvasPort implements RenderPort {
           { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
         ])
       ),
-      wires: s.wires.map((w) => ({ source: w.source, target: w.target, polyline: w.polyline })),
+      wires: s.wires.map((w) => ({ id: w.id, source: w.source, target: w.target, polyline: w.polyline })),
     });
 
     let last = initial;
+    renderer.fullDraw(toLegacy(initial));
+
     const draw = (s: LayoutSnapshot) => {
       last = s;
-      drawLayoutToCanvas(ctx, toLegacy(s), theme);
+      renderer.update(toLegacy(s), { partial: true });
     };
-    draw(initial);
 
     const ro = new ResizeObserver(() => {
       const rr = container.getBoundingClientRect();
@@ -42,7 +47,7 @@ export class CanvasPort implements RenderPort {
         canvas.width = w;
         canvas.height = h;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        draw(last); // redraw after resize
+        renderer.fullDraw(toLegacy(last)); // full redraw after resize
       }
     });
     ro.observe(container);
@@ -52,12 +57,9 @@ export class CanvasPort implements RenderPort {
       destroy: () => {
         try {
           ro.disconnect();
-          if (canvas.parentNode === container) {
-            container.removeChild(canvas);
-          } else {
-            canvas.remove?.();
-          }
-        } catch { /* swallow */ }
+          if (canvas.parentNode === container) container.removeChild(canvas);
+          else canvas.remove?.();
+        } catch {}
       },
     };
   }

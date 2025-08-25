@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T06:37:22.059Z
+Generated on 2025-08-25T22:00:27.039Z
 
 ## Directory structure (src)
 
@@ -14,8 +14,6 @@ Generated on 2025-08-25T06:37:22.059Z
 │   │   ├── env.ts
 │   │   └── theme.ts
 │   ├── core/
-│   │   ├── config/
-
 │   │   ├── geometry/
 │   │   │   ├── geometry.sanity.test.ts
 │   │   │   └── index.ts
@@ -23,12 +21,8 @@ Generated on 2025-08-25T06:37:22.059Z
 │   │   │   └── brand.ts
 │   │   ├── logging/
 │   │   │   └── logger.ts
-│   │   ├── math/
-│   │   │   └── index.ts
-│   │   ├── result-error/
-
-│   │   └── utils/
-
+│   │   └── math/
+│   │       └── index.ts
 │   ├── graph/
 │   │   ├── builders/
 │   │   │   └── tree.ts
@@ -84,6 +78,7 @@ Generated on 2025-08-25T06:37:22.059Z
 │   │   └── types.ts
 │   ├── render/
 │   │   ├── ports/
+│   │   │   ├── anchoring.ts
 │   │   │   ├── canvas.port.ts
 │   │   │   ├── dom.port.ts
 │   │   │   └── types.ts
@@ -113,6 +108,7 @@ Generated on 2025-08-25T06:37:22.059Z
 │   │   ├── Configurator.tsx
 │   │   ├── controls.tsx
 │   │   └── styles.ts
+│   ├── class.types.ts
 │   ├── config.ts
 │   ├── errors.ts
 │   └── ParentChildFlow.tsx
@@ -128,19 +124,47 @@ import { useState } from "react";
 import { ParentChildLayoutsDemo } from "./components/ParentChildFlow";
 import { TestbedMatrix } from "./components/ui/playground/Testbed";
 
-export default function App() {
-  const [tab, setTab] = useState<"playground" | "testbed">("playground");
+function App() {
+  const [tab, setTab] = useState<"Playground" | "Testbed">("Playground");
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <div style={{ position: "absolute", left: 12, top: 100, zIndex: 1000 }}>
-        <button onClick={() => setTab("playground")} style={{ marginRight: 8 }}>Playground</button>
-        <button onClick={() => setTab("testbed")}>Testbed</button>
+    <div style={{ width: "100vw", height: "100vh" }}>
+      <div style={{ position: "absolute", top: 100, left: 8, zIndex: 2000 }}>
+        <button
+          onClick={() => setTab("Playground")}
+          style={{
+            padding: "6px 10px",
+            marginRight: 6,
+            borderRadius: 6,
+            border: "1px solid #d0d7de",
+            background: tab === "Playground" ? "#111827" : "#fff",
+            color: tab === "Playground" ? "#fff" : "#111827",
+            fontSize: 12,
+          }}
+        >
+          Playground
+        </button>
+        <button
+          onClick={() => setTab("Testbed")}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 6,
+            border: "1px solid #d0d7de",
+            background: tab === "Testbed" ? "#111827" : "#fff",
+            color: tab === "Testbed" ? "#fff" : "#111827",
+            fontSize: 12,
+          }}
+        >
+          Testbed
+        </button>
       </div>
-      {tab === "playground" ? <ParentChildLayoutsDemo /> : <TestbedMatrix />}
+
+      {tab === "Playground" ? <ParentChildLayoutsDemo /> : <TestbedMatrix />}
     </div>
   );
 }
+
+export default App;
 
 ```
 
@@ -465,47 +489,54 @@ export const defaultTheme : Theme = {
 
 ```
 
+### src/components/class.types.ts
+
+``` ts
+
+export type ClassOf<T> = { new(...args: any[]): T };
+
+```
+
 ### src/components/config.ts
 
 ``` ts
-export class Config<T extends Record<string, any>> 
-{
-    public set<K extends keyof T>   (
-                                        key     : K, 
-                                        value   : T[K]
-                                    ) : void 
-    {
-        this.settings[key] = value;
-    }
+export class Config<T extends Record<string, any>> {
+  constructor(
+    private settings: T,
+    private readonly defaults: T = { ...settings } // shallow copy
+  ) {
+    Object.freeze(this.defaults);
+  }
 
-    public get<K extends keyof T>   (
-                                        key : K
-                                    ) : T[K] 
-    {
-        return this.settings[key];
-    }
+  public set<K extends keyof T>(key: K, value: T[K]): void {
+    this.settings[key] = value;
+  }
 
-    public reset<K extends keyof T> (
-                                        key : K
-                                    ) : void
-    {
-        this.settings[key] = this.defaults[key];
-    }
+  public get<K extends keyof T>(key: K): T[K] {
+    return this.settings[key];
+  }
 
-    public resetAll() : void
-    {
-        this.settings = { ...this.defaults };
-    }
+  public reset<K extends keyof T>(key: K): void {
+    this.settings[key] = this.defaults[key];
+  }
 
-    constructor (
-                    private settings : T, 
-                    private readonly defaults : T = { ...settings } // @Note: Shallow Copy
-                ) 
-    {
-        Object.freeze(this.defaults);
-        
-    }
+  public resetAll(): void {
+    this.settings = { ...this.defaults };
+  }
+
+  /** Read current effective settings (shallow copy). */
+  public snapshot(): T {
+    return { ...this.settings };
+  }
+
+  /** Create a derived, immutable Config view with overrides applied. */
+  public derive(overrides: Partial<T>): Config<T> {
+    const next = { ...this.settings, ...overrides } as T;
+    // keep original defaults (so reset() on the derived refers to the base defaults)
+    return new Config<T>(next, this.defaults);
+  }
 }
+
 ```
 
 ### src/components/core/geometry/geometry.sanity.test.ts
@@ -526,9 +557,7 @@ console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
 import { add, multiply, divide, subtract } from "../math";
 import { Branded, brand } from "../ids-branding/brand";
 
-
 export type VectorBrand = "Any" | "Position" | "Size" | "Offset" | "Center";
-
 export enum Dimension { X = "x", Y = "y" }
 
 export type Fold = (value: number) => number;
@@ -537,12 +566,9 @@ export type FoldWith = (value1: number, value2: number) => number;
 export type Reduce = (x: number, y: number) => number;
 
 export class Vector {
-  constructor(public readonly x: number, public readonly y: number) { }
+  constructor(public readonly x: number, public readonly y: number) {}
 
-  public as<B extends VectorBrand>(b: B): Branded<Vector, B> {
-    // keep a debug runtime brand
-    return brand(this, b);
-  }
+  public as<B extends VectorBrand>(b: B): Branded<Vector, B> { return brand(this, b); }
   public asPosition() { return this.as("Position"); }
   public asSize() { return this.as("Size"); }
   public asOffset() { return this.as("Offset"); }
@@ -552,7 +578,13 @@ export class Vector {
   public scale = (factor: number) => this.multiply(Vector.scalar(factor));
   public sum = () => this.reduce(add);
   public crossProduct = (vector: Vector) => this.reflect(Dimension.X).dotProduct(vector.swap());
-  public normalize = () => this.scale(1 / this.length());
+
+  /** Safe normalize (guards zero-length). */
+  public normalize = (eps = 1e-6) => {
+    const len = this.length();
+    return len > eps ? this.scale(1 / len) : new Vector(0, 0);
+  };
+
   public length = () => Math.sqrt(this.dotProduct(this));
   public round = () => this.map(Math.round);
   public map = (f: Fold) => this.fold(f, f);
@@ -561,24 +593,35 @@ export class Vector {
   public trig = () => this.fold(Math.cos, Math.sin);
   public swap = () => new Vector(this.y, this.x);
   public area = () => this.reduce(multiply);
-  public aspectRatio = () => this.reduce(divide);
+
+  /** Safe aspect ratio (y=0 → Infinity). */
+  public aspectRatio = () => (this.y === 0 ? Infinity : this.x / this.y);
+
   public add = (vector: Vector) => this.mapWith(add, vector);
   public multiply = (vector: Vector) => this.mapWith(multiply, vector);
+  /** Safe component-wise divide (0 divisor → 0). */
+  public divide = (vector: Vector) =>
+    new Vector(vector.x === 0 ? 0 : this.x / vector.x, vector.y === 0 ? 0 : this.y / vector.y);
+
   public subtract = (vector: Vector) => this.mapWith(subtract, vector);
-  public divide = (vector: Vector) => this.mapWith(divide, vector);
   public max = () => this.reduce(Math.max);
   public min = () => this.reduce(Math.min);
   public negate = () => this.scale(-1);
   public halve = () => this.scale(1 / 2);
   public dotProduct = (vector: Vector) => this.multiply(vector).sum();
-  public rotate = (radians: number) => Vector.scalar(radians).trig().nestFold(
-    (v: Vector) => v.reflect(Dimension.X).multiply(this).sum(),
-    (v: Vector) => v.swap().multiply(this).sum()
-  );
-  public clamp = (min: number = -Infinity, max: number = Infinity) => this.map((x: number) => Math.min(Math.max(x, min), max));
+  public rotate = (radians: number) =>
+    Vector.scalar(radians)
+      .trig()
+      .nestFold(
+        (v: Vector) => v.reflect(Dimension.X).multiply(this).sum(),
+        (v: Vector) => v.swap().multiply(this).sum()
+      );
+  public clamp = (min: number = -Infinity, max: number = Infinity) =>
+    this.map((x: number) => Math.min(Math.max(x, min), max));
   public nestFold = (left: NestFold, right: NestFold) => new Vector(left(this), right(this));
   public mapWith = (f: FoldWith, vector: Vector) => this.foldWith(f, f, vector);
-  public foldWith = (left: FoldWith, right: FoldWith, vector: Vector) => new Vector(left(this.x, vector.x), right(this.y, vector.y));
+  public foldWith = (left: FoldWith, right: FoldWith, vector: Vector) =>
+    new Vector(left(this.x, vector.x), right(this.y, vector.y));
   public fold = (left: Fold, right: Fold) => new Vector(left(this.x), right(this.y));
 }
 
@@ -919,14 +962,13 @@ import { LayoutTuning } from "../layout.tuning";
 export type NodeAttrs = {
   label?: string;
   position?: Vector;
-  size?: Vector;           // optional: if provided, preferred box
+  size?: Vector;           // optional: preferred box
   layout?: LayoutTypes;    // preferred layout strategy for this node
   mode?: LayoutChildrenMode; // GRAPH | NESTED
   data?: unknown;
 };
 
 export type Edge = { id?: string; source: string; target: string; data?: unknown };
-
 
 /** Unified input contract for the pipeline. */
 export type GraphInput =
@@ -940,7 +982,9 @@ export type ComputeOptions = {
   collectOverlaps?: boolean;
   limitsOverride?: Partial<IterationLimits>;
   tuningOverride?: Partial<LayoutTuning>;
-  routerName?: "line" | "ortho";          // NEW
+  routerName?: "line" | "ortho";
+  /** What to do if validate() returns issues. */
+  onValidateIssues?: "ok" | "warn" | "error";
 };
 
 ```
@@ -996,6 +1040,7 @@ import type { LayoutRegistry } from "../registries/layout.registry";
 import type { RouterRegistry } from "../registries/router.registry";
 import { LayoutTypes } from "../layout.enum";
 import { OrthoRouter } from "../routers/ortho.router";
+import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
 
 export type SystemContext = {
   log: Logger;
@@ -1006,19 +1051,33 @@ export type SystemContext = {
 };
 
 export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
-  const layouts = new InMemoryLayoutRegistry();
-  layouts.register(LayoutTypes.Grid, new GridLayout());
-  layouts.register(LayoutTypes.Radial, new RadialLayout());
+  const tunings = overrides?.tunings ?? LayoutTuningConfig;
+  const limits = overrides?.limits ?? IterationConfig;
 
-  const routers = new InMemoryRouterRegistry();
-  routers.register("line", new LineRouter());
-  routers.register("ortho", new OrthoRouter());
+  const layouts =
+    overrides?.layouts ??
+    (() => {
+      const layoutRegistry = new InMemoryLayoutRegistry();
+      layoutRegistry.register(LayoutTypes.Grid, new GridLayout(tunings, createDefaultIteratorRegistry(tunings)));
+      layoutRegistry.register(LayoutTypes.Radial, new RadialLayout(tunings));
+      return layoutRegistry;
+    })();
+
+  const routers =
+    overrides?.routers ??
+    (() => {
+      const routerRegistry = new InMemoryRouterRegistry();
+      routerRegistry.register("line", new LineRouter());
+      routerRegistry.register("ortho", new OrthoRouter());
+      return routerRegistry;
+    })();
+
   return {
     log: overrides?.log ?? new NoopLogger(),
-    tunings: overrides?.tunings ?? LayoutTuningConfig,
-    limits: overrides?.limits ?? IterationConfig,
-    layouts: overrides?.layouts ?? layouts,
-    routers: overrides?.routers ?? routers,
+    tunings,
+    limits,
+    layouts,
+    routers,
   };
 }
 
@@ -1038,12 +1097,16 @@ import type { SystemContext } from "./context";
 import { createDefaultSystem } from "./context";
 import type { LayoutSnapshot } from "../types";
 import { Vector } from "../../core/geometry";
-import { IterationConfig } from "../limits";
-import { LayoutTuningConfig } from "../../layout/layout.tuning";
+import { InMemoryLayoutRegistry } from "../registries/layout.registry";
+import { LayoutTypes } from "../layout.enum";
+import { GridLayout } from "../strategies/grid/grid.layout";
+import { RadialLayout } from "../strategies/radial/radial.layout";
+import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
 import { auditSnapshot } from "../../tooling/diagnostics/audit";
 
-export type ComputeResult = { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
-                         | { ok: false; issues: ReturnType<typeof validate>["issues"] };
+export type ComputeResult =
+  | { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
+  | { ok: false; issues: ReturnType<typeof validate>["issues"] };
 
 export class PipelineEngine {
   constructor(private ctx: SystemContext = createDefaultSystem()) {}
@@ -1051,44 +1114,56 @@ export class PipelineEngine {
   run(input: GraphInput, opts: ComputeOptions = {}): ComputeResult {
     const parsed = parse(input);
     const { issues } = validate(parsed);
-    // Prepare effective knobs
+
+    const severity = opts.onValidateIssues ?? "ok";
+    if (severity === "error" && issues.length) return { ok: false, issues };
+    if (severity === "warn" && issues.length) this.ctx.log.warn("validate: issues", { count: issues.length, issues });
+
+    // Effective knobs
     const nodeSize = opts.nodeSize ?? new Vector(110, 54);
     const spacing = opts.spacing ?? 24;
 
-    const prevLimits: Record<string, unknown> = {};
-    const prevTuning: Record<string, unknown> = {};
-    try {
-      if (opts.limitsOverride) {
-        for (const [k, v] of Object.entries(opts.limitsOverride)) {
-          prevLimits[k] = IterationConfig.get(k as any);
-          IterationConfig.set(k as any, v as any);
-        }
-      }
-      if (opts.tuningOverride) {
-        for (const [k, v] of Object.entries(opts.tuningOverride)) {
-          prevTuning[k] = LayoutTuningConfig.get(k as any);
-          LayoutTuningConfig.set(k as any, v as any);
-        }
-      }
+    // ---- Per-call derived configs (no global mutation) ----
+    const effectiveTunings = opts.tuningOverride ? this.ctx.tunings.derive(opts.tuningOverride) : this.ctx.tunings;
+    const effectiveLimits = opts.limitsOverride ? this.ctx.limits.derive(opts.limitsOverride) : this.ctx.limits;
+
+    // Layout registry must be recreated when tunings change (strategies capture tunings).
+    const effectiveLayouts = new InMemoryLayoutRegistry();
+    effectiveLayouts.register(
+      LayoutTypes.Grid,
+      new GridLayout(effectiveTunings, createDefaultIteratorRegistry(effectiveTunings))
+    );
+    effectiveLayouts.register(LayoutTypes.Radial, new RadialLayout(effectiveTunings));
+
+    const localCtx: SystemContext = {
+      ...this.ctx,
+      tunings: effectiveTunings,
+      limits: effectiveLimits,
+      layouts: effectiveLayouts,
+    };
 
     const pln = plan(parsed);
-    const placed = place(parsed, pln, this.ctx, {
+    const placed = place(parsed, pln, localCtx, {
       nodeSize,
       spacing,
       collectOverlaps: !!opts.collectOverlaps,
     });
-    const routed = route(placed, this.ctx, undefined, opts.routerName ?? "line");
-    const snap = post(routed);
-    
-    const audit = auditSnapshot(snap, pln, this.ctx.tunings);
-    if (audit.length) this.ctx.log.warn("layout audit issues", { count: audit.length, audit });
-    const snapshot = { ...snap, meta: { ...(snap.meta ?? {}), plan: pln, audit } };
+
+    const routed = route(placed, localCtx, undefined, opts.routerName ?? "line");
+    let snapshot = post(routed);
+
+    // Diagnostics audit (non-fatal, attach to meta)
+    try {
+      const audit = auditSnapshot(snapshot, pln, effectiveTunings, { spacing });
+      if (audit.length) {
+        localCtx.log.warn("audit: issues", { count: audit.length, audit });
+      }
+      snapshot = { ...snapshot, meta: { ...(snapshot.meta ?? {}), audit } };
+    } catch (e) {
+      localCtx.log.warn("audit failed", { err: String(e) });
+    }
+
     return { ok: true, snapshot, issues };
-    
-  } finally {
-     for (const [k, v] of Object.entries(prevLimits)) IterationConfig.set(k as any, v as any);
-     for (const [k, v] of Object.entries(prevTuning)) LayoutTuningConfig.set(k as any, v as any);
-   }
   }
 }
 
@@ -1148,17 +1223,12 @@ import type { Parsed } from "./parse";
 import type { Plan } from "./plan";
 import type { SystemContext } from "../context";
 import { Vector } from "../../../core/geometry";
-import { LayoutChildrenMode, LayoutTypes } from "../../layout.enum";
+import { LayoutChildrenMode } from "../../layout.enum";
 import type { LayoutSnapshot, Box, Wire } from "../../types";
 import type { NodeConfig } from "../../../graph/types";
 import { makePhase, type Phase } from "./contracts";
 import { boundsOf, overlapsOf } from "../../metrics/metrics";
 
-/**
- * Pure placement for the new pipeline.
- * - Tree path: uses registered Layout strategies (grid/radial) directly.
- * - Graph path: minimal vertical stack (until general-graph placement lands).
- */
 export function place(
   parsed: Parsed,
   plan: Plan,
@@ -1175,22 +1245,12 @@ export function place(
   const boxes: Record<string, Box> = {};
   let y = 0;
   for (const id of ids) {
-    boxes[id] = {
-      id,
-      position: new Vector(0, y),
-      size: options.nodeSize,
-      depth: 0,
-    };
+    boxes[id] = { id, position: new Vector(0, y), size: options.nodeSize, depth: 0 };
     y += options.nodeSize.y + options.spacing;
   }
   const wires: Wire[] = parsed.graph.edges.map((e, i) => ({ id: e.id ?? String(i), source: e.source, target: e.target }));
   const bounds = boundsOf(Object.values(boxes));
-  const stats = {
-    nodeCount: ids.length,
-    edgeCount: wires.length,
-    maxDepth: 0,
-    bounds,
-  };
+  const stats = { nodeCount: ids.length, edgeCount: wires.length, maxDepth: 0, bounds };
   return { boxes, wires, stats, version: Date.now() };
 }
 
@@ -1208,7 +1268,6 @@ class TreePlacer {
   ) {}
 
   run(root: NodeConfig): LayoutSnapshot {
-    // decide root size based on its own mode
     const rootMode = this.modeOf(root.id);
     const rootSize = this.sizeForNode(root, rootMode);
     const rootTopLeft = (root.position ?? new Vector(0, 0)).round();
@@ -1219,7 +1278,7 @@ class TreePlacer {
       parentId: undefined,
       level: 0,
       centerAbs: rootCenter,
-      parentMode: LayoutChildrenMode.GRAPH, // irrelevant for root
+      parentMode: LayoutChildrenMode.GRAPH,
     });
 
     const boxes = this.boxes;
@@ -1241,127 +1300,103 @@ class TreePlacer {
     };
   }
 
- private placeNode(args: {
-  node: NodeConfig;
-  parentId?: string;
-  level: number;
-  centerAbs: Vector;
-  parentMode: LayoutChildrenMode;
-  forceSize?: Vector;
-}): void {
-  const { node, parentId, level, centerAbs, forceSize } = args;
-  const myMode = this.modeOf(node.id);
-  const myLayout = this.layoutOf(node.id);
+  private placeNode(args: {
+    node: NodeConfig;
+    parentId?: string;
+    level: number;
+    centerAbs: Vector;
+    parentMode: LayoutChildrenMode;
+    forceSize?: Vector;
+  }): void {
+    const { node, parentId, level, centerAbs, forceSize } = args;
+    const myMode = this.modeOf(node.id);
+    const myLayout = this.plan.layouts[node.id];
 
-  // Size for *this* node
-  const size = (forceSize ?? this.sizeForNode(node, myMode)).round();
-  const topLeft = centerAbs.subtract(size.halve()).round();
+    const size = (forceSize ?? this.sizeForNode(node, myMode)).round();
+    const topLeft = centerAbs.subtract(size.halve()).round();
 
-  // --- logging (new) ---
-  this.ctx.log.debug("placeNode: start", {
-    id: node.id, mode: myMode, layout: myLayout, level,
-    size: { x: size.x, y: size.y }, centerAbs: { x: centerAbs.x, y: centerAbs.y }
-  });
-
-  this.boxes[node.id] = {
-    id: node.id,
-    position: topLeft,
-    size,
-    parentId: args.parentMode === LayoutChildrenMode.NESTED ? parentId : undefined,
-    depth: level,
-  };
-  if (level > this.maxDepth) this.maxDepth = level;
-
-  const children = node.children ?? [];
-  if (children.length === 0) return;
-
-  const strat = this.ctx.layouts.get(myLayout);
-  const mapping = strat.placeChildren({
-    mode: myMode,
-    children,
-    parent: node,
-    origin: centerAbs,
-    level,
-    nodeSize: this.opts.nodeSize,
-    spacing: this.opts.spacing,
-    parentSize: size,
-  });
-
-  const needsLocalToAbs = myMode === LayoutChildrenMode.NESTED;
-  const localToAbsOffset = needsLocalToAbs ? topLeft : new Vector(0, 0);
-
-  // ---------- NEW: compute "cell" for my children when I'm NESTED ----------
-  let cellInner: Vector | undefined;
-  if (myMode === LayoutChildrenMode.NESTED) {
-    const padOuter = this.ctx.tunings.get("outerPad")(this.opts.spacing);
-    const inner = size.subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
-    const rowCol = this.ctx.tunings.get("rowCol")(children.length);
-    const ip = this.ctx.tunings.get("itemPad")(this.opts.spacing);
-    cellInner = inner.divide(rowCol).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
-  }
-
-  // Helper to pick forced size for a child (GRAPH or NESTED)
-  const forcedSizeForChild = (childMode: LayoutChildrenMode): Vector | undefined => {
-    if (!cellInner) return undefined;                 // only when I'm a NESTED container
-    const sideMax = Math.max(8, Math.floor(Math.min(cellInner.x, cellInner.y)));
-
-    if (myLayout === LayoutTypes.Grid || myLayout === LayoutTypes.Radial) {
-      if (childMode === LayoutChildrenMode.GRAPH) {
-        // Perfect square for leaf/graph nodes
-        return Vector.scalar(sideMax);
-      } else {
-        // Slightly smaller square for nested containers, so they don't "glue"
-        const k = this.ctx.tunings.get("nestedContainerScale")(level + 1); // ~0.85^(d+1)
-        const side = Math.max(8, Math.floor(sideMax * k));
-        return Vector.scalar(side);
-      }
-    }
-    return undefined;
-  };
-
-  for (const child of children) {
-    // tree wire
-    this.wires.push({
-      id: `${node.id}->${child.id}#${this.wires.length}`,
-      source: node.id,
-      target: child.id,
+    this.ctx.log.debug?.("placeNode", {
+      id: node.id, mode: myMode, layout: myLayout, level,
+      size: { x: size.x, y: size.y }, centerAbs: { x: centerAbs.x, y: centerAbs.y }
     });
 
-    const childCenter = (mapping[child.id] ?? centerAbs).add(localToAbsOffset);
-    const childMode = this.modeOf(child.id);
+    this.boxes[node.id] = {
+      id: node.id,
+      position: topLeft,
+      size,
+      parentId: args.parentMode === LayoutChildrenMode.NESTED ? parentId : undefined,
+      depth: level,
+    };
+    if (level > this.maxDepth) this.maxDepth = level;
 
-    const passSize = forcedSizeForChild(childMode);
+    const children = node.children ?? [];
+    if (!children.length) return;
 
-    // --- logging (new) ---
-    if (passSize) {
-      this.ctx.log.debug("placeNode: child forced size", {
-        parent: node.id,
-        child: child.id,
-        childMode,
-        forced: { x: passSize.x, y: passSize.y }
+    const strat = this.ctx.layouts.get(myLayout);
+    const childModes: Record<string, LayoutChildrenMode> = Object.fromEntries(children.map(c => [c.id, this.modeOf(c.id)]));
+
+    // ask the strategy for centers (and optional size overrides)
+    const ex = typeof (strat as any).placeChildrenEx === "function"
+      ? (strat as any).placeChildrenEx({
+          mode: myMode,
+          children,
+          parent: node,
+          origin: centerAbs,
+          level,
+          nodeSize: this.opts.nodeSize,
+          spacing: this.opts.spacing,
+          parentSize: size,
+          childModes,
+        }) as { centers: Record<string, Vector>, sizes?: Record<string, Vector> }
+      : { centers: strat.placeChildren({
+          mode: myMode,
+          children,
+          parent: node,
+          origin: centerAbs,
+          level,
+          nodeSize: this.opts.nodeSize,
+          spacing: this.opts.spacing,
+          parentSize: size,
+        }) };
+
+    const localToAbsOffset = myMode === LayoutChildrenMode.NESTED ? topLeft : new Vector(0, 0);
+
+    for (const child of children) {
+      // tree wire
+      this.wires.push({
+        id: `${node.id}->${child.id}#${this.wires.length}`,
+        source: node.id,
+        target: child.id,
+      });
+
+      const localOrAbs = ex.centers[child.id] ?? centerAbs;
+      const childCenterAbs = localOrAbs.add(localToAbsOffset);
+
+      const passSize = ex.sizes?.[child.id];
+
+      if (passSize) {
+        this.ctx.log.debug?.("child forced size", {
+          parent: node.id, child: child.id, forced: { x: passSize.x, y: passSize.y }
+        });
+      }
+
+      this.placeNode({
+        node: child,
+        parentId: node.id,
+        level: level + 1,
+        centerAbs: childCenterAbs,
+        parentMode: myMode,
+        forceSize: passSize,
       });
     }
-
-    this.placeNode({
-      node: child,
-      parentId: node.id,
-      level: level + 1,
-      centerAbs: childCenter,
-      parentMode: myMode,
-      forceSize: passSize,   // <-- actual override for both GRAPH and NESTED children
-    });
   }
-}
 
   private modeOf(id: string): LayoutChildrenMode {
     return this.plan.modes[id] ?? LayoutChildrenMode.GRAPH;
   }
-  private layoutOf(id: string): LayoutTypes {
-    return this.plan.layouts[id] ?? LayoutTypes.Grid;
-  }
   private sizeForNode(node: NodeConfig, myMode: LayoutChildrenMode): Vector {
     if (myMode === LayoutChildrenMode.NESTED) {
-      const strat = this.ctx.layouts.get(this.layoutOf(node.id));
+      const strat = this.ctx.layouts.get(this.plan.layouts[node.id]);
       return strat.preferredSize({
         count: (node.children ?? []).length,
         nodeSize: this.opts.nodeSize,
@@ -1369,13 +1404,13 @@ class TreePlacer {
         mode: LayoutChildrenMode.NESTED,
       }).round();
     }
-    // GRAPH: node renders as a “unit” box
     return this.opts.nodeSize.round();
   }
 }
 
 export const PlacePhase: Phase<{ parsed: Parsed; plan: Plan; ctx: SystemContext; options: { nodeSize: Vector; spacing: number; collectOverlaps: boolean } }, LayoutSnapshot> =
   makePhase("place", (input) => place(input.parsed, input.plan, input.ctx, input.options));
+
 ```
 
 ### src/components/layout/engine/phases/plan.ts
@@ -1427,18 +1462,28 @@ export const PostPhase: Phase<LayoutSnapshot, LayoutSnapshot> = makePhase("post"
 import type { LayoutSnapshot } from "../../types";
 import type { SystemContext } from "../context";
 import type { Edge } from "../../api/contracts";
-import { makePhase, type Phase } from "./contracts";
+import { sliceBound } from "../../../iteration/iterate";
 
-export function route(snapshot: LayoutSnapshot, ctx: SystemContext, _edges?: Edge[], routerName = "line"): LayoutSnapshot {
+/** Route wires using the chosen router; respects edge limits policy. */
+export function route(
+  snapshot: LayoutSnapshot,
+  ctx: SystemContext,
+  _edges?: Edge[],
+  routerName = "line"
+): LayoutSnapshot {
   const router = ctx.routers.get(routerName);
-  const wires = snapshot.wires.map((w, i) => {
+  const maxEdges = ctx.limits.get("maxEdges");
+  const policy = ctx.limits.get("onLimit");
+
+  const wires = sliceBound(snapshot.wires as any[], maxEdges, policy, ctx.log, "route:wires").map((w, i) => {
     const routed = router.route({ id: w.id ?? String(i), source: w.source, target: w.target }, snapshot);
     return routed?.polyline ? { ...w, polyline: routed.polyline } : w;
   });
+
   return { ...snapshot, wires };
 }
-// export const RoutePhase: Phase<LayoutSnapshot, LayoutSnapshot> = makePhase("route", (s) => route(s, {} as any));
 // (phase wrapper intentionally not exported; engine calls route(snapshot, ctx) directly)
+
 ```
 
 ### src/components/layout/engine/phases/validate.ts
@@ -1706,61 +1751,89 @@ export enum LayoutChildrenMode
 ### src/components/layout/layout.ts
 
 ``` ts
+import { Config } from "../config";
 import { Vector } from "../core/geometry";
 import { NodeConfig } from "../graph/types";
-import { 
-    LayoutChildrenMode 
-} from "./layout.enum";
-import { 
-    MappedGrid 
-} from "./strategies/grid/grid.mapped";
-export type PreferredSizeParam = 
-{
-  /* number of direct children */
-  count     : number;
-  /* node box size used when graph-mode node is rendered (base unit) */
-  nodeSize  : Vector;
-  /* visual spacing knob */
-  spacing   : number;
-  /* where the node is being asked to measure for */
-  mode      : LayoutChildrenMode; // GRAPH | NESTED
+import { LayoutChildrenMode } from "./layout.enum";
+import { LayoutTuning } from "./layout.tuning";
+import { MappedGrid } from "./strategies/grid/grid.mapped";
+import { LayoutSnapshot } from "./types";
+// NEW: strategy-level audits (optional)
+export type StrategyAuditIssue = {
+  code: string;                 // e.g. "RADIAL_CHILD_OFF_RING"
+  severity: "warn" | "error";
+  parentId: string;
+  childId?: string;
+  detail?: unknown;
 };
-
-/** formerly autosizeParent */
+/* ----------- contracts ----------- */
+export type PreferredSizeParam = {
+  count: number;
+  nodeSize: Vector;
+  spacing: number;
+  mode: LayoutChildrenMode;
+};
 export type PreferredSizeReturn = Vector;
 
-export type NestedFrameParam = 
-{
-    children      : NodeConfig[];
-    parentSize    : Vector;
-    spacing       : number;
+export type NestedFrameParam = {
+  children: NodeConfig[];
+  parentSize: Vector;
+  spacing: number;
 };
-export type NestedFramesReturn = 
-{
-    ip      : number;
-    content : Vector;
-    grid    : MappedGrid;
+export type NestedFramesReturn = {
+  ip: number;
+  content: Vector;
+  grid: MappedGrid;
 };
 
-export type PlaceChildrenParam = 
-{
-    mode          : LayoutChildrenMode;
-    children      : NodeConfig[];
-    parent        : NodeConfig;
-    origin        : Vector;
-    level         : number;
-    nodeSize      : Vector;
-    spacing       : number;
-    parentSize    : Vector;
+export type PlaceChildrenParam = {
+  mode: LayoutChildrenMode;
+  children: NodeConfig[];
+  parent: NodeConfig;
+  origin: Vector;      // absolute anchor for GRAPH mode
+  level: number;
+  nodeSize: Vector;
+  spacing: number;
+  parentSize: Vector;  // parent’s box (already decided)
 };
+
+/** Legacy return (kept for back-compat) */
 export type PlaceChildrenReturn = Record<string, Vector>;
-export abstract class Layout 
+
+/** New, extended placement contract (strategies fully own child sizing) */
+export type PlaceChildrenExReturn = {
+  /** centers: local to parent if mode=NESTED; absolute if mode=GRAPH */
+  centers: Record<string, Vector>;
+  /** per-child size override (usually a square) when parent is NESTED */
+  sizes?: Record<string, Vector>;
+};
+export type AuditParentParam = 
 {
-    abstract nestedFrames   (args   : NestedFrameParam      )   : NestedFramesReturn;
-    abstract placeChildren  (args   : PlaceChildrenParam    )   : PlaceChildrenReturn;
-    
-    /** Return the layout’s preferred box size ONLY if the node has no externally-allocated size. */
-    abstract preferredSize  (args   : PreferredSizeParam    )   : PreferredSizeReturn;
+    parentId: string;
+    childIds: string[];
+    snapshot: LayoutSnapshot;
+    spacing: number;
+    tuning: Config<LayoutTuning>;
+}
+/* ----------- strategy base ----------- */
+export abstract class Layout {
+  /** Frames/grid helpers (used by Grid) */
+  abstract nestedFrames(args: NestedFrameParam): NestedFramesReturn;
+
+  /** Simple centers (legacy) */
+  abstract placeChildren(args: PlaceChildrenParam): PlaceChildrenReturn;
+
+  /** Extended placement with optional per-child sizes (preferred) */
+  placeChildrenEx?(
+    args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }
+  ): PlaceChildrenExReturn;
+
+  /** Preferred size for a node when it behaves as a NESTED container */
+  abstract preferredSize(args: PreferredSizeParam): PreferredSizeReturn;
+
+
+  // Optional: strategies can add their own audits
+  auditParent?( args: AuditParentParam): StrategyAuditIssue[];
 }
 
 ```
@@ -2061,6 +2134,13 @@ import { Vector } from "../../core/geometry";
 import type { Edge } from "../api/contracts";
 import type { LayoutSnapshot } from "../types";
 import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+import type { Box } from "../types";
+// import { resolveEndpoints, AnchorKind } from "./ports/anchoring";
+
+// export function routeLine(a: Box, b: Box, opts?: { anchor?: AnchorKind }): WireRoute {
+//   const { A, B } = resolveEndpoints(a, b, opts?.anchor ?? "center");
+//   return { polyline: [A, B] };
+// }
 
 /** Simple center-to-center straight router. */
 export class LineRouter implements EdgeRouter {
@@ -2115,7 +2195,7 @@ export class OrthoRouter implements EdgeRouter {
 import { Vector, Shapes } from "../../../core/geometry";
 import {
   Layout, NestedFrameParam, PlaceChildrenReturn, PreferredSizeParam,
-  NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam
+  NestedFramesReturn, PreferredSizeReturn, PlaceChildrenParam, PlaceChildrenExReturn
 } from "../../layout";
 import { LayoutChildrenMode, LayoutTypes } from "../../layout.enum";
 import { MappedGrid, MappedGridItemData } from "./grid.mapped";
@@ -2127,77 +2207,25 @@ import { IterationConfig } from "../../limits";
 import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
 import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
 
-/* Split an integer total into `parts` integers that sum to total.
-   Distribute the remainder one px at a time to the first `remainder` parts. */
-export type SplitEvenReturn = 
-{
-    sizes   : number[],
-    offs    : number[]
-}
-export const splitEven =    (
-                                total : number, 
-                                parts : number
-                            ) 
-                            : SplitEvenReturn => 
-{
-    const base  : number   = Math.floor(total / parts);
-    const rem   : number   = total - base * parts;
-    const sizes : number[] = Array.from (
-                                            { 
-                                                length : parts 
-                                            }, 
-                                            (
-                                                _ : number, 
-                                                i : number
-                                            ) => 
-                                                base + (i < rem ? 1 : 0)
-                                        );
-    const offs  : number[] = sizes
-                                .map(
-                                        (
-                                            _ : number, 
-                                            i : number
-                                        ) => 
-                                            sizes
-                                                .slice  (
-                                                            0, 
-                                                            i
-                                                        )
-                                                .reduce (
-                                                            (
-                                                                a : number, 
-                                                                b : number
-                                                            ) => 
-                                                                a + b, 
-                                                            0
-                                                        )
-                                    );
-    return  { 
-                sizes, 
-                offs 
-            };
-};
-
-export const rcSquare = (
-                            n : number
-                        ) 
-                        : Vector => 
-{ 
-    const rows : number = Math.ceil(Math.sqrt(Math.max(1, n)));
-    const cols : number = Math.ceil(n / rows);
-    return new Vector   (
-                            cols, 
-                            rows
-                        );
+/* ===== utilities ===== */
+export type SplitEvenReturn = { sizes: number[]; offs: number[] };
+export const splitEven = (total: number, parts: number): SplitEvenReturn => {
+  const base = Math.floor(total / parts);
+  const rem = total - base * parts;
+  const sizes = Array.from({ length: parts }, (_ , i) => base + (i < rem ? 1 : 0));
+  const offs: number[] = new Array(parts);
+  let acc = 0;
+  for (let i = 0; i < parts; i++) { offs[i] = acc; acc += sizes[i]; }
+  return { sizes, offs };
 };
 
 export class GridLayout extends Layout {
   constructor(
     private tuning: Config<LayoutTuning> = LayoutTuningConfig,
     private iters: IteratorRegistry = createDefaultIteratorRegistry(LayoutTuningConfig)
-
   ) { super(); }
 
+  /* ---------- frames (grid cell mapping inside padded content) ---------- */
   nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
     const maxPer = IterationConfig.get("maxChildrenPerNode");
     const policy = IterationConfig.get("onLimit");
@@ -2224,6 +2252,57 @@ export class GridLayout extends Layout {
     return { ip, content, grid };
   };
 
+  /* ---------- extended placement (strategies own child sizes) ---------- */
+  placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
+    const { children, nodeSize, spacing, origin, parentSize, mode, level, childModes } = args;
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = sliceBound(children, maxPer, policy);
+
+    const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
+    const ip: number = this.tuning.get("itemPad")(spacing);
+    const anchor: Vector = this.iters.get(LayoutTypes.Grid).anchorOffset({ mode, parentSize, spacing });
+
+    if (mode === LayoutChildrenMode.GRAPH) {
+      const cell = nodeSize.add(Vector.scalar(2 * ip));
+      const total = rowCol.multiply(cell);
+      const topLeft = origin.add(anchor).subtract(total.halve());
+      const centers: Record<string, Vector> = Object.fromEntries(
+        mapIndexBounded(safeChildren.length, safeChildren.length, "truncate", (i: number) => [
+          safeChildren[i].id,
+          topLeft
+            .add(cell.multiply(new Vector(i % rowCol.x, Math.floor(i / rowCol.x))))
+            .add(cell.halve())
+            .round(),
+        ])
+      );
+      return { centers }; // no forced sizes in GRAPH mode
+    }
+
+    // NESTED mode: centers in local space + per-child forced square
+    const pad = this.tuning.get("outerPad")(spacing);
+    const rect = new Shapes.Rectangle(
+      parentSize.subtract(Vector.scalar(2 * pad)),
+      new Vector(pad, pad)
+    );
+    const centersArray = this.iters.get(LayoutTypes.Grid).centersInRect(safeChildren.length, rowCol, rect);
+
+    // compute square side per cell
+    const innerCell = rect.getSize().divide(rowCol).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
+    const baseSide = Math.max(8, Math.floor(Math.min(innerCell.x, innerCell.y)));
+
+    const sizes: Record<string, Vector> = {};
+    for (let i = 0; i < safeChildren.length; i++) {
+      const ch = safeChildren[i];
+      const m = childModes[ch.id] ?? LayoutChildrenMode.GRAPH;
+      const k = (m === LayoutChildrenMode.NESTED) ? this.tuning.get("nestedContainerScale")(level + 1) : 1;
+      sizes[ch.id] = Vector.scalar(Math.floor(baseSide * k));
+    }
+    const centers: Record<string, Vector> = Object.fromEntries(safeChildren.map((c, i) => [c.id, centersArray[i]]));
+    return { centers, sizes };
+  };
+
+  /* ---------- legacy centers (kept for back-compat) ---------- */
   placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn => {
     const { children, nodeSize, spacing, origin, parentSize, mode } = args;
     const maxPer = IterationConfig.get("maxChildrenPerNode");
@@ -2242,7 +2321,7 @@ export class GridLayout extends Layout {
         return Object.fromEntries(
           mapIndexBounded(
             safeChildren.length,
-            safeChildren.length, // already bounded
+            safeChildren.length,
             "truncate",
             (i: number) => [
               safeChildren[i].id,
@@ -2275,6 +2354,7 @@ export class GridLayout extends Layout {
     return inner.add(Vector.scalar(2 * pad));
   };
 }
+
 ```
 
 ### src/components/layout/strategies/grid/grid.mapped.ts
@@ -2437,7 +2517,8 @@ export class Grid<T>
 ``` ts
 import { Vector } from "../../../core/geometry";
 import {
-  PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam, NestedFramesReturn
+  PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam,
+  NestedFramesReturn, PlaceChildrenExReturn
 } from "../../layout";
 import { LayoutChildrenMode } from "../../layout.enum";
 import { MappedGrid } from "../grid/grid.mapped";
@@ -2445,75 +2526,175 @@ import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
 import { IterationConfig } from "../../limits";
 import { mapIndexBounded } from "../../../iteration/iterate";
+import { AuditIssue } from "../../../tooling/diagnostics/audit";
+
+/** geometry helper for nested-radial child square side */
+function radialChildSquareSide(tuning: Config<LayoutTuning>, n: number, parentSize: Vector, spacing: number): number {
+  const pad = tuning.get("outerPad")(spacing);
+  const g   = tuning.get("itemPad")(spacing);
+  const R   = Math.max(1, Math.min(parentSize.x, parentSize.y) / 2 - pad);
+  const sin = Math.sin(Math.PI / Math.max(1, n));
+  const denom = 1 + sin;
+  const sBound = (2 * R * sin - g * (1 + sin)) / Math.max(denom, 1e-6);
+  const f = tuning.get("nestedChildMaxFraction")();
+  const sMax = Math.min(sBound, 2 * R * f);
+  return Math.floor(Math.max(8, sMax));
+}
 
 export class RadialLayout extends Layout {
   constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) { super(); }
+
   nestedFrames = (): NestedFramesReturn => ({
     ip: 0,
     content: new Vector(0, 0),
     grid: MappedGrid.emptyMapped(new Vector(0, 0), () => ({ id: "" })),
   });
 
+  /* ---------- extended placement (owns child sizing for NESTED) ---------- */
+  placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
+    const { children, origin, nodeSize, spacing, level, parentSize, mode, childModes } = args;
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+    const safeChildren = mapIndexBounded(children.length, maxPer, policy, (i) => children[i]);
+
+    if (mode === LayoutChildrenMode.GRAPH) {
+      // Absolute ring around origin+anchor
+      const base = this.tuning.get("radialBase")(nodeSize, spacing);
+      const r = Math.max(this.tuning.get("minRadius")(), base * (1 + level * this.tuning.get("radialLevelScale")()));
+      const a = this.tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
+      const c = origin.add(a);
+
+      const start = this.tuning.get("startAngle")();
+      const cw = this.tuning.get("clockwise")();
+
+      const centers: Record<string, Vector> = {};
+      for (let i = 0; i < safeChildren.length; i++) {
+        const ang = this.tuning.get("angleOf")(i, safeChildren.length, start, cw);
+        centers[safeChildren[i].id] = Vector.scalar(ang).trig().scale(r).add(c).round();
+      }
+      return { centers };
+    }
+
+    // NESTED: local centers inside parent’s inner rect with pad offset
+    const padOuter = this.tuning.get("outerPad")(spacing);
+    const inner = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+    const R = inner.min() / 2;
+    const g = this.tuning.get("itemPad")(spacing);
+
+    const sBase = radialChildSquareSide(this.tuning, safeChildren.length, parentSize, spacing);
+
+    // sizes per child (scale down if the child is also a nested container)
+    const sizes: Record<string, Vector> = {};
+    for (const ch of safeChildren) {
+      const m = childModes[ch.id] ?? LayoutChildrenMode.GRAPH;
+      const k = (m === LayoutChildrenMode.NESTED) ? this.tuning.get("nestedContainerScale")(level + 1) : 1;
+      sizes[ch.id] = Vector.scalar(Math.floor(sBase * k));
+    }
+
+    // choose a radius safe for the largest child
+    const sMax = Object.values(sizes).reduce((mx, v) => Math.max(mx, v.x), 0);
+    const r = Math.max(this.tuning.get("minRadius")(), R - (sMax + g) / 2);
+    // const r = Math.max(this.tuning.get("minRadius")(), R - (sMax / 2 + g));
+
+      // local center (include pad offset)
+    const cLocal = Vector.scalar(padOuter).add(inner.scale(1 / 2));
+    const start = this.tuning.get("startAngle")();
+    const cw = this.tuning.get("clockwise")();
+
+    const centers: Record<string, Vector> = {};
+    for (let i = 0; i < safeChildren.length; i++) {
+      const ang = this.tuning.get("angleOf")(i, safeChildren.length, start, cw);
+      centers[safeChildren[i].id] = Vector.scalar(ang).trig().scale(r).add(cLocal);
+    }
+    return { centers, sizes };
+  };
+
+  /* ---------- legacy centers (kept for back-compat) ---------- */
   placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn =>
-    args.mode === LayoutChildrenMode.NESTED ? nestedRadialCenters(this.tuning, args) : graphRadialCenters(this.tuning, args);
+    args.mode === LayoutChildrenMode.NESTED ? this.nestedCenters(args) : this.graphCenters(args);
+
+  private nestedCenters({ children, parentSize, nodeSize, spacing }: PlaceChildrenParam): PlaceChildrenReturn {
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+
+    const padOuter = this.tuning.get("outerPad")(spacing);
+    const inner: Vector = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+
+    const c: Vector = Vector.scalar(padOuter).add(inner.scale(1 / 2));
+    const start = this.tuning.get("startAngle")();
+    const cw = this.tuning.get("clockwise")();
+    const ip = this.tuning.get("itemPad")(spacing);
+
+    const baseR = inner.min() / 2 - Math.max(0, nodeSize.max() / 2 + ip);
+    const r = Math.max(this.tuning.get("minRadius")(), baseR);
+
+    return Object.fromEntries(
+      mapIndexBounded(children.length, maxPer, policy, (i) => [
+        children[i].id,
+        Vector.scalar(this.tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c),
+      ])
+    );
+  }
+
+  private graphCenters({ children, origin, nodeSize, spacing, level, parentSize }: PlaceChildrenParam): PlaceChildrenReturn {
+    const maxPer = IterationConfig.get("maxChildrenPerNode");
+    const policy = IterationConfig.get("onLimit");
+
+    const base = this.tuning.get("radialBase")(nodeSize, spacing);
+    const r = Math.max(this.tuning.get("minRadius")(), base * (1 + level * this.tuning.get("radialLevelScale")()));
+    const a = this.tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
+    const c = origin.add(a);
+
+    const start = this.tuning.get("startAngle")();
+    const cw = this.tuning.get("clockwise")();
+
+    return Object.fromEntries(
+      mapIndexBounded(children.length, maxPer, policy, (i) => [
+        children[i].id,
+        Vector.scalar(this.tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c).round(),
+      ])
+    );
+  }
 
   preferredSize = ({ count, nodeSize, spacing, mode }: PreferredSizeParam): PreferredSizeReturn =>
-    mode === LayoutChildrenMode.NESTED ? this.tuning.get("nestedRadialPreferred")(count, nodeSize, spacing) : nodeSize;
+    mode === LayoutChildrenMode.NESTED
+      ? this.tuning.get("nestedRadialPreferred")(count, nodeSize, spacing)
+      : nodeSize;
+  auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
+    const issues : AuditIssue[] = [];
+    const p = snapshot.boxes[parentId];
+    if (!p) return issues;
+
+    const pad = tuning.get("outerPad")(spacing);
+    const inner = p.size.subtract(Vector.scalar(2 * pad));
+    const R = inner.min() / 2;
+    const g = tuning.get("itemPad")(spacing);
+
+    // use each child's own size (matches placement)
+    for (const cid of childIds) {
+      const c = snapshot.boxes[cid];
+      if (!c) continue;
+
+      const center = c.position.add(c.size.halve());
+      const innerCenter = p.position.add(Vector.scalar(pad)).add(inner.scale(1 / 2));
+      const dist = center.subtract(innerCenter).length();
+
+      const s = Math.max(c.size.x, c.size.y);
+      const rExpected = Math.max(tuning.get("minRadius")(), R - (s / 2 + g));
+      if (Math.abs(dist - rExpected) > 1.0) {
+        issues.push({
+          code: "RADIAL_CHILD_OFF_RING",
+        severity: "warn",
+        parentId,
+        childId: cid,
+        detail: { dist, rExpected, s },
+      });
+    }
+  }
+  return issues;
+};
+
 }
-
-/* ==================== helpers ==================== */
-export const nestedRadialCenters = (
-  tuning: Config<LayoutTuning>,
-  { children, parentSize, nodeSize, spacing }: PlaceChildrenParam
-): PlaceChildrenReturn => {
- const maxPer = IterationConfig.get("maxChildrenPerNode");
-  const policy = IterationConfig.get("onLimit");
-
-  // use content box (outer pad)
-  const padOuter = tuning.get("outerPad")(spacing);
-  const inner: Vector = parentSize
-    .round()
-    .subtract(Vector.scalar(2 * padOuter))
-    .clamp(1, Infinity);
-
-  const c: Vector = inner.scale(1 / 2);
-  const start = tuning.get("startAngle")();
-  const cw = tuning.get("clockwise")();
-  const ip = tuning.get("itemPad")(spacing);
-
-  const baseR = inner.min() / 2 - Math.max(0, nodeSize.max() / 2 + ip);
-  const r = Math.max(tuning.get("minRadius")(), baseR);
-
-  return Object.fromEntries(
-    mapIndexBounded(children.length, maxPer, policy, (i) => [
-      children[i].id,
-      Vector.scalar(tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c),
-    ])
-  );
-};
-
-export const graphRadialCenters = (
-  tuning: Config<LayoutTuning>,
-  { children, origin, nodeSize, spacing, level, parentSize }: PlaceChildrenParam
-): PlaceChildrenReturn => {
-  const maxPer = IterationConfig.get("maxChildrenPerNode");
-  const policy = IterationConfig.get("onLimit");
-
-  const base = tuning.get("radialBase")(nodeSize, spacing);
-  const r = Math.max(tuning.get("minRadius")(), base * (1 + level * tuning.get("radialLevelScale")()));
-  const a = tuning.get("anchor")({ mode: LayoutChildrenMode.GRAPH, parentSize, spacing });
-  const c = origin.add(a);
-
-  const start = tuning.get("startAngle")();
-  const cw = tuning.get("clockwise")();
-
-  return Object.fromEntries(
-    mapIndexBounded(children.length, maxPer, policy, (i) => [
-      children[i].id,
-      Vector.scalar(tuning.get("angleOf")(i, children.length, start, cw)).trig().scale(r).add(c).round(),
-    ])
-  );
-};
 
 ```
 
@@ -2732,6 +2913,38 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
 
 ```
 
+### src/components/render/ports/anchoring.ts
+
+``` ts
+import { Vector } from "../../core/geometry";
+import type { Box } from "../../layout/types";
+
+export type AnchorKind = "center" | "perimeter";
+
+/** Rectangle perimeter intersection from center toward target */
+function perimeterAnchor(from: Box, towardCenter: Vector): Vector {
+  const c = from.position.add(from.size.halve());
+  const d = towardCenter.subtract(c);
+  const dx = d.x, dy = d.y;
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return c;
+
+  const hw = from.size.x / 2, hh = from.size.y / 2;
+  const tx = dx > 0 ? hw / dx : -hw / dx; // parameter to hit vertical side
+  const ty = dy > 0 ? hh / dy : -hh / dy; // parameter to hit horizontal side
+  const t = Math.min(Math.abs(tx), Math.abs(ty));
+  return c.add(d.scale(t));
+}
+
+export function resolveEndpoints(a: Box, b: Box, kind: AnchorKind): { A: Vector; B: Vector } {
+  const ca = a.position.add(a.size.halve());
+  const cb = b.position.add(b.size.halve());
+
+  if (kind === "center") return { A: ca, B: cb };
+  return { A: perimeterAnchor(a, cb), B: perimeterAnchor(b, ca) };
+}
+
+```
+
 ### src/components/render/ports/canvas.port.ts
 
 ``` ts
@@ -2816,7 +3029,7 @@ export class DomPort implements RenderPort {
     Object.assign(root.style, { position: "relative", width: "100%", height: "100%" });
 
     const svgNS = "http://www.w3.org/2000/svg";
-    const svg: SVGElement = document.createElementNS(svgNS, "svg") as SVGElement;
+    const svg: SVGSVGElement = document.createElementNS(svgNS, "svg") as SVGSVGElement;
     Object.assign(svg.style, {
       position: "absolute",
       inset: "0",
@@ -2825,70 +3038,79 @@ export class DomPort implements RenderPort {
       pointerEvents: "none",
       zIndex: "0",
     });
-    // Some browsers still prefer explicit attributes on <svg>
     svg.setAttribute("width", "100%");
     svg.setAttribute("height", "100%");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
     container.appendChild(root);
     root.appendChild(svg);
 
-    const draw = (s: LayoutSnapshot) => {
-      // NEW: update viewBox to match snapshot bounds
-      // const b = s.stats.bounds;
-      // const w = Math.max(1, b.size.x);
-      // const h = Math.max(1, b.size.y);
-      // (svg as SVGSVGElement).setAttribute("viewBox", `${b.position.x} ${b.position.y} ${w} ${h}`);
-
-      root.querySelectorAll("[data-node]").forEach((n) => n.remove());
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
-
-      for (const w of s.wires) {
-        if (w.polyline && w.polyline.length >= 2) {
-          const poly = document.createElementNS(svgNS, "polyline");
-          poly.setAttribute("points", w.polyline.map(p => `${p.x},${p.y}`).join(" "));
-          poly.setAttribute("fill", "none");
-          poly.setAttribute("stroke", theme.wire.stroke);
-          poly.setAttribute("stroke-width", String(theme.wire.width));
-          svg.appendChild(poly);
-          continue;
-        }
-        const a = s.boxes[w.source]; const b = s.boxes[w.target];
-        if (!a || !b) continue;
-        const A = a.position.add(a.size.halve());
-        const B = b.position.add(b.size.halve());
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", String(A.x));
-        line.setAttribute("y1", String(A.y));
-        line.setAttribute("x2", String(B.x));
-        line.setAttribute("y2", String(B.y));
-        line.setAttribute("stroke", theme.wire.stroke);
-        line.setAttribute("stroke-width", String(theme.wire.width));
-        svg.appendChild(line);
-      }
-
-
-      for (const b of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
-        const el = document.createElement("div");
-        el.dataset.node = b.id;
-        const style = el.style;
-        style.position = "absolute";
-        style.left = `${b.position.x}px`;
-        style.top = `${b.position.y}px`;
-        style.width = `${b.size.x}px`;
-        style.height = `${b.size.y}px`;
-        style.border = `1px solid ${theme.node.border}`;
-        style.borderRadius = `${theme.node.radius}px`;
-        style.background = theme.node.bg;
-        style.boxSizing = "border-box";
-        style.fontSize = `${theme.node.fontSize}px`;
-        style.color = theme.node.text;
-        style.display = "flex";
-        style.alignItems = "center";
-        style.justifyContent = "center";
-        (style as any).userSelect = "none";
-        el.textContent = b.id;
-        root.appendChild(el);
-      }
+    const applyViewBox = (s: LayoutSnapshot) => {
+      const b = s.stats.bounds;
+      const w = Math.max(1, Math.ceil(b.size.x));
+      const h = Math.max(1, Math.ceil(b.size.y));
+      svg.setAttribute("viewBox", `${Math.floor(b.position.x)} ${Math.floor(b.position.y)} ${w} ${h}`);
     };
+
+    const draw = (s: LayoutSnapshot) => {
+  root.querySelectorAll("[data-node]").forEach((n) => n.remove());
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // --- viewBox fix so lines outside initial CSS box are visible
+  const b = s.stats.bounds;
+  const vbW = Math.max(1, Math.ceil(b.size.x));
+  const vbH = Math.max(1, Math.ceil(b.size.y));
+  (svg as SVGSVGElement).setAttribute("viewBox", `${Math.floor(b.position.x)} ${Math.floor(b.position.y)} ${vbW} ${vbH}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+  for (const w of s.wires) {
+    if (w.polyline && w.polyline.length >= 2) {
+      const poly = document.createElementNS(svgNS, "polyline");
+      poly.setAttribute("points", w.polyline.map(p => `${p.x},${p.y}`).join(" "));
+      poly.setAttribute("fill", "none");
+      poly.setAttribute("stroke", theme.wire.stroke);
+      poly.setAttribute("stroke-width", String(theme.wire.width));
+      svg.appendChild(poly);
+      continue;
+    }
+    const a = s.boxes[w.source]; const b2 = s.boxes[w.target];
+    if (!a || !b2) continue;
+    const A = a.position.add(a.size.halve());
+    const B = b2.position.add(b2.size.halve());
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", String(A.x));
+    line.setAttribute("y1", String(A.y));
+    line.setAttribute("x2", String(B.x));
+    line.setAttribute("y2", String(B.y));
+    line.setAttribute("stroke", theme.wire.stroke);
+    line.setAttribute("stroke-width", String(theme.wire.width));
+    svg.appendChild(line);
+  }
+
+  for (const b3 of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
+    const el = document.createElement("div");
+    el.dataset.node = b3.id;
+    const style = el.style;
+    style.position = "absolute";
+    style.left = `${b3.position.x}px`;
+    style.top = `${b3.position.y}px`;
+    style.width = `${b3.size.x}px`;
+    style.height = `${b3.size.y}px`;
+    style.border = `1px solid ${theme.node.border}`;
+    style.borderRadius = `${theme.node.radius}px`;
+    style.background = theme.node.bg;
+    style.boxSizing = "border-box";
+    style.fontSize = `${theme.node.fontSize}px`;
+    style.color = theme.node.text;
+    style.display = "flex";
+    style.alignItems = "center";
+    style.justifyContent = "center";
+    (style as any).userSelect = "none";
+    el.textContent = b3.id;
+    root.appendChild(el);
+  }
+};
+
 
     draw(initial);
 
@@ -2896,12 +3118,8 @@ export class DomPort implements RenderPort {
       draw,
       destroy: () => {
         try {
-          if (root.parentNode === container) {
-            container.removeChild(root);
-          } else {
-            // if React already removed it, no-op
-            root.remove?.();
-          }
+          if (root.parentNode === container) container.removeChild(root);
+          else root.remove?.();
         } catch { /* swallow */ }
       },
     };
@@ -2999,67 +3217,90 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewP
 ### src/components/tooling/diagnostics/audit.ts
 
 ``` ts
-import type { LayoutSnapshot } from "../../layout/types";
-import type { Config } from "../../config";
-import type { LayoutTuning } from "../../layout/layout.tuning";
-import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
-import type { Plan } from "../../layout/engine/phases/plan";
-import { Vector } from "../../core/geometry";
+
+import { Config } from "../../config";
+import { SystemContext } from "../../layout/engine/context";
+import { Plan } from "../../layout/engine/phases/plan";
+import { LayoutTuning } from "../../layout/layout.tuning";
+import { LayoutSnapshot } from "../../layout/types";
 
 export type AuditIssue = {
-  code: "NESTED_GRID_CHILD_NOT_SQUARE" | "NESTED_GRID_CHILD_TOO_BIG";
+  code: "NESTED_CHILD_NOT_SQUARE" | "NESTED_CHILD_OUTSIDE_PARENT" | "NESTED_CHILD_TOO_BIG" | string;
+  severity: "warn" | "error";
   parentId: string;
-  childId: string;
-  details?: Record<string, unknown>;
+  childId?: string;
+  detail?: unknown;
 };
 
-export function auditSnapshot(
+function childrenOf(s: LayoutSnapshot): Record<string, string[]> {
+  const kids: Record<string, string[]> = {};
+  for (const b of Object.values(s.boxes)) {
+    if (b.parentId) (kids[b.parentId] ??= []).push(b.id);
+  }
+  return kids;
+}
+
+function genericNestedChecks(
+  s: LayoutSnapshot,
+  tuning: Config<LayoutTuning>,
+  spacing: number
+): AuditIssue[] {
+  const issues: AuditIssue[] = [];
+  const kids = childrenOf(s);
+  const pad = tuning.get("outerPad")(spacing);
+
+  for (const [pid, arr] of Object.entries(kids)) {
+    const p = s.boxes[pid];
+    if (!p) continue;
+
+    const innerW = p.size.x - 2 * pad;
+    const innerH = p.size.y - 2 * pad;
+    const x1 = p.position.x + pad, y1 = p.position.y + pad;
+    const x2 = x1 + innerW,       y2 = y1 + innerH;
+    const maxSide = Math.min(innerW, innerH);
+
+    for (const cid of arr) {
+      const c = s.boxes[cid];
+      if (!c) continue;
+
+      if (Math.abs(c.size.x - c.size.y) > 0.5) {
+        issues.push({ code: "NESTED_CHILD_NOT_SQUARE", severity: "warn", parentId: pid, childId: cid });
+      }
+      if (Math.max(c.size.x, c.size.y) > maxSide + 0.5) {
+        issues.push({ code: "NESTED_CHILD_TOO_BIG", severity: "warn", parentId: pid, childId: cid });
+      }
+      const cx1 = c.position.x, cy1 = c.position.y;
+      const cx2 = cx1 + c.size.x, cy2 = cy1 + c.size.y;
+      if (cx1 < x1 - 0.5 || cy1 < y1 - 0.5 || cx2 > x2 + 0.5 || cy2 > y2 + 0.5) {
+        issues.push({ code: "NESTED_CHILD_OUTSIDE_PARENT", severity: "warn", parentId: pid, childId: cid });
+      }
+    }
+  }
+  return issues;
+}
+
+/** Call generic + strategy-local audits and merge */
+export function runAudit(
   s: LayoutSnapshot,
   plan: Plan,
-  tuning: Config<LayoutTuning>
+  ctx: SystemContext,
+  opts: { spacing: number }
 ): AuditIssue[] {
-  // Build children map from wires (tree edges)
-  const kids: Record<string, string[]> = {};
-  for (const w of s.wires) {
-    (kids[w.source] ??= []).push(w.target);
-  }
+  const issues: AuditIssue[] = genericNestedChecks(s, ctx.tunings, opts.spacing);
+  const kids = childrenOf(s);
 
-  const issues: AuditIssue[] = [];
-
-  for (const [id, box] of Object.entries(s.boxes)) {
-    const mode = plan.modes[id] ?? LayoutChildrenMode.GRAPH;
-    const layout = plan.layouts[id] ?? LayoutTypes.Grid;
-    if (mode !== LayoutChildrenMode.NESTED || layout !== LayoutTypes.Grid) continue;
-
-    const children = kids[id] ?? [];
-    if (children.length === 0) continue;
-
-    const pad = tuning.get("outerPad")(0); // spacing not needed for this check; caller can refine
-    const inner = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-    const rc = tuning.get("rowCol")(children.length);
-    const ip = tuning.get("itemPad")(0);
-    const cell = inner.divide(rc).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
-    const sideMax = Math.min(cell.x, cell.y);
-
-    for (const cid of children) {
-      const cb = s.boxes[cid];
-      if (!cb) continue;
-      if (Math.abs(cb.size.x - cb.size.y) > 1) {
-        issues.push({
-          code: "NESTED_GRID_CHILD_NOT_SQUARE",
-          parentId: id,
-          childId: cid,
-          details: { size: cb.size, sideMax }
-        });
-      }
-      if (cb.size.x - sideMax > 1 || cb.size.y - sideMax > 1) {
-        issues.push({
-          code: "NESTED_GRID_CHILD_TOO_BIG",
-          parentId: id,
-          childId: cid,
-          details: { size: cb.size, sideMax }
-        });
-      }
+  for (const [pid, arr] of Object.entries(kids)) {
+    const layout = plan.layouts[pid];
+    const strat = ctx.layouts.get(layout);
+    if (strat.auditParent) {
+      const extra = strat.auditParent({
+        parentId: pid,
+        childIds: arr,
+        snapshot: s,
+        spacing: opts.spacing,
+        tuning: ctx.tunings,
+      }) ?? [];
+      issues.push(...extra);
     }
   }
   return issues;
@@ -3418,234 +3659,125 @@ export const Configurator = (
 ### src/components/ui/controls.tsx
 
 ``` tsx
-import { 
-  JSX 
-} from "react";
+import { JSX } from "react";
 
-export type SelectOption<T> =
-{
-    label     : string;
-    value     : T;
-    disabled? : boolean;
-}
+export type SelectOption<T> = { label: string; value: T; disabled?: boolean };
+
 /* ---------- Segmented (general) ---------- */
-export type SelectionProps<T> = 
-{
-    label     : string;
-    options   : SelectOption<T>[];
-    onChange  : (v : T) => void;
-    value     : T;
-}
-export function Segmented<T>(
-                                {
-                                    label,
-                                    options,
-                                    onChange,
-                                    value
-                                } : SelectionProps<T>
-                            ) : JSX.Element 
-{
-    const labelToValue = new Map<string, T>(options.map((o : SelectOption<T>) : [string, T] => [o.label, o.value]));
-    const valueToLabel = new Map<T, string>(options.map((o : SelectOption<T>) : [T, string] => [o.value, o.label]));
+export type SelectionProps<T> = {
+  label: string;
+  options: SelectOption<T>[];
+  onChange: (v: T) => void;
+  value: T;
+};
+export function Segmented<T>({ label, options, onChange, value }: SelectionProps<T>): JSX.Element {
+  const OuterStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, marginRight: 12 };
+  const OuterLabelStyle: React.CSSProperties = { fontSize: 12 };
+  const TabListStyle: React.CSSProperties = {
+    display: "inline-flex",
+    border: "1px solid #d0d7de",
+    borderRadius: 8,
+    overflow: "hidden",
+  };
 
-    const OuterStyle : React.CSSProperties = 
-    {
-        display     : "inline-flex",
-        alignItems  : "center",
-        gap         : 8,
-        marginRight : 12
-    };
-    const OuterLabelStyle : React.CSSProperties =
-    {
-        fontSize : 12
-    }
-    const TabListStyle : React.CSSProperties =
-    {
-        display       : "inline-flex",
-        border        : "1px solid #d0d7de",
-        borderRadius  : 8,
-        overflow      : "hidden"
-    };
+  const OptionStyle = (o: SelectOption<T>, selected: boolean): React.CSSProperties => ({
+    padding: "6px 10px",
+    fontSize: 12,
+    border: "none",
+    background: selected ? "#111827" : "#fff",
+    color: selected ? "#fff" : "#111827",
+    cursor: o.disabled ? "not-allowed" : "pointer",
+    opacity: o.disabled ? 0.5 : 1,
+  });
 
-    const OptionStyle = (o : SelectOption<T>, selected : boolean) : React.CSSProperties =>
-    {
-        return {
-            padding      : "6px 10px",
-            fontSize     : 12,
-            border       : "none",
-            background   : selected ? "#111827" : "#fff",
-            color        : selected ? "#fff" : "#111827",
-            cursor       : o.disabled ? "not-allowed" : "pointer",
-            opacity      : o.disabled ? 0.5 : 1,
-        };
-    };
-
-    return (
-        <div style = {OuterStyle}>
-            <span style = {OuterLabelStyle}>
-                {label}
-            </span>
-            <div
-                role        =   "tablist"
-                aria-label  =   {label          }
-                style       =   {TabListStyle   }
+  return (
+    <div style={OuterStyle}>
+      <span style={OuterLabelStyle}>{label}</span>
+      <div role="tablist" aria-label={label} style={TabListStyle}>
+        {options.map((o) => {
+          const selected = value === o.value;
+          return (
+            <button
+              key={String(o.value)}
+              role="tab"
+              aria-selected={selected}
+              disabled={o.disabled}
+              onClick={() => onChange(o.value)}
+              style={OptionStyle(o, selected)}
             >
-                {
-                    options.map (
-                                    (o : SelectOption<T>) : JSX.Element => 
-                                    {
-                                        const selected : boolean = value === o.value;
-                                        return (
-                                            <button
-                                                key             =   {o.label + Math.random().toString(16)   }
-                                                role            =   "tab"
-                                                aria-selected   =   {selected                               }
-                                                disabled        =   {o.disabled                             }
-                                                onClick         =   {() => onChange(o.value)                }
-                                                style           =   {OptionStyle(o, selected)               }
-                                            >
-                                                {o.label}
-                                            </button>
-                                        );
-                                    }
-                    )
-                }
-            </div>
-        </div>
-    );
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /* ---------- Select (keep for node scope) ---------- */
-export function Select<T>   (
-                                {
-                                    label, 
-                                    onChange, 
-                                    options, 
-                                    value
-                                } : SelectionProps<T>
-                            ) : JSX.Element 
-{
-    const labelToValue : Map<string, T> = new Map<string, T>(options.map((o : SelectOption<T>) : [string, T] => [o.label, o.value]));
-    const valueToLabel : Map<T, string> = new Map<T, string>(options.map((o : SelectOption<T>) : [T, string] => [o.value, o.label]));
-    
-    const OuterStyle : React.CSSProperties =
-    {
-        display       : "inline-flex",
-        alignItems    : "center",
-        marginRight   : 12
-    };
+export function Select<T>({ label, onChange, options, value }: SelectionProps<T>): JSX.Element {
+  const OuterStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", marginRight: 12 };
+  const OuterLabelStyle: React.CSSProperties = { marginRight: 8, fontSize: 12 };
 
-    const OuterLabelStyle : React.CSSProperties =
-    {
-        marginRight   : 8,
-        fontSize      : 12
-    };
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = options.find((o) => String(o.value) === e.target.value);
+    if (next) onChange(next.value);
+  };
 
-    const SelectOnChange =  (
-                                e : React.ChangeEvent<HTMLSelectElement>
-                            ) : void =>
-    {
-        onChange(labelToValue.get(e.target.value)!);
-    };
-
-    return (
-        <div style = {OuterStyle}>
-            <label style = {OuterLabelStyle}>
-                {label}
-            </label>
-            <select 
-                value       =   {valueToLabel.get(value)!   } 
-                onChange    =   {SelectOnChange             }
-            >
-                {
-                    options
-                        .map(   
-                                (
-                                    o : SelectOption<T>
-                                ) : JSX.Element => 
-                                    (
-                                        <option 
-                                            key         =   {o.label + Math.random().toString(16)} 
-                                            value       =   {o.label} 
-                                            disabled    =   {o.disabled}
-                                        >
-                                            {o.label}
-                                        </option>
-                                    )
-                        )
-                }
-            </select>
-        </div>
-    );
+  return (
+    <div style={OuterStyle}>
+      <label style={OuterLabelStyle}>{label}</label>
+      <select value={String(value)} onChange={handleChange}>
+        {options.map((o) => (
+          <option key={String(o.value)} value={String(o.value)} disabled={o.disabled}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 /* ---------- Slider ---------- */
 
-export type LabeledSliderProps = 
-    Omit<SelectionProps<number>, 'options'> 
-&   {
-        min         : number;
-        max         : number;
-        step?       : number;
-        disabled?   : boolean;
-    };
+export type LabeledSliderProps = Omit<SelectionProps<number>, "options"> & {
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+};
 
-export const LabeledSlider =    (
-                                    {
-                                        label, 
-                                        value, 
-                                        min, 
-                                        max, 
-                                        step = 1, 
-                                        onChange, 
-                                        disabled = false
-                                    } : LabeledSliderProps
-                                ) : JSX.Element => 
-{
-    const OuterStyle : React.CSSProperties =
-    {
-        display       : "inline-flex",
-        alignItems    : "center",
-        margin        : "0 12px",
-        opacity       : disabled ? 0.5 : 1
-    };
-    const OuterLabelStyle : React.CSSProperties =
-    {
-        marginRight   : 8,
-        fontSize      : 12
-    };
-    const InnerStyle : React.CSSProperties =
-    {
-        marginLeft    : 8,
-        fontSize      : 12
-    };
+export const LabeledSlider = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  disabled = false,
+}: LabeledSliderProps): JSX.Element => {
+  const OuterStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", margin: "0 12px", opacity: disabled ? 0.5 : 1 };
+  const OuterLabelStyle: React.CSSProperties = { marginRight: 8, fontSize: 12 };
+  const InnerStyle: React.CSSProperties = { marginLeft: 8, fontSize: 12 };
 
-    const OnChange =    (
-                            e : React.ChangeEvent<HTMLInputElement>
-                        ) : void => 
-    {
-        onChange(parseInt(e.target.value, 10));
-    };
-    return  (
-                <div style = {OuterStyle}>
-                    <label style = {OuterLabelStyle}>
-                        {label}
-                    </label>
-                    <input
-                        type        =   "range" 
-                        min         =   {min        } 
-                        max         =   {max        } 
-                        step        =   {step       } 
-                        value       =   {value      } 
-                        disabled    =   {disabled   }
-                        onChange    =   {OnChange   }
-                    />
-                    <span style = {InnerStyle}>
-                        {value}
-                    </span>
-                </div>
-            );
-}
+  const onChangeInput = (e: React.ChangeEvent<HTMLInputElement>) => onChange(parseInt(e.target.value, 10));
+
+  return (
+    <div style={OuterStyle}>
+      <label style={OuterLabelStyle}>{label}</label>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={onChangeInput}
+      />
+      <span style={InnerStyle}>{value}</span>
+    </div>
+  );
+};
 
 ```
 
@@ -3653,95 +3785,74 @@ export const LabeledSlider =    (
 
 ``` tsx
 import { JSX, useMemo } from "react";
-import { LayoutView } from "../../render/views/LayoutView";
+import { LayoutTypes, LayoutChildrenMode } from "../../layout/layout.enum";
 import { Target } from "../../adapters/env";
 import { createLayoutAPI } from "../../layout/api";
-import { createDefaultSystem } from "../../layout/engine/context";
-import { ConsoleLogger, LogLevel } from "../../core/logging/logger";
-import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
-import { Vector } from "../../core/geometry";
-import type { NodeConfig } from "../../graph/types";
 import type { GraphInput } from "../../layout/api";
-
-const BASE: NodeConfig = {
-  id: "root",
-  position: new Vector(40, 40),
-  children: [
-    { id: "A", children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
-    { id: "B", children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
-    { id: "C", children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
-  ],
-};
-
-function stamp(layout: LayoutTypes, mode: LayoutChildrenMode): NodeConfig {
-  const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
-  const root = clone(BASE);
-  const apply = (n: NodeConfig) => {
-    n.layout = layout;
-    n.mode = mode;
-    (n.children ?? []).forEach(apply);
+import { Vector } from "../../core/geometry";
+import { LayoutView } from "../../render/views/LayoutView";
+import { NodeConfig } from "../../graph/types";
+function cloneNodeConfig(n: NodeConfig): NodeConfig {
+  return {
+    id: n.id,
+    layout: n.layout,
+    // keep "mode" if you store it on the node
+    ...(n as any).mode ? { mode: (n as any).mode } : {},
+    position: n.position ? new Vector(n.position.x, n.position.y) : undefined,
+    children: n.children?.map(cloneNodeConfig),
   };
-  apply(root);
-  return root;
 }
-
 const RENDERERS: Target[] = [Target.DOM, Target.Canvas, Target.ReactFlow];
 const LAYOUTS: LayoutTypes[] = [LayoutTypes.Grid, LayoutTypes.Radial];
 const MODES: LayoutChildrenMode[] = [LayoutChildrenMode.GRAPH, LayoutChildrenMode.NESTED];
 
+const TREE: NodeConfig = Object.freeze({
+  id: "root",
+  position: new Vector(120, 60),
+  layout: LayoutTypes.Grid,
+  children: [
+    { id: "A", layout: LayoutTypes.Radial, children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", layout: LayoutTypes.Grid,   children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", layout: LayoutTypes.Radial, children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
+});
+
 export function TestbedMatrix(): JSX.Element {
-  const api = useMemo(() => createLayoutAPI(createDefaultSystem({ log: new ConsoleLogger(LogLevel.Warn) })), []);
-  const combos = useMemo(() => {
-    return RENDERERS.flatMap((r) =>
-      LAYOUTS.flatMap((L) =>
-        MODES.map((M) => ({
-          key: `${Target[r]}-${LayoutTypes[L]}-${LayoutChildrenMode[M]}`,
-          renderer: r,
-          layout: L,
-          mode: M,
-          snapshot: api.compute({ kind: "tree", root: stamp(L, M) }, {
-            nodeSize: new Vector(90, 50),
-            spacing: 16,
-            routerName: "ortho",
-          }),
-        }))
-      )
-    );
-  }, [api]);
-
-  const grid: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    top: 72,
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gridAutoRows: "340px",
-    gap: 12,
-    padding: 12,
-    boxSizing: "border-box",
-  };
-
-  const cell: React.CSSProperties = {
-    position: "relative",
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    overflow: "hidden",
-  };
-
-  const title: React.CSSProperties = { position: "absolute", left: 8, top: 8, fontSize: 12, color: "#64748b", zIndex: 1 };
+  const api = useMemo(() => createLayoutAPI(), []);
+  const input: GraphInput = { kind: "tree", root: TREE };
+  const spacing = 24;
+  const nodeSize = new Vector(110, 54);
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <div style={grid}>
-        {combos.map((c) => (
-          <div key={c.key} style={cell}>
-            <div style={title}>
-              {Target[c.renderer]} • {LayoutTypes[c.layout]} • {LayoutChildrenMode[c.mode]}
-            </div>
-            <LayoutView kind={c.renderer} snapshot={c.snapshot} />
-          </div>
-        ))}
-      </div>
+    <div style={{ padding: 16, display: "grid", gap: 16, gridTemplateColumns: "repeat(3, minmax(320px, 1fr))" }}>
+      {RENDERERS.flatMap((r) =>
+        LAYOUTS.flatMap((L) =>
+          MODES.map((M) => {
+            const cfg = cloneNodeConfig(TREE);
+            // apply mode on all nodes for this cell
+            const setMode = (n: NodeConfig) => { (n as any).mode = M; (n.children ?? []).forEach(setMode); };
+            setMode(cfg);
+            // apply layout at root for visual variation
+            cfg.layout = L;
+
+            const snap = api.compute(input.kind === "tree" ? { kind: "tree", root: cfg } : input, {
+              nodeSize, spacing, routerName: "line",
+            });
+
+            const key = `${r}-${L}-${M}`;
+            return (
+              <div key={key} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", height: 240, position: "relative" }}>
+                <div style={{ padding: 6, fontSize: 12, color: "#334155", borderBottom: "1px solid #e5e7eb" }}>
+                  {r} • {L} • {M}
+                </div>
+                <div style={{ position: "absolute", inset: "28px 0 0 0" }}>
+                  <LayoutView kind={r} snapshot={snap} />
+                </div>
+              </div>
+            );
+          })
+        )
+      )}
     </div>
   );
 }

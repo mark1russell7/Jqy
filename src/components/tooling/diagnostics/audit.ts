@@ -1,70 +1,88 @@
-import type { LayoutSnapshot } from "../../layout/types";
-import type { Plan } from "../../layout/engine/phases/plan";
-import type { LayoutTuning } from "../../layout/layout.tuning";
+
 import { Config } from "../../config";
+import { SystemContext } from "../../layout/engine/context";
+import { Plan } from "../../layout/engine/phases/plan";
+import { LayoutTuning } from "../../layout/layout.tuning";
+import { LayoutSnapshot } from "../../layout/types";
 
 export type AuditIssue = {
-  code:
-    | "NESTED_CHILD_NOT_SQUARE"
-    | "NESTED_CHILD_OUTSIDE_PARENT"
-    | "NESTED_CHILD_TOO_BIG";
+  code: "NESTED_CHILD_NOT_SQUARE" | "NESTED_CHILD_OUTSIDE_PARENT" | "NESTED_CHILD_TOO_BIG" | string;
   severity: "warn" | "error";
   parentId: string;
-  childId: string;
+  childId?: string;
   detail?: unknown;
 };
 
 function childrenOf(s: LayoutSnapshot): Record<string, string[]> {
   const kids: Record<string, string[]> = {};
   for (const b of Object.values(s.boxes)) {
-    if (!b.parentId) continue;
-    (kids[b.parentId] ??= []).push(b.id);
+    if (b.parentId) (kids[b.parentId] ??= []).push(b.id);
   }
   return kids;
 }
 
-export function auditSnapshot(
+function genericNestedChecks(
   s: LayoutSnapshot,
-  _plan: Plan,
   tuning: Config<LayoutTuning>,
-  opts: { spacing: number }
+  spacing: number
 ): AuditIssue[] {
   const issues: AuditIssue[] = [];
   const kids = childrenOf(s);
-  const padOuter = tuning.get("outerPad")(opts.spacing);
+  const pad = tuning.get("outerPad")(spacing);
 
   for (const [pid, arr] of Object.entries(kids)) {
-    const parent = s.boxes[pid];
-    if (!parent) continue;
+    const p = s.boxes[pid];
+    if (!p) continue;
 
-    const innerX = parent.size.x - 2 * padOuter;
-    const innerY = parent.size.y - 2 * padOuter;
-    const innerX1 = parent.position.x + padOuter;
-    const innerY1 = parent.position.y + padOuter;
-    const innerX2 = innerX1 + innerX;
-    const innerY2 = innerY1 + innerY;
-    const maxSide = Math.min(innerX, innerY);
+    const innerW = p.size.x - 2 * pad;
+    const innerH = p.size.y - 2 * pad;
+    const x1 = p.position.x + pad, y1 = p.position.y + pad;
+    const x2 = x1 + innerW,       y2 = y1 + innerH;
+    const maxSide = Math.min(innerW, innerH);
 
     for (const cid of arr) {
-      const child = s.boxes[cid];
-      if (!child) continue;
+      const c = s.boxes[cid];
+      if (!c) continue;
 
-      if (child.size.x !== child.size.y) {
+      if (Math.abs(c.size.x - c.size.y) > 0.5) {
         issues.push({ code: "NESTED_CHILD_NOT_SQUARE", severity: "warn", parentId: pid, childId: cid });
       }
-      if (Math.max(child.size.x, child.size.y) > maxSide + 0.5) {
+      if (Math.max(c.size.x, c.size.y) > maxSide + 0.5) {
         issues.push({ code: "NESTED_CHILD_TOO_BIG", severity: "warn", parentId: pid, childId: cid });
       }
-
-      const cx1 = child.position.x, cy1 = child.position.y;
-      const cx2 = cx1 + child.size.x, cy2 = cy1 + child.size.y;
-      const outsideInner =
-        cx1 < innerX1 - 0.5 || cy1 < innerY1 - 0.5 || cx2 > innerX2 + 0.5 || cy2 > innerY2 + 0.5;
-      if (outsideInner) {
+      const cx1 = c.position.x, cy1 = c.position.y;
+      const cx2 = cx1 + c.size.x, cy2 = cy1 + c.size.y;
+      if (cx1 < x1 - 0.5 || cy1 < y1 - 0.5 || cx2 > x2 + 0.5 || cy2 > y2 + 0.5) {
         issues.push({ code: "NESTED_CHILD_OUTSIDE_PARENT", severity: "warn", parentId: pid, childId: cid });
       }
     }
   }
+  return issues;
+}
 
+/** Call generic + strategy-local audits and merge */
+export function runAudit(
+  s: LayoutSnapshot,
+  plan: Plan,
+  ctx: SystemContext,
+  opts: { spacing: number }
+): AuditIssue[] {
+  const issues: AuditIssue[] = genericNestedChecks(s, ctx.tunings, opts.spacing);
+  const kids = childrenOf(s);
+
+  for (const [pid, arr] of Object.entries(kids)) {
+    const layout = plan.layouts[pid];
+    const strat = ctx.layouts.get(layout);
+    if (strat.auditParent) {
+      const extra = strat.auditParent({
+        parentId: pid,
+        childIds: arr,
+        snapshot: s,
+        spacing: opts.spacing,
+        tuning: ctx.tunings,
+      }) ?? [];
+      issues.push(...extra);
+    }
+  }
   return issues;
 }

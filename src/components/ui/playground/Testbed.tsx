@@ -1,93 +1,72 @@
 import { JSX, useMemo } from "react";
-import { LayoutView } from "../../render/views/LayoutView";
+import { LayoutTypes, LayoutChildrenMode } from "../../layout/layout.enum";
 import { Target } from "../../adapters/env";
 import { createLayoutAPI } from "../../layout/api";
-import { createDefaultSystem } from "../../layout/engine/context";
-import { ConsoleLogger, LogLevel } from "../../core/logging/logger";
-import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
-import { Vector } from "../../core/geometry";
-import type { NodeConfig } from "../../graph/types";
 import type { GraphInput } from "../../layout/api";
-
-const BASE: NodeConfig = {
-  id: "root",
-  position: new Vector(40, 40),
-  children: [
-    { id: "A", children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
-    { id: "B", children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
-    { id: "C", children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
-  ],
-};
-
-function stamp(layout: LayoutTypes, mode: LayoutChildrenMode): NodeConfig {
-  const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
-  const root = clone(BASE);
-  const apply = (n: NodeConfig) => {
-    n.layout = layout;
-    n.mode = mode;
-    (n.children ?? []).forEach(apply);
+import { Vector } from "../../core/geometry";
+import { LayoutView } from "../../render/views/LayoutView";
+import { NodeConfig } from "../../graph/types";
+function cloneNodeConfig(n: NodeConfig): NodeConfig {
+  return {
+    id: n.id,
+    layout: n.layout,
+    // keep "mode" if you store it on the node
+    ...(n as any).mode ? { mode: (n as any).mode } : {},
+    position: n.position ? new Vector(n.position.x, n.position.y) : undefined,
+    children: n.children?.map(cloneNodeConfig),
   };
-  apply(root);
-  return root;
 }
-
 const RENDERERS: Target[] = [Target.DOM, Target.Canvas, Target.ReactFlow];
 const LAYOUTS: LayoutTypes[] = [LayoutTypes.Grid, LayoutTypes.Radial];
 const MODES: LayoutChildrenMode[] = [LayoutChildrenMode.GRAPH, LayoutChildrenMode.NESTED];
 
+const TREE: NodeConfig = Object.freeze({
+  id: "root",
+  position: new Vector(120, 60),
+  layout: LayoutTypes.Grid,
+  children: [
+    { id: "A", layout: LayoutTypes.Radial, children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", layout: LayoutTypes.Grid,   children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", layout: LayoutTypes.Radial, children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
+});
+
 export function TestbedMatrix(): JSX.Element {
-  const api = useMemo(() => createLayoutAPI(createDefaultSystem({ log: new ConsoleLogger(LogLevel.Warn) })), []);
-  const combos = useMemo(() => {
-    return RENDERERS.flatMap((r) =>
-      LAYOUTS.flatMap((L) =>
-        MODES.map((M) => ({
-          key: `${Target[r]}-${LayoutTypes[L]}-${LayoutChildrenMode[M]}`,
-          renderer: r,
-          layout: L,
-          mode: M,
-          snapshot: api.compute({ kind: "tree", root: stamp(L, M) }, {
-            nodeSize: new Vector(90, 50),
-            spacing: 16,
-            routerName: "ortho",
-          }),
-        }))
-      )
-    );
-  }, [api]);
-
-  const grid: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    top: 72,
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gridAutoRows: "340px",
-    gap: 12,
-    padding: 12,
-    boxSizing: "border-box",
-  };
-
-  const cell: React.CSSProperties = {
-    position: "relative",
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    overflow: "hidden",
-  };
-
-  const title: React.CSSProperties = { position: "absolute", left: 8, top: 8, fontSize: 12, color: "#64748b", zIndex: 1 };
+  const api = useMemo(() => createLayoutAPI(), []);
+  const input: GraphInput = { kind: "tree", root: TREE };
+  const spacing = 24;
+  const nodeSize = new Vector(110, 54);
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <div style={grid}>
-        {combos.map((c) => (
-          <div key={c.key} style={cell}>
-            <div style={title}>
-              {Target[c.renderer]} • {LayoutTypes[c.layout]} • {LayoutChildrenMode[c.mode]}
-            </div>
-            <LayoutView kind={c.renderer} snapshot={c.snapshot} />
-          </div>
-        ))}
-      </div>
+    <div style={{ padding: 16, display: "grid", gap: 16, gridTemplateColumns: "repeat(3, minmax(320px, 1fr))" }}>
+      {RENDERERS.flatMap((r) =>
+        LAYOUTS.flatMap((L) =>
+          MODES.map((M) => {
+            const cfg = cloneNodeConfig(TREE);
+            // apply mode on all nodes for this cell
+            const setMode = (n: NodeConfig) => { (n as any).mode = M; (n.children ?? []).forEach(setMode); };
+            setMode(cfg);
+            // apply layout at root for visual variation
+            cfg.layout = L;
+
+            const snap = api.compute(input.kind === "tree" ? { kind: "tree", root: cfg } : input, {
+              nodeSize, spacing, routerName: "line",
+            });
+
+            const key = `${r}-${L}-${M}`;
+            return (
+              <div key={key} style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", height: 240, position: "relative" }}>
+                <div style={{ padding: 6, fontSize: 12, color: "#334155", borderBottom: "1px solid #e5e7eb" }}>
+                  {r} • {L} • {M}
+                </div>
+                <div style={{ position: "absolute", inset: "28px 0 0 0" }}>
+                  <LayoutView kind={r} snapshot={snap} />
+                </div>
+              </div>
+            );
+          })
+        )
+      )}
     </div>
   );
 }

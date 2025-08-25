@@ -14,7 +14,7 @@ import { LayoutTypes } from "../layout.enum";
 import { GridLayout } from "../strategies/grid/grid.layout";
 import { RadialLayout } from "../strategies/radial/radial.layout";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
-import { auditSnapshot } from "../../tooling/diagnostics/audit";
+import { runAudit } from "../../tooling/diagnostics/audit";
 
 export type ComputeResult =
   | { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
@@ -66,7 +66,9 @@ export class PipelineEngine {
 
     // Diagnostics audit (non-fatal, attach to meta)
     try {
-      const audit = auditSnapshot(snapshot, pln, effectiveTunings, { spacing });
+      // const audit = auditSnapshot(snapshot, pln, effectiveTunings, { spacing });
+      const audit = runAudit(snapshot, pln, localCtx, { spacing });
+
       if (audit.length) {
         localCtx.log.warn("audit: issues", { count: audit.length, audit });
       }
