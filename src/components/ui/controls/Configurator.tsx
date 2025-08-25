@@ -7,11 +7,11 @@ import {
   Select, 
   SelectOption
 } from "./controls";
-import { NodeConfig } from "../graph/types";
+import { NodeConfig } from "../../graph/types";
 import { 
   LayoutChildrenMode, 
   LayoutTypes 
-} from "../layout/layout.enum";
+} from "../../layout/layout.enum";
 
 type Scope = "all" | string;
 
