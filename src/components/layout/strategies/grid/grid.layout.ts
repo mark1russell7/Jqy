@@ -1,7 +1,7 @@
 import { 
     Vector, 
     Shapes 
-} from "../../geometry";
+} from "../../../geometry";
 import {
     Layout, 
     NestedFrameParam, 
@@ -10,11 +10,11 @@ import {
     NestedFramesReturn, 
     PreferredSizeReturn, 
     PlaceChildrenParam
-} from "../layout";
+} from "../../layout";
 import { 
     LayoutChildrenMode, 
     LayoutTypes
-} from "../layout.enum";
+} from "../../layout.enum";
 import { 
     MappedGrid, 
     MappedGridItemData 
@@ -24,18 +24,18 @@ import {
 } from "./grid";
 import { 
     Config 
-} from "../../config";
+} from "../../../config";
 import { 
     LayoutTuning, 
     LayoutTuningConfig 
-} from "../layout.tuning";
+} from "../../layout.tuning";
 import { 
     IteratorsConfig, 
     IteratorsSet 
-} from "../layout.iterators";
+} from "../../iterator/layout.iterators";
 import { 
     mapIndex 
-} from "./radial.layout";
+} from "../radial/radial.layout";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */

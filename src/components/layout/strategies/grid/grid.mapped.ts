@@ -1,7 +1,7 @@
 import { 
     Shapes,
     Vector 
-} from "../../geometry";
+} from "../../../geometry";
 import { 
     Grid, 
     GridItem 

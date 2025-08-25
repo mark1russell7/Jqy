@@ -9,7 +9,7 @@ import {
 } from "./layout.enum";
 import { 
     MappedGrid 
-} from "./strategies/grid.mapped";
+} from "./strategies/grid/grid.mapped";
 export type PreferredSizeParam = 
 {
   /* number of direct children */

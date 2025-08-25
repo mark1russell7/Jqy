@@ -7,7 +7,7 @@ import type {
 } from "reactflow";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Vector 
 } from "../geometry";

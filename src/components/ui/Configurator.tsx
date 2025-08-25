@@ -16,7 +16,7 @@ import {
 } from "../layout/layout.enum";
 import { 
   ModeMap 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 
 type Scope = "all" | string;
 

@@ -1,8 +1,8 @@
-import { Shapes, Vector } from "../geometry";
-import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterators.types";
-import { LayoutChildrenMode } from "./layout.enum";
-import { Config } from "../config";
-import { LayoutTuning, LayoutTuningConfig } from "./layout.tuning";
+import { Shapes, Vector } from "../../geometry";
+import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterator.types";
+import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
+import { Config } from "../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
 
 /** map unit [0,1]² → top-left rect (position + u * size). */
 export const mapToRect =    (
@@ -31,8 +31,8 @@ export const gridUnit = (
 /** iterator registry */
 export type IteratorsSet = 
 {
-    grid    : Iterator;
-    radial  : Iterator;
+   [LayoutTypes.Grid]    : Iterator;  
+   [LayoutTypes.Radial]  : Iterator;
 };
 
 export const buildIterators =   (

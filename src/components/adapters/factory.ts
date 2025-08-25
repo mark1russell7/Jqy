@@ -30,7 +30,7 @@ import {
 } from "./vanilla-dom.adapter";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../layout/engine/layout.engine";
 // factory.ts
 
 export type Renderer =

@@ -6,7 +6,7 @@ import {
 } from "../geometry";
 import { 
     AnchorIteratorParams 
-} from "./iterators.types";
+} from "./iterator.types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";

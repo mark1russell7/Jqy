@@ -1,6 +1,6 @@
 import { JSX, useMemo } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
-import { LayoutResult } from "../engine/computeLayout";
+import { LayoutResult } from "../engine/layout.engine";
 import { toReactFlow } from "./react-flow.adapter";
 import { AbsoluteDOM } from "./react-dom.adapter";
 import { Canvas2D } from "./canvas.adapter";

@@ -5,7 +5,7 @@ import {
 } from "react";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Theme, 
     defaultTheme 

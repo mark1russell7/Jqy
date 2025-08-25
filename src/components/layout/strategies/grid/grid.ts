@@ -1,7 +1,7 @@
 import { 
     Vector, 
     Shapes 
-} from "../../geometry";
+} from "../../../geometry";
 export class GridItem<T> 
 {
     constructor(

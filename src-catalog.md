@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-24T21:17:35.397Z
+Generated on 2025-08-25T00:37:35.512Z
 
 ## Directory structure (src)
 
@@ -22,26 +22,31 @@ Generated on 2025-08-24T21:17:35.397Z
 │   │   ├── theme.ts
 │   │   ├── three.adapter.ts
 │   │   └── vanilla-dom.adapter.ts
-│   ├── engine/
-│   │   └── computeLayout.ts
 │   ├── layout/
+│   │   ├── engine/
+│   │   │   └── layout.engine.ts
+│   │   ├── iterator/
+│   │   │   ├── iterator.registry.ts
+│   │   │   ├── iterator.types.ts
+│   │   │   └── layout.iterators.ts
 │   │   ├── strategies/
-│   │   │   ├── grid.layout.ts
-│   │   │   ├── grid.mapped.ts
-│   │   │   ├── grid.ts
-│   │   │   └── radial.layout.ts
-│   │   ├── iterators.types.ts
-│   │   ├── layout.config.ts
+│   │   │   ├── grid/
+│   │   │   │   ├── grid.layout.ts
+│   │   │   │   ├── grid.mapped.ts
+│   │   │   │   └── grid.ts
+│   │   │   └── radial/
+│   │   │       └── radial.layout.ts
 │   │   ├── layout.enum.ts
-│   │   ├── layout.iterators.ts
+│   │   ├── layout.registry.ts
 │   │   ├── layout.ts
-│   │   ├── layout.tuning.ts
-│   │   └── layout.values.ts
+│   │   └── layout.tuning.ts
 │   ├── ui/
 │   │   ├── Configurator.tsx
 │   │   ├── controls.tsx
 │   │   └── styles.ts
+│   ├── class.types.ts
 │   ├── config.ts
+│   ├── geometry.sanity.test.ts
 │   ├── geometry.ts
 │   ├── graph.ts
 │   ├── math.ts
@@ -118,7 +123,7 @@ import {
 } from "react";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Theme, 
     defaultTheme 
@@ -226,7 +231,7 @@ export const Canvas2D = (
 ``` ts
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Shapes, 
     Vector 
@@ -270,11 +275,13 @@ export const depthOf =  (
                                             () => 
                                             {
                                                 d++;
-                                                if(boxes[p]?.parentId! === undefined)
+                                                const boxesBox      : Shapes.Box = boxes[p];
+                                                const parentBoxID   :  string | undefined = boxesBox.parentId;
+                                                if(parentBoxID === undefined)
                                                 {
                                                     return false;
                                                 }
-                                                p = boxes[p]?.parentId!;
+                                                p = parentBoxID;
                                                 return true;
                                             }
                                         );
@@ -607,7 +614,7 @@ import {
 } from "./vanilla-dom.adapter";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../layout/engine/layout.engine";
 // factory.ts
 
 export type Renderer =
@@ -797,7 +804,7 @@ import {
 } from "react/jsx-dev-runtime";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Theme, 
     defaultTheme 
@@ -920,7 +927,7 @@ import type {
 } from "reactflow";
 import { 
     LayoutResult 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 import { 
     Vector 
 } from "../geometry";
@@ -1002,7 +1009,7 @@ export function toReactFlow (
 ``` tsx
 import { JSX, useMemo } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
-import { LayoutResult } from "../engine/computeLayout";
+import { LayoutResult } from "../engine/layout.engine";
 import { toReactFlow } from "./react-flow.adapter";
 import { AbsoluteDOM } from "./react-dom.adapter";
 import { Canvas2D } from "./canvas.adapter";
@@ -1239,6 +1246,14 @@ export const mountAbsoluteDOM = (
 
 ```
 
+### src/components/class.types.ts
+
+``` ts
+
+export type ClassOf<T> = { new(...args: any[]): T };
+
+```
+
 ### src/components/config.ts
 
 ``` ts
@@ -1273,321 +1288,25 @@ export class Config<T extends Record<string, any>>
 
     constructor (
                     private settings : T, 
-                    private defaults : T = settings
+                    private readonly defaults : T = { ...settings } // @Note: Shallow Copy
                 ) 
     {
+        Object.freeze(this.defaults);
         
     }
 }
 ```
 
-### src/components/engine/computeLayout.ts
+### src/components/geometry.sanity.test.ts
 
 ``` ts
-import { 
-  Shapes,
-    Vector 
-} from "../geometry";
-import { 
-    NodeConfig 
-} from "../graph";
-import { 
-    LayoutTypes, 
-    LayoutChildrenMode 
-} from "../layout/layout.enum";
-import { 
-    LayoutConfigs, 
-    resolveLayoutName 
-} from "../layout/layout.values";
-import { 
-    Layout, 
-    NestedFramesReturn,
-    PlaceChildrenReturn
-} from "../layout/layout";
-import { 
-    LayoutTuningConfig 
-} from "../layout/layout.tuning";
-import { 
-    MappedGridItemData 
-} from "../layout/strategies/grid.mapped";
-import { 
-    GridItem 
-} from "../layout/strategies/grid";
+import { Vector } from "./geometry";
 
-export type ModeMap = Record<string, LayoutChildrenMode>;
 
-export type Wire = 
-{ 
-    source  : string; 
-    target  : string 
-};
+console.log(new Vector(3, 4).length()); // 5
+console.log(new Vector(1, 0).rotate(Math.PI / 2)); // ~ (0,1)
+console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
 
-export type LayoutResult = 
-{ 
-    boxes   : Record<string, Shapes.Box>; 
-    wires   : Wire[] 
-};
-export const computeLayout =    (
-                                    root        : NodeConfig,
-                                    modes       : ModeMap,
-                                    nodeSize    : Vector,
-                                    spacing     : number
-                                ) : LayoutResult =>
-{
-    const boxes: Record<string, Shapes.Box> = {};
-    const wires: Wire[] = [];
-
-    const place =   (
-                        node            : NodeConfig,
-                        level           : number,
-                        assigned?       : Shapes.Box,
-                        currentNodeSize : Vector = nodeSize
-                    ) : void  => 
-                    {
-                        const id        : string                = node.id;
-                        const mode      : LayoutChildrenMode    = modes[id] ?? LayoutChildrenMode.GRAPH;
-                        const chosen    : LayoutTypes           = resolveLayoutName (
-                                                                                        node, 
-                                                                                        node.layout ?? LayoutTypes.Grid
-                                                                                    );
-                        const strat     : Layout                = LayoutConfigs.get<LayoutTypes>(chosen);
-
-                        // Resolve this node's box
-                        let   box       : Shapes.Box;
-                        if (assigned) 
-                        {
-                            box = assigned;
-                        } 
-                        else 
-                        {
-                            const size =
-                                mode === LayoutChildrenMode.GRAPH
-                                    ? currentNodeSize
-                                    : strat.preferredSize({
-                                        count       : (node.children ?? []).length,
-                                        nodeSize    : currentNodeSize,
-                                        spacing,
-                                        mode        : LayoutChildrenMode.NESTED,
-                                    });
-                            const tl = node.position ?? Vector.scalar(0);
-                            box = new Shapes.Box( 
-                                                    id, 
-                                                    tl, 
-                                                    size 
-                                                );
-                        }
-
-                        boxes[id] = box;
-
-                        const children = node.children ?? [];
-                        if (!children.length) 
-                        {
-                            return;
-                        }
-
-                        if (mode === LayoutChildrenMode.NESTED) 
-                        {
-                            // children placed INSIDE this node’s box
-                            const pad           : number = LayoutTuningConfig.get("outerPad")(spacing);
-                            const inner         : Vector = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-                            const innerTL       : Vector = box.position.add(Vector.scalar(pad));
-                            const nextNodeSize  : Vector = currentNodeSize.scale(
-                                LayoutTuningConfig.get("nestedNodeScale")(level)
-                            );
-
-                            if (chosen === LayoutTypes.Grid) 
-                            {
-                                // Grid nested: cells hard-size children (independent of sliders)
-                                const frames : NestedFramesReturn = strat.nestedFrames  (  
-                                                                                            { 
-                                                                                                children, 
-                                                                                                parentSize  : inner, 
-                                                                                                spacing 
-                                                                                            }
-                                                                                        );
-                                for (const c of children) 
-                                {
-                                    const item  : GridItem<MappedGridItemData | undefined> | undefined = frames.grid.getItem(c.id)!;
-                                    const pos   : Vector = item.dimensions.getPosition();
-                                    const sz    : Vector = item.dimensions
-                                                                .getSize    ()
-                                                                .subtract   (Vector.scalar(2 * frames.ip))
-                                                                .clamp      (1, Infinity);
-                                    const childBox = new Shapes.Box (
-                                                                        c.id,
-                                                                        innerTL
-                                                                            .add(pos)
-                                                                            .add(Vector.scalar(frames.ip)),
-                                                                        sz
-                                                                    );
-                                    place   (
-                                                c, 
-                                                level + 1, 
-                                                childBox, 
-                                                nextNodeSize
-                                            ); // pass scaled base
-                                }
-                            } 
-                            else 
-                            {
-                                // Radial (or any center-based) nested
-                                // 1) get centers (uses nextNodeSize only)
-                                const centers : Record<string, Vector> = strat.placeChildren(
-                                                                                                {
-                                                                                                    mode        : LayoutChildrenMode.NESTED,
-                                                                                                    children, 
-                                                                                                    parent      : node,
-                                                                                                    origin      : inner.halve(),
-                                                                                                    level, 
-                                                                                                    nodeSize    : nextNodeSize, 
-                                                                                                    spacing, 
-                                                                                                    parentSize  : inner,
-                                                                                                }
-                                                                                            );
-
-                                // 2) compute each child's *base* desired size (before global fit)
-                                const baseSizes : Record<string, Vector> = {};
-                                for (const c of children) 
-                                {
-                                    const childMode     : LayoutChildrenMode    = modes[c.id] ?? LayoutChildrenMode.GRAPH;
-                                    const childChosen   : LayoutTypes           = resolveLayoutName (   
-                                                                                                        c, 
-                                                                                                        c.layout ?? LayoutTypes.Grid
-                                                                                                    );
-                                    const childStrat    : Layout                = LayoutConfigs.get<LayoutTypes>(childChosen);
-                                    const sz : Vector = (childMode === LayoutChildrenMode.NESTED)
-                                                            ? childStrat.preferredSize  (
-                                                                                            {
-                                                                                                count       : (c.children ?? []).length,
-                                                                                                nodeSize    : nextNodeSize,
-                                                                                                spacing,
-                                                                                                mode        : LayoutChildrenMode.NESTED,
-                                                                                            }
-                                                                                        )
-                                                                        .scale          (
-                                                                                            LayoutTuningConfig
-                                                                                                .get("nestedContainerScale")
-                                                                                                (level)
-                                                                                        )
-                                                            : nextNodeSize;
-                                    baseSizes[c.id] = sz;
-                                }
-                    
-                                // 3) derive a *single* scale k that guarantees fit:
-                                //    - radial containment (half-diagonal inside ring)
-                                //    - tangential non-overlap (chord >= width)
-                                //    - global max-fraction of parent inner
-                                const n             : number = Math.max(1, children.length);
-                                const innerRadius   : number = inner.halve().min();
-                                const ip            : number = LayoutTuningConfig.get("itemPad")(spacing);
-                                // radius used by nestedRadialCenters (to keep consistent)
-                                const r             : number = Math.max(
-                                    LayoutTuningConfig.get("minRadius")(),
-                                    innerRadius - nextNodeSize.max() / 2 - ip
-                                );
-                                const theta         : number = (Math.PI * 2) / n;
-                                const chord         : number = 2 * r * Math.sin(theta / 2);
-
-                                let maxWidth        : number = 0;
-                                let maxHalfDiag     : number = 0;
-                                let maxSideForFrac  : number = 0;
-                                for (const c of children) 
-                                {
-                                    const sz : Vector   = baseSizes[c.id];
-                                    maxWidth            = Math.max(maxWidth, sz.x);
-                                    maxHalfDiag         = Math.max(maxHalfDiag, sz.length() / 2);
-                                    maxSideForFrac      = Math.max(maxSideForFrac, sz.max());
-                                }
-                                const fracMax       : number = LayoutTuningConfig.get("nestedChildMaxFraction")();
-                                const kRadial       : number = maxHalfDiag > 0 ? (r - ip) / maxHalfDiag : 1;
-                                const kTangential   : number = (n >= 2 && maxWidth > 0) ? (chord - ip) / maxWidth : 1;
-                                const kFraction     : number = maxSideForFrac > 0 ? ((innerRadius * 2) * fracMax) / maxSideForFrac : 1;
-                                let   k             : number = Math.min (
-                                                                            1, 
-                                                                            kRadial, 
-                                                                            kTangential, 
-                                                                            kFraction
-                                                                        );
-                                if (!isFinite(k) || k <= 0) 
-                                {
-                                    k = Math.min(
-                                                    1, 
-                                                    kFraction, 
-                                                    0.1
-                                                );
-                                }
-                    
-                                // 4) place scaled children
-                                for (const c of children) {
-                                    const p         : Vector = centers[c.id] ?? inner.scale(1 / 2);
-                                    const finalSize : Vector = baseSizes[c.id]
-                                                                .scale(k)
-                                                                .clamp(1, Infinity);
-                                    const tlChild   : Vector = innerTL
-                                                                .add(
-                                                                        p.subtract(finalSize.halve())
-                                                                    );
-                                    const childBox  : Shapes.Box = new Shapes.Box   (
-                                                                                        c.id, 
-                                                                                        tlChild, 
-                                                                                        finalSize
-                                                                                    );
-                                    place   (
-                                                c, 
-                                                level + 1, 
-                                                childBox, 
-                                                nextNodeSize
-                                            );
-                                }
-                            }
-                        } else {
-                            // GRAPH mode: children outside; constant base node size from current level
-                            const centers : PlaceChildrenReturn = strat.placeChildren({
-                                mode: LayoutChildrenMode.GRAPH,
-                                children,
-                                parent: node,
-                                origin: box.position.add(box.size.scale(1 / 2)),
-                                level,
-                                nodeSize: currentNodeSize,
-                                spacing,
-                                parentSize: box.size,
-                            });
-
-                            for (const c of children) 
-                            {
-                                const cc        : Vector = centers[c.id];
-                                const tlChild   : Vector = cc.subtract(currentNodeSize.halve());
-                                const childBox  : Shapes.Box = new Shapes.Box   (
-                                                                                    c.id, 
-                                                                                    tlChild, 
-                                                                                    currentNodeSize
-                                                                                );
-                                wires.push  (
-                                                { 
-                                                    source  : id, 
-                                                    target  : c.id 
-                                                }
-                                            );
-                                place   (
-                                            c, 
-                                            level + 1, 
-                                            childBox, 
-                                            currentNodeSize);
-                            }
-                        }
-                    }
-
-    place   (
-                root, 
-                0, 
-                undefined, 
-                nodeSize
-            );
-    return  { 
-                boxes, 
-                wires 
-            };
-}
 ```
 
 ### src/components/geometry.ts
@@ -1742,9 +1461,7 @@ export namespace Shapes
         }
     }
 }
-console.log(new Vector(3,4).length());                 // 5
-console.log(new Vector(1,0).rotate(Math.PI/2));        // ~ (0,1)
-console.log(new Vector(2,3).crossProduct(new Vector(5,7))); // 2*7 - 3*5 = -1
+
 ```
 
 ### src/components/graph.ts
@@ -1797,18 +1514,359 @@ export type Edge =
 
 ```
 
-### src/components/layout/iterators.types.ts
+### src/components/layout/engine/layout.engine.ts
+
+``` ts
+import { 
+  Shapes,
+    Vector 
+} from "../../geometry";
+import { 
+    NodeConfig 
+} from "../../graph";
+import { 
+    LayoutTypes, 
+    LayoutChildrenMode 
+} from "../layout.enum";
+import { LayoutConfigs } from "../layout.registry";
+import { 
+    Layout, 
+    NestedFramesReturn,
+    PlaceChildrenReturn
+} from "../layout";
+import { 
+    LayoutTuningConfig 
+} from "../layout.tuning";
+import { 
+    MappedGridItemData 
+} from "../strategies/grid/grid.mapped";
+import { 
+    GridItem 
+} from "../strategies/grid/grid";
+
+
+export type ModeMap = Record<string, LayoutChildrenMode>;
+
+export type Wire = 
+{ 
+    source  : string; 
+    target  : string 
+};
+
+export type LayoutResult = 
+{ 
+    boxes   : Record<string, Shapes.Box>; 
+    wires   : Wire[] 
+};
+export const computeLayout =    (
+                                    root        : NodeConfig,
+                                    modes       : ModeMap,
+                                    nodeSize    : Vector,
+                                    spacing     : number
+                                ) : LayoutResult =>
+{
+    const boxes: Record<string, Shapes.Box> = {};
+    const wires: Wire[] = [];
+
+    const place =   (
+                        node            : NodeConfig,
+                        level           : number,
+                        assigned?       : Shapes.Box,
+                        currentNodeSize : Vector = nodeSize,
+                        parent          : Shapes.Box | undefined = undefined
+                    ) : void  => 
+                    {
+                        const id        : string                = node.id;
+                        const mode      : LayoutChildrenMode    = modes[id] ?? LayoutChildrenMode.GRAPH;
+                        const chosen    : LayoutTypes           = resolveLayoutName (
+                                                                                        node, 
+                                                                                        node.layout ?? LayoutTypes.Grid
+                                                                                    );
+                        const strat     : Layout                = LayoutConfigs.get<LayoutTypes>(chosen);
+
+                        // Resolve this node's box
+                        let   box       : Shapes.Box;
+                        if (assigned) 
+                        {
+                            box = assigned;
+                        } 
+                        else 
+                        {
+                            const size =
+                                mode === LayoutChildrenMode.GRAPH
+                                    ? currentNodeSize
+                                    : strat.preferredSize({
+                                        count       : (node.children ?? []).length,
+                                        nodeSize    : currentNodeSize,
+                                        spacing,
+                                        mode        : LayoutChildrenMode.NESTED,
+                                    });
+                            const tl = node.position ?? Vector.scalar(0);
+                            box = new Shapes.Box( 
+                                                    id, 
+                                                    tl, 
+                                                    size,
+                                                    parent?.id
+                                                );
+                        }
+
+                        boxes[id] = box;
+
+                        const children = node.children ?? [];
+                        if (!children.length) 
+                        {
+                            return;
+                        }
+
+                        if (mode === LayoutChildrenMode.NESTED) 
+                        {
+                            // children placed INSIDE this node’s box
+                            const pad           : number = LayoutTuningConfig.get("outerPad")(spacing);
+                            const inner         : Vector = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
+                            const innerTL       : Vector = box.position.add(Vector.scalar(pad));
+                            const nextNodeSize  : Vector = currentNodeSize.scale(
+                                LayoutTuningConfig.get("nestedNodeScale")(level)
+                            );
+
+                            if (chosen === LayoutTypes.Grid) 
+                            {
+                                // Grid nested: cells hard-size children (independent of sliders)
+                                const frames : NestedFramesReturn = strat.nestedFrames  (  
+                                                                                            { 
+                                                                                                children, 
+                                                                                                parentSize  : inner, 
+                                                                                                spacing 
+                                                                                            }
+                                                                                        );
+                                for (const c of children) 
+                                {
+                                    const item  : GridItem<MappedGridItemData | undefined> = frames.grid.getItem(c.id);
+                                    const pos   : Vector = item.dimensions.getPosition();
+                                    const sz    : Vector = item.dimensions
+                                                                .getSize    ()
+                                                                .subtract   (Vector.scalar(2 * frames.ip))
+                                                                .clamp      (1, Infinity);
+                                    const childBox = new Shapes.Box (
+                                                                        c.id,
+                                                                        innerTL
+                                                                            .add(pos)
+                                                                            .add(Vector.scalar(frames.ip)),
+                                                                        sz,
+                                                                        box.id
+                                                                    );
+                                    place   (
+                                                c, 
+                                                level + 1, 
+                                                childBox, 
+                                                nextNodeSize,
+                                                box
+                                            ); // pass scaled base
+                                }
+                            } 
+                            else 
+                            {
+                                // Radial (or any center-based) nested
+                                // 1) get centers (uses nextNodeSize only)
+                                const centers : Record<string, Vector> = strat.placeChildren(
+                                                                                                {
+                                                                                                    mode        : LayoutChildrenMode.NESTED,
+                                                                                                    children, 
+                                                                                                    parent      : node,
+                                                                                                    origin      : inner.halve(),
+                                                                                                    level, 
+                                                                                                    nodeSize    : nextNodeSize, 
+                                                                                                    spacing, 
+                                                                                                    parentSize  : inner,
+                                                                                                }
+                                                                                            );
+
+                                // 2) compute each child's *base* desired size (before global fit)
+                                const baseSizes : Record<string, Vector> = {};
+                                for (const c of children) 
+                                {
+                                    const childMode     : LayoutChildrenMode    = modes[c.id] ?? LayoutChildrenMode.GRAPH;
+                                    const childChosen   : LayoutTypes           = resolveLayoutName (   
+                                                                                                        c, 
+                                                                                                        c.layout ?? LayoutTypes.Grid
+                                                                                                    );
+                                    const childStrat    : Layout                = LayoutConfigs.get<LayoutTypes>(childChosen);
+                                    const sz : Vector = (childMode === LayoutChildrenMode.NESTED)
+                                                            ? childStrat.preferredSize  (
+                                                                                            {
+                                                                                                count       : (c.children ?? []).length,
+                                                                                                nodeSize    : nextNodeSize,
+                                                                                                spacing,
+                                                                                                mode        : LayoutChildrenMode.NESTED,
+                                                                                            }
+                                                                                        )
+                                                                        .scale          (
+                                                                                            LayoutTuningConfig
+                                                                                                .get("nestedContainerScale")
+                                                                                                (level)
+                                                                                        )
+                                                            : nextNodeSize;
+                                    baseSizes[c.id] = sz;
+                                }
+                    
+                                // 3) derive a *single* scale k that guarantees fit:
+                                //    - radial containment (half-diagonal inside ring)
+                                //    - tangential non-overlap (chord >= width)
+                                //    - global max-fraction of parent inner
+                                const n             : number = Math.max(1, children.length);
+                                const innerRadius   : number = inner.halve().min();
+                                const ip            : number = LayoutTuningConfig.get("itemPad")(spacing);
+                                // radius used by nestedRadialCenters (to keep consistent)
+                                const r             : number = Math.max(
+                                    LayoutTuningConfig.get("minRadius")(),
+                                    innerRadius - nextNodeSize.max() / 2 - ip
+                                );
+                                const theta         : number = (Math.PI * 2) / n;
+                                const chord         : number = 2 * r * Math.sin(theta / 2);
+
+                                let maxWidth        : number = 0;
+                                let maxHalfDiag     : number = 0;
+                                let maxSideForFrac  : number = 0;
+                                for (const c of children) 
+                                {
+                                    const sz : Vector   = baseSizes[c.id];
+                                    maxWidth            = Math.max(maxWidth, sz.x);
+                                    maxHalfDiag         = Math.max(maxHalfDiag, sz.length() / 2);
+                                    maxSideForFrac      = Math.max(maxSideForFrac, sz.max());
+                                }
+                                const fracMax       : number = LayoutTuningConfig.get("nestedChildMaxFraction")();
+                                const kRadial       : number = maxHalfDiag > 0 ? (r - ip) / maxHalfDiag : 1;
+                                const kTangential   : number = (n >= 2 && maxWidth > 0) ? (chord - ip) / maxWidth : 1;
+                                const kFraction     : number = maxSideForFrac > 0 ? ((innerRadius * 2) * fracMax) / maxSideForFrac : 1;
+                                let   k             : number = Math.min (
+                                                                            1, 
+                                                                            kRadial, 
+                                                                            kTangential, 
+                                                                            kFraction
+                                                                        );
+                                if (!isFinite(k) || k <= 0) 
+                                {
+                                    k = Math.min(
+                                                    1, 
+                                                    kFraction, 
+                                                    0.1
+                                                );
+                                }
+                    
+                                // 4) place scaled children
+                                for (const c of children) {
+                                    const p         : Vector = centers[c.id] ?? inner.scale(1 / 2);
+                                    const finalSize : Vector = baseSizes[c.id]
+                                                                .scale(k)
+                                                                .clamp(1, Infinity);
+                                    const tlChild   : Vector = innerTL
+                                                                .add(
+                                                                        p.subtract(finalSize.halve())
+                                                                    );
+                                    const childBox  : Shapes.Box = new Shapes.Box   (
+                                                                                        c.id, 
+                                                                                        tlChild, 
+                                                                                        finalSize,
+                                                                                        box.id
+                                                                                    );
+                                    place   (
+                                                c, 
+                                                level + 1, 
+                                                childBox, 
+                                                nextNodeSize,
+                                                box
+                                            );
+                                }
+                            }
+                        } else {
+                            // GRAPH mode: children outside; constant base node size from current level
+                            const centers : PlaceChildrenReturn = strat.placeChildren({
+                                mode: LayoutChildrenMode.GRAPH,
+                                children,
+                                parent: node,
+                                origin: box.position.add(box.size.scale(1 / 2)),
+                                level,
+                                nodeSize: currentNodeSize,
+                                spacing,
+                                parentSize: box.size,
+                            });
+
+                            for (const c of children) 
+                            {
+                                const cc        : Vector = centers[c.id];
+                                const tlChild   : Vector = cc.subtract(currentNodeSize.halve());
+                                const childBox  : Shapes.Box = new Shapes.Box   (
+                                                                                    c.id, 
+                                                                                    tlChild, 
+                                                                                    currentNodeSize,
+                                                                                    box.id
+                                                                                );
+                                wires.push  (
+                                                { 
+                                                    source  : id, 
+                                                    target  : c.id 
+                                                }
+                                            );
+                                place   (
+                                            c, 
+                                            level + 1, 
+                                            childBox, 
+                                            currentNodeSize,
+                                            box
+                                        );
+                            }
+                        }
+                    }
+
+    place   (
+                root, 
+                0, 
+                undefined, 
+                nodeSize,
+                undefined
+            );
+    return  { 
+                boxes, 
+                wires 
+            };
+};
+export const resolveLayoutName = (
+    node: NodeConfig,
+    fallback: LayoutTypes
+): LayoutTypes => node.layout && LayoutConfigs.get<LayoutTypes>(node.layout)
+        ? node.layout
+        : fallback;
+
+```
+
+### src/components/layout/iterator/iterator.registry.ts
+
+``` ts
+import { Config } from "../../config";
+import { Iterator } from "./iterator.types";
+import { LayoutTypes } from "../layout.enum";
+import { buildIterators } from "./layout.iterators";
+
+export interface IteratorRegistry {
+  [LayoutTypes.Grid  ]: Iterator;
+  [LayoutTypes.Radial]: Iterator;
+  // later: [LayoutTypes.Spiral]: Iterator;
+}
+export const IteratorsConfig = new Config<Record<keyof IteratorRegistry, Iterator>>(buildIterators());
+
+```
+
+### src/components/layout/iterator/iterator.types.ts
 
 ``` ts
 import { 
     Vector 
-} from "../geometry";
+} from "../../geometry";
 import { 
     LayoutChildrenMode 
-} from "./layout.enum";
+} from "../layout.enum";
 import { 
     Shapes 
-} from "../geometry";
+} from "../../geometry";
 
 /** Unit point in [0,1]² (center-based for grid centers). */
 export type UnitPoint = Vector;
@@ -1935,64 +1993,14 @@ export class Iterator
 
 ```
 
-### src/components/layout/layout.config.ts
+### src/components/layout/iterator/layout.iterators.ts
 
 ``` ts
-import { 
-    Config 
-} from "../config";
-import { 
-    Vector 
-} from "../geometry";
-import { 
-    LayoutTypes 
-} from "./layout.enum";
-
-export type LayoutConfigOptions = 
-{
-    mode        : LayoutTypes;
-    spacing     : number;
-    nodeSize    : Vector;
-}
-
-export const layoutConfig = new Config<LayoutConfigOptions>({
-    mode     : LayoutTypes.Grid,
-    spacing  : 10,
-    nodeSize : new Vector(100, 100)
-});
-
-export const nestedGridConfig = new Config<{
-    outerPadding : Vector;
-}>({
-    outerPadding : new Vector(20, 20),
-});
-```
-
-### src/components/layout/layout.enum.ts
-
-``` ts
-
-export enum LayoutTypes 
-{
-    Grid    = "grid",
-    Radial  = "radial"
-}
-export enum LayoutChildrenMode 
-{
-    GRAPH   = "graph",
-    NESTED  = "nested"
-}
-
-```
-
-### src/components/layout/layout.iterators.ts
-
-``` ts
-import { Shapes, Vector } from "../geometry";
-import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterators.types";
-import { LayoutChildrenMode } from "./layout.enum";
-import { Config } from "../config";
-import { LayoutTuning, LayoutTuningConfig } from "./layout.tuning";
+import { Shapes, Vector } from "../../geometry";
+import { AnchorIteratorParams, Iterator, IteratorOps } from "./iterator.types";
+import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
+import { Config } from "../../config";
+import { LayoutTuning, LayoutTuningConfig } from "../layout.tuning";
 
 /** map unit [0,1]² → top-left rect (position + u * size). */
 export const mapToRect =    (
@@ -2021,8 +2029,8 @@ export const gridUnit = (
 /** iterator registry */
 export type IteratorsSet = 
 {
-    grid    : Iterator;
-    radial  : Iterator;
+   [LayoutTypes.Grid]    : Iterator;  
+   [LayoutTypes.Radial]  : Iterator;
 };
 
 export const buildIterators =   (
@@ -2094,6 +2102,52 @@ export const IteratorsConfig = new Config<IteratorsSet>(buildIterators());
 
 ```
 
+### src/components/layout/layout.enum.ts
+
+``` ts
+
+export enum LayoutTypes 
+{
+    Grid    = "grid",
+    Radial  = "radial"
+}
+export enum LayoutChildrenMode 
+{
+    GRAPH   = "graph",
+    NESTED  = "nested"
+}
+
+```
+
+### src/components/layout/layout.registry.ts
+
+``` ts
+import { 
+    Config 
+} from "../config";
+import { 
+    Layout 
+} from "./layout";
+import { 
+    LayoutTypes 
+} from "./layout.enum";
+
+export interface LayoutRegistry
+{
+    [LayoutTypes.Grid   ] : import("./strategies/grid/grid.layout").GridLayout;
+    [LayoutTypes.Radial ] : import("./strategies/radial/radial.layout").RadialLayout;
+}
+
+export type LayoutKind      = keyof LayoutRegistry;
+export const LayoutConfigs  = new Config<Record<LayoutKind, Layout>>(
+    {
+        [LayoutTypes.Grid   ]   : new (await import("./strategies/grid/grid.layout"  )).GridLayout(),
+        [LayoutTypes.Radial ]   : new (await import("./strategies/radial/radial.layout")).RadialLayout(),
+    }
+);
+
+```
+
 ### src/components/layout/layout.ts
 
 ``` ts
@@ -2108,7 +2162,7 @@ import {
 } from "./layout.enum";
 import { 
     MappedGrid 
-} from "./strategies/grid.mapped";
+} from "./strategies/grid/grid.mapped";
 export type PreferredSizeParam = 
 {
   /* number of direct children */
@@ -2171,7 +2225,7 @@ import {
 } from "../geometry";
 import { 
     AnchorIteratorParams 
-} from "./iterators.types";
+} from "./iterator.types";
 import { 
     LayoutChildrenMode 
 } from "./layout.enum";
@@ -2280,55 +2334,13 @@ export const LayoutTuningConfig = new Config<LayoutTuning>(defaultTuning);
 
 ```
 
-### src/components/layout/layout.values.ts
-
-``` ts
-import { 
-    Config 
-} from "../config";
-import { 
-    GridLayout 
-} from "./strategies/grid.layout";
-import { 
-    Layout 
-} from "./layout";
-import { 
-    LayoutTypes 
-} from "./layout.enum";
-import { 
-    RadialLayout 
-} from "./strategies/radial.layout";
-import { 
-    NodeConfig 
-} from "../graph";
-
-/* =========================================================
- * Public API (functional, no mutations)
- * ========================================================= */
-
-export type ClassOf<T> = { new(...args: any[]): T };
-export const LayoutConfigs : Config<Record<LayoutTypes, Layout>> = new Config<Record<LayoutTypes, Layout>>(
-    {
-        grid   : new GridLayout(),
-        radial : new RadialLayout(),
-    }
-);
-export const resolveLayoutName =    (
-                                        node        : NodeConfig, 
-                                        fallback    : LayoutTypes
-                                    ) : LayoutTypes => 
-    node.layout && LayoutConfigs.get<LayoutTypes>(node.layout) 
-        ? node.layout 
-        : fallback;
-```
-
-### src/components/layout/strategies/grid.layout.ts
+### src/components/layout/strategies/grid/grid.layout.ts
 
 ``` ts
 import { 
     Vector, 
     Shapes 
-} from "../../geometry";
+} from "../../../geometry";
 import {
     Layout, 
     NestedFrameParam, 
@@ -2337,11 +2349,11 @@ import {
     NestedFramesReturn, 
     PreferredSizeReturn, 
     PlaceChildrenParam
-} from "../layout";
+} from "../../layout";
 import { 
     LayoutChildrenMode, 
     LayoutTypes
-} from "../layout.enum";
+} from "../../layout.enum";
 import { 
     MappedGrid, 
     MappedGridItemData 
@@ -2351,18 +2363,18 @@ import {
 } from "./grid";
 import { 
     Config 
-} from "../../config";
+} from "../../../config";
 import { 
     LayoutTuning, 
     LayoutTuningConfig 
-} from "../layout.tuning";
+} from "../../layout.tuning";
 import { 
     IteratorsConfig, 
     IteratorsSet 
-} from "../layout.iterators";
+} from "../../iterator/layout.iterators";
 import { 
     mapIndex 
-} from "./radial.layout";
+} from "../radial/radial.layout";
 
 /* Split an integer total into `parts` integers that sum to total.
    Distribute the remainder one px at a time to the first `remainder` parts. */
@@ -2461,7 +2473,10 @@ export  class   GridLayout
         const X : SplitEvenReturn = splitEven(content.x, gridSize.x);
         const Y : SplitEvenReturn = splitEven(content.y, gridSize.y);
 
-        const grid : MappedGrid = new MappedGrid(gridSize);
+        const grid : MappedGrid = MappedGrid.emptyMapped<MappedGridItemData>(
+            gridSize,
+            () => ({ id: '' })
+        );
         for (let i : number = 0; i < children.length; i++) 
         {
             const cell : Vector = new Vector(
@@ -2588,12 +2603,13 @@ export  class   GridLayout
 }
 ```
 
-### src/components/layout/strategies/grid.mapped.ts
+### src/components/layout/strategies/grid/grid.mapped.ts
 
 ``` ts
 import { 
+    Shapes,
     Vector 
-} from "../../geometry";
+} from "../../../geometry";
 import { 
     Grid, 
     GridItem 
@@ -2604,9 +2620,38 @@ export type MappedGridItemData =
 {
     id : MappedGridItemID;
 };
-export  class   MappedGrid<T extends MappedGridItemData = MappedGridItemData> 
+export type MappedGridItemDataType = MappedGridItemData;
+export  class   MappedGrid<T extends MappedGridItemDataType = MappedGridItemDataType> 
         extends Grid<T>
 {
+    static emptyMapped<T extends MappedGridItemDataType>(
+        size : Vector,
+        factory : () => T
+    ) : MappedGrid<T> {
+        return new MappedGrid<T>(
+            size,
+            Array
+                .from(
+                    { 
+                        length : size.y 
+                    }, 
+                    () => Array
+                            .from(
+                                { 
+                                    length : size.x 
+                                }, 
+                                () => new GridItem<T>(
+                                                        new Vector(0, 0), 
+                                                        new Shapes.Rectangle(
+                                                                                new Vector(0, 0), 
+                                                                                new Vector(0, 0)
+                                                                            ),
+                                                            factory()
+                                                        )
+                            )
+                )
+        )
+    }
     protected map : Map<MappedGridItemID, Vector> = new Map();
     override set =  (   
                         cell : Vector, 
@@ -2622,12 +2667,12 @@ export  class   MappedGrid<T extends MappedGridItemData = MappedGridItemData>
                     this.map.get(id);
     getItem =   (
                     id : MappedGridItemID
-                ) : GridItem<T | undefined> | undefined => 
+                ) : GridItem<T | undefined> => 
     {
         const cell : Vector | undefined = this.getCell(id);
         if (!cell) 
         {
-            return undefined;
+            throw new Error(`Cell not found for item ID: ${id}`);
         }
         return this.grid[cell.y][cell.x];
     }
@@ -2636,13 +2681,13 @@ export  class   MappedGrid<T extends MappedGridItemData = MappedGridItemData>
  
 ```
 
-### src/components/layout/strategies/grid.ts
+### src/components/layout/strategies/grid/grid.ts
 
 ``` ts
 import { 
     Vector, 
     Shapes 
-} from "../../geometry";
+} from "../../../geometry";
 export class GridItem<T> 
 {
     constructor(
@@ -2658,30 +2703,46 @@ export class GridItem<T>
 
 export class Grid<T> 
 {
-    public grid : GridItem<T | undefined>[][];
-    constructor(public size : Vector) 
-    {
-        this.grid = Array
-                        .from(
-                            { 
-                                length : size.y 
-                            }, 
-                            () => Array
-                                    .from(
-                                        { 
-                                            length : size.x 
-                                        }, 
-                                        () => new GridItem<undefined>(
-                                                                new Vector(0, 0), 
-                                                                new Shapes.Rectangle(
-                                                                                        new Vector(0, 0), 
-                                                                                        new Vector(0, 0)
-                                                                                    ),
-                                                                undefined
-                                                             )
-                                    )
-                        );
+    static empty<T>(
+        size : Vector,
+        factory : (
+            x : number,
+            y : number
+        ) => T
+    ) : Grid<T>{
+        return new Grid<T>(
+            size,
+            Array
+                .from(
+                    { 
+                        length : size.y 
+                    }, 
+                    (
+                        y : number
+                    ) => Array
+                            .from(
+                                { 
+                                    length : size.x 
+                                }, 
+                                (
+                                    x : number
+                                ) => new GridItem<T>(
+                                                        new Vector(0, 0), 
+                                                        new Shapes.Rectangle(
+                                                                                new Vector(0, 0), 
+                                                                                new Vector(0, 0)
+                                                                            ),
+                                                        factory(x, y)
+                                                    )
+                            )
+                )
+        )
     }
+    constructor(
+        public size : Vector,
+        public grid : GridItem<T>[][]
+    ) 
+    {}
     set =   (
                 cell : Vector, 
                 item : GridItem<T>
@@ -2697,12 +2758,12 @@ export class Grid<T>
 
 ```
 
-### src/components/layout/strategies/radial.layout.ts
+### src/components/layout/strategies/radial/radial.layout.ts
 
 ``` ts
 import { 
     Vector 
-} from "../../geometry";
+} from "../../../geometry";
 import {
     PreferredSizeParam, 
     PreferredSizeReturn,
@@ -2710,20 +2771,20 @@ import {
     PlaceChildrenReturn, 
     PlaceChildrenParam, 
     NestedFramesReturn
-} from "../layout";
+} from "../../layout";
 import { 
     LayoutChildrenMode 
-} from "../layout.enum";
+} from "../../layout.enum";
 import { 
     MappedGrid 
-} from "./grid.mapped";
+} from "../grid/grid.mapped";
 import { 
     Config 
-} from "../../config";
+} from "../../../config";
 import { 
     LayoutTuning, 
     LayoutTuningConfig 
-} from "../layout.tuning";
+} from "../../layout.tuning";
 
 export  class   RadialLayout 
         extends Layout 
@@ -2737,7 +2798,11 @@ export  class   RadialLayout
                                                     {
                                                         ip      : 0,
                                                         content : new Vector(0, 0),
-                                                        grid    : new MappedGrid(new Vector(0, 0))
+                                                        grid    : MappedGrid
+                                                                    .emptyMapped(
+                                                                                    new Vector(0, 0), 
+                                                                                    () => ({ id: '' })
+                                                                                )
                                                     }
                                                 );
     placeChildren   =   (
@@ -2924,7 +2989,7 @@ import {
     computeLayout, 
     LayoutResult, 
     ModeMap 
-} from "./engine/computeLayout";
+} from "./layout/engine/layout.engine";
 import { 
     LabeledSlider, 
     Segmented 
@@ -3411,7 +3476,7 @@ import {
 } from "../layout/layout.enum";
 import { 
   ModeMap 
-} from "../engine/computeLayout";
+} from "../engine/layout.engine";
 
 type Scope = "all" | string;
 
@@ -3624,10 +3689,10 @@ export const Configurator = (
             <Segmented<string | undefined>
                 label       =   "Mode"
                 value       =   {allSame 
-                                    ? (activeMode as string | undefined) 
-                                    : undefined                         }
-                options     =   {modeOptions                            }
-                onChange    =   {onModeChange                           }
+                                    ? activeMode
+                                    : undefined }
+                options     =   {modeOptions    }
+                onChange    =   {onModeChange   }
             />
         </div>
     );

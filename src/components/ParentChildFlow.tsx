@@ -22,7 +22,7 @@ import {
     computeLayout, 
     LayoutResult, 
     ModeMap 
-} from "./engine/computeLayout";
+} from "./layout/engine/layout.engine";
 import { 
     LabeledSlider, 
     Segmented 

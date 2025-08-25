@@ -1,32 +1,30 @@
 import { 
   Shapes,
     Vector 
-} from "../geometry";
+} from "../../geometry";
 import { 
     NodeConfig 
-} from "../graph";
+} from "../../graph";
 import { 
     LayoutTypes, 
     LayoutChildrenMode 
-} from "../layout/layout.enum";
-import { 
-    LayoutConfigs, 
-    resolveLayoutName 
-} from "../layout/layout.values";
+} from "../layout.enum";
+import { LayoutConfigs } from "../layout.registry";
 import { 
     Layout, 
     NestedFramesReturn,
     PlaceChildrenReturn
-} from "../layout/layout";
+} from "../layout";
 import { 
     LayoutTuningConfig 
-} from "../layout/layout.tuning";
+} from "../layout.tuning";
 import { 
     MappedGridItemData 
-} from "../layout/strategies/grid.mapped";
+} from "../strategies/grid/grid.mapped";
 import { 
     GridItem 
-} from "../layout/strategies/grid";
+} from "../strategies/grid/grid";
+
 
 export type ModeMap = Record<string, LayoutChildrenMode>;
 
@@ -311,4 +309,10 @@ export const computeLayout =    (
                 boxes, 
                 wires 
             };
-}
+};
+export const resolveLayoutName = (
+    node: NodeConfig,
+    fallback: LayoutTypes
+): LayoutTypes => node.layout && LayoutConfigs.get<LayoutTypes>(node.layout)
+        ? node.layout
+        : fallback;
