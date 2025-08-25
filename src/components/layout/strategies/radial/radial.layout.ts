@@ -33,14 +33,15 @@ export const nestedRadialCenters = (
   const policy = IterationConfig.get("onLimit");
 
   const padOuter = tuning.get("outerPad")(spacing);
-  const inner: Vector = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+  const inner = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
 
   const R = inner.min() / 2;
   const ip = tuning.get("itemPad")(spacing);
-  // choose a generous ring radius; child sizing is enforced in place.ts
   const r = Math.max(tuning.get("minRadius")(), R - ip);
 
-  const c: Vector = inner.scale(1 / 2);
+  // NOTE: include pad offset so local (0,0) is parent top-left
+  const c = Vector.scalar(padOuter).add(inner.scale(1 / 2));
+
   const start = tuning.get("startAngle")();
   const cw = tuning.get("clockwise")();
 
