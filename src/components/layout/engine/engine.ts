@@ -21,7 +21,12 @@ export class PipelineEngine {
 
   run(input: GraphInput, opts: ComputeOptions = {}): ComputeResult {
     const parsed = parse(input);
+    // engine.ts
     const { issues } = validate(parsed);
+    const failOnIssues = true; // or from options
+    if (failOnIssues && issues.length) {
+      return { ok: false, issues };
+    }
     // Prepare effective knobs
     const nodeSize = opts.nodeSize ?? new Vector(110, 54);
     const spacing = opts.spacing ?? 24;
@@ -51,7 +56,7 @@ export class PipelineEngine {
     const routed = route(placed, this.ctx, undefined, opts.routerName ?? "line");
     const snap = post(routed);
     
-    const audit = auditSnapshot(snap, pln, this.ctx.tunings);
+    const audit = auditSnapshot(snap, pln, this.ctx.tunings, { spacing });
     if (audit.length) this.ctx.log.warn("layout audit issues", { count: audit.length, audit });
     const snapshot = { ...snap, meta: { ...(snap.meta ?? {}), plan: pln, audit } };
     return { ok: true, snapshot, issues };

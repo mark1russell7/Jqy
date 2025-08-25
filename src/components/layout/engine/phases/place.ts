@@ -153,25 +153,42 @@ class TreePlacer {
     const ip = this.ctx.tunings.get("itemPad")(this.opts.spacing);
     cellInner = inner.divide(rowCol).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
   }
+// place.ts (inside TreePlacer)
+const radialChildSquareSide = (n: number, parentSize: Vector, spacing: number): number => {
+  const pad = this.ctx.tunings.get("outerPad")(spacing);
+  const g   = this.ctx.tunings.get("itemPad")(spacing); // or define a dedicated radial gap
+  const R   = Math.max(1, Math.min(parentSize.x, parentSize.y) / 2 - pad);
+  const sin = Math.sin(Math.PI / Math.max(1, n));
+  const denom = 1 + sin;
+  const sBound = (2 * R * sin - g * (1 + sin)) / Math.max(denom, 1e-6);
+  const f = this.ctx.tunings.get("nestedChildMaxFraction")();
+  const sMax = Math.min(sBound, 2 * R * f);
+  return Math.floor(Math.max(8, sMax));
+};
 
-  // Helper to pick forced size for a child (GRAPH or NESTED)
   const forcedSizeForChild = (childMode: LayoutChildrenMode): Vector | undefined => {
-    if (!cellInner) return undefined;                 // only when I'm a NESTED container
-    const sideMax = Math.max(8, Math.floor(Math.min(cellInner.x, cellInner.y)));
+  if (myMode !== LayoutChildrenMode.NESTED) return undefined;
 
-    if (myLayout === LayoutTypes.Grid || myLayout === LayoutTypes.Radial) {
-      if (childMode === LayoutChildrenMode.GRAPH) {
-        // Perfect square for leaf/graph nodes
-        return Vector.scalar(sideMax);
-      } else {
-        // Slightly smaller square for nested containers, so they don't "glue"
-        const k = this.ctx.tunings.get("nestedContainerScale")(level + 1); // ~0.85^(d+1)
-        const side = Math.max(8, Math.floor(sideMax * k));
-        return Vector.scalar(side);
-      }
-    }
-    return undefined;
-  };
+  if (myLayout === LayoutTypes.Grid) {
+    // current cellInner policy is fine
+    const sideMax = Math.max(8, Math.floor(Math.min(cellInner!.x, cellInner!.y)));
+    const k = (childMode === LayoutChildrenMode.NESTED)
+      ? this.ctx.tunings.get("nestedContainerScale")(level + 1)
+      : 1;
+    return Vector.scalar(Math.floor(sideMax * k));
+  }
+
+  if (myLayout === LayoutTypes.Radial) {
+    const n = children.length;
+    const side = radialChildSquareSide(n, size /* parentSize */, this.opts.spacing);
+    const k = (childMode === LayoutChildrenMode.NESTED)
+      ? this.ctx.tunings.get("nestedContainerScale")(level + 1)
+      : 1;
+    return Vector.scalar(Math.floor(side * k));
+  }
+  return undefined;
+};
+
 
   for (const child of children) {
     // tree wire

@@ -38,26 +38,10 @@ export const splitEven =    (
                                             ) => 
                                                 base + (i < rem ? 1 : 0)
                                         );
-    const offs  : number[] = sizes
-                                .map(
-                                        (
-                                            _ : number, 
-                                            i : number
-                                        ) => 
-                                            sizes
-                                                .slice  (
-                                                            0, 
-                                                            i
-                                                        )
-                                                .reduce (
-                                                            (
-                                                                a : number, 
-                                                                b : number
-                                                            ) => 
-                                                                a + b, 
-                                                            0
-                                                        )
-                                    );
+    const offs: number[] = new Array(parts);
+    let acc = 0;
+    for (let i = 0; i < parts; i++) { offs[i] = acc; acc += sizes[i]; }
+
     return  { 
                 sizes, 
                 offs 

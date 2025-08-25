@@ -1,6 +1,6 @@
 import { Config } from "../../config";
-import { LayoutTuning, LayoutTuningConfig } from "../../layout/layout.tuning";
-import { IterationConfig, IterationLimits } from "../limits";
+import { defaultTuning, LayoutTuning, LayoutTuningConfig } from "../../layout/layout.tuning";
+import { defaultLayoutLimits, IterationConfig, IterationLimits } from "../limits";
 import { Logger, NoopLogger } from "../../core/logging/logger";
 import { InMemoryLayoutRegistry } from "../registries/layout.registry";
 import { InMemoryRouterRegistry } from "../registries/router.registry";
@@ -20,19 +20,18 @@ export type SystemContext = {
   routers: RouterRegistry;
 };
 
+// context.ts
 export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
-  const layouts = new InMemoryLayoutRegistry();
-  layouts.register(LayoutTypes.Grid, new GridLayout());
-  layouts.register(LayoutTypes.Radial, new RadialLayout());
+  const tunings = overrides?.tunings ?? new Config<LayoutTuning>({ ...defaultTuning });
+  const limits  = overrides?.limits  ?? new Config<IterationLimits>({ ...defaultLayoutLimits });
 
-  const routers = new InMemoryRouterRegistry();
-  routers.register("line", new LineRouter());
+  const layouts = new InMemoryLayoutRegistry();
+  layouts.register(LayoutTypes.Grid,  new GridLayout(tunings /* pass ctx */));
+  layouts.register(LayoutTypes.Radial,new RadialLayout(tunings /* pass ctx */));
+
+  const routers = new InMemoryRouterRegistry(); // routers usually stateless
+  routers.register("line",  new LineRouter());
   routers.register("ortho", new OrthoRouter());
-  return {
-    log: overrides?.log ?? new NoopLogger(),
-    tunings: overrides?.tunings ?? LayoutTuningConfig,
-    limits: overrides?.limits ?? IterationConfig,
-    layouts: overrides?.layouts ?? layouts,
-    routers: overrides?.routers ?? routers,
-  };
+
+  return { log: overrides?.log ?? new NoopLogger(), tunings, limits, layouts, routers };
 }

@@ -12,15 +12,11 @@ export type AuditIssue = {
   details?: Record<string, unknown>;
 };
 
-export function auditSnapshot(
-  s: LayoutSnapshot,
-  plan: Plan,
-  tuning: Config<LayoutTuning>
-): AuditIssue[] {
-  // Build children map from wires (tree edges)
+export function auditSnapshot(s: LayoutSnapshot, plan: Plan, tuning: Config<LayoutTuning>, opts: { spacing: number }): AuditIssue[] {
+  // build real children from parentId on boxes, or from plan/tree meta
   const kids: Record<string, string[]> = {};
-  for (const w of s.wires) {
-    (kids[w.source] ??= []).push(w.target);
+  for (const b of Object.values(s.boxes)) {
+    if (b.parentId) (kids[b.parentId] ??= []).push(b.id);
   }
 
   const issues: AuditIssue[] = [];

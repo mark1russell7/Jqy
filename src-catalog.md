@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T04:23:31.440Z
+Generated on 2025-08-25T06:37:22.059Z
 
 ## Directory structure (src)
 
@@ -93,7 +93,7 @@ Generated on 2025-08-25T04:23:31.440Z
 │   │       └── LayoutView.tsx
 │   ├── tooling/
 │   │   ├── diagnostics/
-
+│   │   │   └── audit.ts
 │   │   ├── exporters/
 │   │   │   ├── reactflow.ts
 │   │   │   └── svg.ts
@@ -107,7 +107,7 @@ Generated on 2025-08-25T04:23:31.440Z
 │   │   ├── controls/
 
 │   │   ├── playground/
-
+│   │   │   └── Testbed.tsx
 │   │   ├── styles/
 
 │   │   ├── Configurator.tsx
@@ -124,16 +124,23 @@ Generated on 2025-08-25T04:23:31.440Z
 ### src/App.tsx
 
 ``` tsx
-import { 
-  ParentChildLayoutsDemo 
-} from './components/ParentChildFlow';
+import { useState } from "react";
+import { ParentChildLayoutsDemo } from "./components/ParentChildFlow";
+import { TestbedMatrix } from "./components/ui/playground/Testbed";
 
-function App() 
-{
-  return <ParentChildLayoutsDemo  />;
+export default function App() {
+  const [tab, setTab] = useState<"playground" | "testbed">("playground");
+
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      <div style={{ position: "absolute", left: 12, top: 100, zIndex: 1000 }}>
+        <button onClick={() => setTab("playground")} style={{ marginRight: 8 }}>Playground</button>
+        <button onClick={() => setTab("testbed")}>Testbed</button>
+      </div>
+      {tab === "playground" ? <ParentChildLayoutsDemo /> : <TestbedMatrix />}
+    </div>
+  );
 }
-
-export default App;
 
 ```
 
@@ -1033,6 +1040,7 @@ import type { LayoutSnapshot } from "../types";
 import { Vector } from "../../core/geometry";
 import { IterationConfig } from "../limits";
 import { LayoutTuningConfig } from "../../layout/layout.tuning";
+import { auditSnapshot } from "../../tooling/diagnostics/audit";
 
 export type ComputeResult = { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
                          | { ok: false; issues: ReturnType<typeof validate>["issues"] };
@@ -1070,7 +1078,11 @@ export class PipelineEngine {
       collectOverlaps: !!opts.collectOverlaps,
     });
     const routed = route(placed, this.ctx, undefined, opts.routerName ?? "line");
-    const snapshot = post(routed);
+    const snap = post(routed);
+    
+    const audit = auditSnapshot(snap, pln, this.ctx.tunings);
+    if (audit.length) this.ctx.log.warn("layout audit issues", { count: audit.length, audit });
+    const snapshot = { ...snap, meta: { ...(snap.meta ?? {}), plan: pln, audit } };
     return { ok: true, snapshot, issues };
     
   } finally {
@@ -1229,102 +1241,117 @@ class TreePlacer {
     };
   }
 
-  private placeNode(args: {
-    node: NodeConfig;
-    parentId?: string;
-    level: number;
-    centerAbs: Vector;
-    parentMode: LayoutChildrenMode;
-    forceSize?: Vector;                     // NEW: allow caller to override size
-  }): void {
-    const { node, parentId, level, centerAbs, forceSize } = args;
-    const myMode = this.modeOf(node.id);
-    const myLayout = this.layoutOf(node.id);
+ private placeNode(args: {
+  node: NodeConfig;
+  parentId?: string;
+  level: number;
+  centerAbs: Vector;
+  parentMode: LayoutChildrenMode;
+  forceSize?: Vector;
+}): void {
+  const { node, parentId, level, centerAbs, forceSize } = args;
+  const myMode = this.modeOf(node.id);
+  const myLayout = this.layoutOf(node.id);
 
-    // Size: either override (from parent), or our own “preferred”
-    const size = (forceSize ?? this.sizeForNode(node, myMode)).round();
-    const topLeft = centerAbs.subtract(size.halve()).round();
+  // Size for *this* node
+  const size = (forceSize ?? this.sizeForNode(node, myMode)).round();
+  const topLeft = centerAbs.subtract(size.halve()).round();
 
-    const box: Box = {
-      id: node.id,
-      position: topLeft,
-      size,
-      parentId: args.parentMode === LayoutChildrenMode.NESTED ? parentId : undefined,
-      depth: level,
-    };
-    this.boxes[node.id] = box;
-    if (level > this.maxDepth) this.maxDepth = level;
+  // --- logging (new) ---
+  this.ctx.log.debug("placeNode: start", {
+    id: node.id, mode: myMode, layout: myLayout, level,
+    size: { x: size.x, y: size.y }, centerAbs: { x: centerAbs.x, y: centerAbs.y }
+  });
 
-    const children = node.children ?? [];
-    if (children.length === 0) return;
+  this.boxes[node.id] = {
+    id: node.id,
+    position: topLeft,
+    size,
+    parentId: args.parentMode === LayoutChildrenMode.NESTED ? parentId : undefined,
+    depth: level,
+  };
+  if (level > this.maxDepth) this.maxDepth = level;
 
-    const strat = this.ctx.layouts.get(myLayout);
-    const mapping = strat.placeChildren({
-      mode: myMode,
-      children,
-      parent: node,
-      origin: centerAbs,
-      level,
-      nodeSize: this.opts.nodeSize,
-      spacing: this.opts.spacing,
-      parentSize: size,
+  const children = node.children ?? [];
+  if (children.length === 0) return;
+
+  const strat = this.ctx.layouts.get(myLayout);
+  const mapping = strat.placeChildren({
+    mode: myMode,
+    children,
+    parent: node,
+    origin: centerAbs,
+    level,
+    nodeSize: this.opts.nodeSize,
+    spacing: this.opts.spacing,
+    parentSize: size,
+  });
+
+  const needsLocalToAbs = myMode === LayoutChildrenMode.NESTED;
+  const localToAbsOffset = needsLocalToAbs ? topLeft : new Vector(0, 0);
+
+  // ---------- NEW: compute "cell" for my children when I'm NESTED ----------
+  let cellInner: Vector | undefined;
+  if (myMode === LayoutChildrenMode.NESTED) {
+    const padOuter = this.ctx.tunings.get("outerPad")(this.opts.spacing);
+    const inner = size.subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+    const rowCol = this.ctx.tunings.get("rowCol")(children.length);
+    const ip = this.ctx.tunings.get("itemPad")(this.opts.spacing);
+    cellInner = inner.divide(rowCol).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
+  }
+
+  // Helper to pick forced size for a child (GRAPH or NESTED)
+  const forcedSizeForChild = (childMode: LayoutChildrenMode): Vector | undefined => {
+    if (!cellInner) return undefined;                 // only when I'm a NESTED container
+    const sideMax = Math.max(8, Math.floor(Math.min(cellInner.x, cellInner.y)));
+
+    if (myLayout === LayoutTypes.Grid || myLayout === LayoutTypes.Radial) {
+      if (childMode === LayoutChildrenMode.GRAPH) {
+        // Perfect square for leaf/graph nodes
+        return Vector.scalar(sideMax);
+      } else {
+        // Slightly smaller square for nested containers, so they don't "glue"
+        const k = this.ctx.tunings.get("nestedContainerScale")(level + 1); // ~0.85^(d+1)
+        const side = Math.max(8, Math.floor(sideMax * k));
+        return Vector.scalar(side);
+      }
+    }
+    return undefined;
+  };
+
+  for (const child of children) {
+    // tree wire
+    this.wires.push({
+      id: `${node.id}->${child.id}#${this.wires.length}`,
+      source: node.id,
+      target: child.id,
     });
 
-    const needsLocalToAbs = myMode === LayoutChildrenMode.NESTED;
-    const localToAbsOffset = needsLocalToAbs ? topLeft : new Vector(0, 0);
+    const childCenter = (mapping[child.id] ?? centerAbs).add(localToAbsOffset);
+    const childMode = this.modeOf(child.id);
 
-    // If I am a NESTED container, square-size my GRAPH-mode children to the grid/radial cell.
-    const childForcedSize = (childCount: number): Vector | undefined => {
-      if (myMode !== LayoutChildrenMode.NESTED) return undefined;
+    const passSize = forcedSizeForChild(childMode);
 
-      const padOuter = this.ctx.tunings.get("outerPad")(this.opts.spacing);
-      const inner = size.subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
-
-      if (myLayout === LayoutTypes.Grid) {
-        const rowCol = this.ctx.tunings.get("rowCol")(childCount);
-        const ip = this.ctx.tunings.get("itemPad")(this.opts.spacing);
-        const cell = inner.divide(rowCol).subtract(Vector.scalar(2 * ip));
-        const side = Math.max(8, Math.floor(Math.min(cell.x, cell.y)));
-        return Vector.scalar(side);
-      }
-
-      if (myLayout === LayoutTypes.Radial) {
-        const maxFrac = this.ctx.tunings.get("nestedChildMaxFraction")();
-        const levelScale = this.ctx.tunings.get("nestedNodeScale")(level + 1);
-        const maxSide = Math.floor(inner.min() * maxFrac);
-        const baseSide = Math.floor(this.opts.nodeSize.max() * levelScale);
-        const side = Math.max(8, Math.min(maxSide, baseSide));
-        return Vector.scalar(side);
-      }
-      return undefined;
-    };
-
-    const forcedSizeForMyChildren = childForcedSize(children.length);
-
-    for (const child of children) {
-      // emit tree wire
-      this.wires.push({
-        id: `${node.id}->${child.id}#${this.wires.length}`,
-        source: node.id,
-        target: child.id,
-      });
-
-      const childCenter = (mapping[child.id] ?? centerAbs).add(localToAbsOffset);
-
-      // Only override size for GRAPH-mode children (containers size themselves)
-      const childMode = this.modeOf(child.id);
-      const passSize = childMode === LayoutChildrenMode.GRAPH ? forcedSizeForMyChildren : undefined;
-
-      this.placeNode({
-        node: child,
-        parentId: node.id,
-        level: level + 1,
-        centerAbs: childCenter,
-        parentMode: myMode,
-        forceSize: passSize,
+    // --- logging (new) ---
+    if (passSize) {
+      this.ctx.log.debug("placeNode: child forced size", {
+        parent: node.id,
+        child: child.id,
+        childMode,
+        forced: { x: passSize.x, y: passSize.y }
       });
     }
+
+    this.placeNode({
+      node: child,
+      parentId: node.id,
+      level: level + 1,
+      centerAbs: childCenter,
+      parentMode: myMode,
+      forceSize: passSize,   // <-- actual override for both GRAPH and NESTED children
+    });
   }
+}
 
   private modeOf(id: string): LayoutChildrenMode {
     return this.plan.modes[id] ?? LayoutChildrenMode.GRAPH;
@@ -2538,6 +2565,8 @@ import { Target } from "./adapters/env";
 import { LayoutView } from "./render/views/LayoutView";
 import { createLayoutAPI } from "./layout/api";
 import type { GraphInput } from "./layout/api";
+import { ConsoleLogger, LogLevel } from "./core/logging/logger";
+import { createDefaultSystem } from "./layout/engine/context";
 
 const DEMO: NodeConfig = {
   id: "root",
@@ -2607,7 +2636,12 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
 
   const nodeSize: Vector = useMemo(() => new Vector(Math.max(20, nodeW), Math.max(20, nodeH)), [nodeW, nodeH]);
 
-  const api = useMemo(() => createLayoutAPI(), []);
+  const [logLevel, setLogLevel] = useState<LogLevel>(LogLevel.Warn);
+
+  const api = useMemo(() => {
+    const ctx = createDefaultSystem({ log: new ConsoleLogger(logLevel) });
+    return createLayoutAPI(ctx);
+  }, [logLevel]);
 
   const input: GraphInput = useMemo(() => ({ kind: "tree", root: effectiveConfig }), [effectiveConfig]);
 
@@ -2631,14 +2665,26 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
   useEffect(() => {
     if (nestedGridActive) {
       setSpacing(LIMITS.spacing.min);
-      setNodeW(50);
-      setNodeH(50);
+      setNodeW(LIMITS.nodeW.max);
+      setNodeH(LIMITS.nodeH.max);
     }
   }, [nestedGridActive]);
 
   return (
     <div style={Shell.outer}>
       <div style={Shell.bar}>
+        <Segmented<LogLevel>
+          label="Log"
+          value={logLevel}
+          onChange={setLogLevel}
+          options={[
+            { label: "Off",  value: LogLevel.Off },
+            { label: "Warn", value: LogLevel.Warn },
+            { label: "Info", value: LogLevel.Info },
+            { label: "Debug",value: LogLevel.Debug },
+          ]}
+        />
+
         <Segmented<Target.DOM | Target.Canvas | Target.ReactFlow>
           label="Right Pane"
           value={adapter}
@@ -2649,6 +2695,9 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
             { label: "ReactFlow", value: Target.ReactFlow },
           ]}
         />
+        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
         <Configurator
           root={config}
           modes={modes}
@@ -2662,9 +2711,6 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
           routerName={routerName}
           setRouterName={setRouterName}
         />
-        <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
-        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={false} />
-        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={false} />
       </div>
 
       <div style={Shell.left}>
@@ -2786,6 +2832,12 @@ export class DomPort implements RenderPort {
     root.appendChild(svg);
 
     const draw = (s: LayoutSnapshot) => {
+      // NEW: update viewBox to match snapshot bounds
+      // const b = s.stats.bounds;
+      // const w = Math.max(1, b.size.x);
+      // const h = Math.max(1, b.size.y);
+      // (svg as SVGSVGElement).setAttribute("viewBox", `${b.position.x} ${b.position.y} ${w} ${h}`);
+
       root.querySelectorAll("[data-node]").forEach((n) => n.remove());
       while (svg.firstChild) svg.removeChild(svg.firstChild);
 
@@ -2941,6 +2993,77 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewP
     </div>
   );
 };
+
+```
+
+### src/components/tooling/diagnostics/audit.ts
+
+``` ts
+import type { LayoutSnapshot } from "../../layout/types";
+import type { Config } from "../../config";
+import type { LayoutTuning } from "../../layout/layout.tuning";
+import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
+import type { Plan } from "../../layout/engine/phases/plan";
+import { Vector } from "../../core/geometry";
+
+export type AuditIssue = {
+  code: "NESTED_GRID_CHILD_NOT_SQUARE" | "NESTED_GRID_CHILD_TOO_BIG";
+  parentId: string;
+  childId: string;
+  details?: Record<string, unknown>;
+};
+
+export function auditSnapshot(
+  s: LayoutSnapshot,
+  plan: Plan,
+  tuning: Config<LayoutTuning>
+): AuditIssue[] {
+  // Build children map from wires (tree edges)
+  const kids: Record<string, string[]> = {};
+  for (const w of s.wires) {
+    (kids[w.source] ??= []).push(w.target);
+  }
+
+  const issues: AuditIssue[] = [];
+
+  for (const [id, box] of Object.entries(s.boxes)) {
+    const mode = plan.modes[id] ?? LayoutChildrenMode.GRAPH;
+    const layout = plan.layouts[id] ?? LayoutTypes.Grid;
+    if (mode !== LayoutChildrenMode.NESTED || layout !== LayoutTypes.Grid) continue;
+
+    const children = kids[id] ?? [];
+    if (children.length === 0) continue;
+
+    const pad = tuning.get("outerPad")(0); // spacing not needed for this check; caller can refine
+    const inner = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
+    const rc = tuning.get("rowCol")(children.length);
+    const ip = tuning.get("itemPad")(0);
+    const cell = inner.divide(rc).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
+    const sideMax = Math.min(cell.x, cell.y);
+
+    for (const cid of children) {
+      const cb = s.boxes[cid];
+      if (!cb) continue;
+      if (Math.abs(cb.size.x - cb.size.y) > 1) {
+        issues.push({
+          code: "NESTED_GRID_CHILD_NOT_SQUARE",
+          parentId: id,
+          childId: cid,
+          details: { size: cb.size, sideMax }
+        });
+      }
+      if (cb.size.x - sideMax > 1 || cb.size.y - sideMax > 1) {
+        issues.push({
+          code: "NESTED_GRID_CHILD_TOO_BIG",
+          parentId: id,
+          childId: cid,
+          details: { size: cb.size, sideMax }
+        });
+      }
+    }
+  }
+  return issues;
+}
 
 ```
 
@@ -3526,6 +3649,105 @@ export const LabeledSlider =    (
 
 ```
 
+### src/components/ui/playground/Testbed.tsx
+
+``` tsx
+import { JSX, useMemo } from "react";
+import { LayoutView } from "../../render/views/LayoutView";
+import { Target } from "../../adapters/env";
+import { createLayoutAPI } from "../../layout/api";
+import { createDefaultSystem } from "../../layout/engine/context";
+import { ConsoleLogger, LogLevel } from "../../core/logging/logger";
+import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
+import { Vector } from "../../core/geometry";
+import type { NodeConfig } from "../../graph/types";
+import type { GraphInput } from "../../layout/api";
+
+const BASE: NodeConfig = {
+  id: "root",
+  position: new Vector(40, 40),
+  children: [
+    { id: "A", children: [{ id: "A1" }, { id: "A2" }, { id: "A3" }] },
+    { id: "B", children: [{ id: "B1" }, { id: "B2" }, { id: "B3" }, { id: "B4" }] },
+    { id: "C", children: [{ id: "C1" }, { id: "C2" }, { id: "C3" }, { id: "C4" }] },
+  ],
+};
+
+function stamp(layout: LayoutTypes, mode: LayoutChildrenMode): NodeConfig {
+  const clone = (n: NodeConfig): NodeConfig => ({ ...n, children: (n.children ?? []).map(clone) });
+  const root = clone(BASE);
+  const apply = (n: NodeConfig) => {
+    n.layout = layout;
+    n.mode = mode;
+    (n.children ?? []).forEach(apply);
+  };
+  apply(root);
+  return root;
+}
+
+const RENDERERS: Target[] = [Target.DOM, Target.Canvas, Target.ReactFlow];
+const LAYOUTS: LayoutTypes[] = [LayoutTypes.Grid, LayoutTypes.Radial];
+const MODES: LayoutChildrenMode[] = [LayoutChildrenMode.GRAPH, LayoutChildrenMode.NESTED];
+
+export function TestbedMatrix(): JSX.Element {
+  const api = useMemo(() => createLayoutAPI(createDefaultSystem({ log: new ConsoleLogger(LogLevel.Warn) })), []);
+  const combos = useMemo(() => {
+    return RENDERERS.flatMap((r) =>
+      LAYOUTS.flatMap((L) =>
+        MODES.map((M) => ({
+          key: `${Target[r]}-${LayoutTypes[L]}-${LayoutChildrenMode[M]}`,
+          renderer: r,
+          layout: L,
+          mode: M,
+          snapshot: api.compute({ kind: "tree", root: stamp(L, M) }, {
+            nodeSize: new Vector(90, 50),
+            spacing: 16,
+            routerName: "ortho",
+          }),
+        }))
+      )
+    );
+  }, [api]);
+
+  const grid: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    top: 72,
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gridAutoRows: "340px",
+    gap: 12,
+    padding: 12,
+    boxSizing: "border-box",
+  };
+
+  const cell: React.CSSProperties = {
+    position: "relative",
+    border: "1px solid #e5e7eb",
+    borderRadius: 8,
+    overflow: "hidden",
+  };
+
+  const title: React.CSSProperties = { position: "absolute", left: 8, top: 8, fontSize: 12, color: "#64748b", zIndex: 1 };
+
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      <div style={grid}>
+        {combos.map((c) => (
+          <div key={c.key} style={cell}>
+            <div style={title}>
+              {Target[c.renderer]} • {LayoutTypes[c.layout]} • {LayoutChildrenMode[c.mode]}
+            </div>
+            <LayoutView kind={c.renderer} snapshot={c.snapshot} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+```
+
 ### src/components/ui/styles.ts
 
 ``` ts
@@ -3553,7 +3775,7 @@ export const Shell : ShellStyles =
                     top             : 0, 
                     width           : "100%", 
                     height          : 72,
-                    background      : "#f6f8fa", 
+                    background      : "#242424", 
                     borderBottom    : "1px solid #d0d7de", 
                     zIndex          : 1000, 
                     padding         : 8, 
