@@ -8,14 +8,13 @@ import { LayoutTuning } from "../layout.tuning";
 export type NodeAttrs = {
   label?: string;
   position?: Vector;
-  size?: Vector;           // optional: if provided, preferred box
+  size?: Vector;           // optional: preferred box
   layout?: LayoutTypes;    // preferred layout strategy for this node
   mode?: LayoutChildrenMode; // GRAPH | NESTED
   data?: unknown;
 };
 
 export type Edge = { id?: string; source: string; target: string; data?: unknown };
-
 
 /** Unified input contract for the pipeline. */
 export type GraphInput =
@@ -29,5 +28,7 @@ export type ComputeOptions = {
   collectOverlaps?: boolean;
   limitsOverride?: Partial<IterationLimits>;
   tuningOverride?: Partial<LayoutTuning>;
-  routerName?: "line" | "ortho";          // NEW
+  routerName?: "line" | "ortho";
+  /** What to do if validate() returns issues. */
+  onValidateIssues?: "ok" | "warn" | "error";
 };

@@ -1,6 +1,6 @@
 import { Config } from "../../config";
-import { defaultTuning, LayoutTuning, LayoutTuningConfig } from "../../layout/layout.tuning";
-import { defaultLayoutLimits, IterationConfig, IterationLimits } from "../limits";
+import { LayoutTuning, LayoutTuningConfig } from "../../layout/layout.tuning";
+import { IterationConfig, IterationLimits } from "../limits";
 import { Logger, NoopLogger } from "../../core/logging/logger";
 import { InMemoryLayoutRegistry } from "../registries/layout.registry";
 import { InMemoryRouterRegistry } from "../registries/router.registry";
@@ -11,6 +11,7 @@ import type { LayoutRegistry } from "../registries/layout.registry";
 import type { RouterRegistry } from "../registries/router.registry";
 import { LayoutTypes } from "../layout.enum";
 import { OrthoRouter } from "../routers/ortho.router";
+import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
 
 export type SystemContext = {
   log: Logger;
@@ -20,18 +21,33 @@ export type SystemContext = {
   routers: RouterRegistry;
 };
 
-// context.ts
 export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
-  const tunings = overrides?.tunings ?? new Config<LayoutTuning>({ ...defaultTuning });
-  const limits  = overrides?.limits  ?? new Config<IterationLimits>({ ...defaultLayoutLimits });
+  const tunings = overrides?.tunings ?? LayoutTuningConfig;
+  const limits = overrides?.limits ?? IterationConfig;
 
-  const layouts = new InMemoryLayoutRegistry();
-  layouts.register(LayoutTypes.Grid,  new GridLayout(tunings /* pass ctx */));
-  layouts.register(LayoutTypes.Radial,new RadialLayout(tunings /* pass ctx */));
+  const layouts =
+    overrides?.layouts ??
+    (() => {
+      const layoutRegistry = new InMemoryLayoutRegistry();
+      layoutRegistry.register(LayoutTypes.Grid, new GridLayout(tunings, createDefaultIteratorRegistry(tunings)));
+      layoutRegistry.register(LayoutTypes.Radial, new RadialLayout(tunings));
+      return layoutRegistry;
+    })();
 
-  const routers = new InMemoryRouterRegistry(); // routers usually stateless
-  routers.register("line",  new LineRouter());
-  routers.register("ortho", new OrthoRouter());
+  const routers =
+    overrides?.routers ??
+    (() => {
+      const routerRegistry = new InMemoryRouterRegistry();
+      routerRegistry.register("line", new LineRouter());
+      routerRegistry.register("ortho", new OrthoRouter());
+      return routerRegistry;
+    })();
 
-  return { log: overrides?.log ?? new NoopLogger(), tunings, limits, layouts, routers };
+  return {
+    log: overrides?.log ?? new NoopLogger(),
+    tunings,
+    limits,
+    layouts,
+    routers,
+  };
 }
