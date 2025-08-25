@@ -20,30 +20,45 @@ export type SplitEvenReturn =
     sizes   : number[],
     offs    : number[]
 }
-export const splitEven = (total: number, parts: number): { sizes: number[]; offs: number[] } => {
-  const p = Math.max(1, parts);
-  const base = Math.floor(total / p);
-  const rem = total - base * p;
+export const splitEven =    (
+                                total : number, 
+                                parts : number
+                            ) 
+                            : SplitEvenReturn => 
+{
+    const base  : number   = Math.floor(total / parts);
+    const rem   : number   = total - base * parts;
+    const sizes : number[] = Array.from (
+                                            { 
+                                                length : parts 
+                                            }, 
+                                            (
+                                                _ : number, 
+                                                i : number
+                                            ) => 
+                                                base + (i < rem ? 1 : 0)
+                                        );
+    const offs: number[] = new Array(parts);
+    let acc = 0;
+    for (let i = 0; i < parts; i++) { offs[i] = acc; acc += sizes[i]; }
 
-  const sizes = new Array(p);
-  for (let i = 0; i < p; i++) sizes[i] = base + (i < rem ? 1 : 0);
-
-  const offs = new Array(p);
-  let acc = 0;
-  for (let i = 0; i < p; i++) {
-    offs[i] = acc;
-    acc += sizes[i];
-  }
-  return { sizes, offs };
+    return  { 
+                sizes, 
+                offs 
+            };
 };
 
-
 export const rcSquare = (
-  n: number
-): Vector => {
-  const rows: number = Math.ceil(Math.sqrt(Math.max(1, n)));
-  const cols: number = Math.ceil(n / rows);
-  return new Vector(cols, rows);
+                            n : number
+                        ) 
+                        : Vector => 
+{ 
+    const rows : number = Math.ceil(Math.sqrt(Math.max(1, n)));
+    const cols : number = Math.ceil(n / rows);
+    return new Vector   (
+                            cols, 
+                            rows
+                        );
 };
 
 export class GridLayout extends Layout {

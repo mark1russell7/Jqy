@@ -9,7 +9,7 @@ export class DomPort implements RenderPort {
     Object.assign(root.style, { position: "relative", width: "100%", height: "100%" });
 
     const svgNS = "http://www.w3.org/2000/svg";
-    const svg: SVGElement = document.createElementNS(svgNS, "svg") as SVGElement;
+    const svg: SVGSVGElement = document.createElementNS(svgNS, "svg") as SVGSVGElement;
     Object.assign(svg.style, {
       position: "absolute",
       inset: "0",
@@ -18,33 +18,37 @@ export class DomPort implements RenderPort {
       pointerEvents: "none",
       zIndex: "0",
     });
-    // Some browsers still prefer explicit attributes on <svg>
     svg.setAttribute("width", "100%");
     svg.setAttribute("height", "100%");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
     container.appendChild(root);
     root.appendChild(svg);
 
-    const draw = (s: LayoutSnapshot) => {
-      // NEW: update viewBox to match snapshot bounds
-      // const b = s.stats.bounds;
-      // const w = Math.max(1, b.size.x);
-      // const h = Math.max(1, b.size.y);
-      // (svg as SVGSVGElement).setAttribute("viewBox", `${b.position.x} ${b.position.y} ${w} ${h}`);
+    const applyViewBox = (s: LayoutSnapshot) => {
+      const b = s.stats.bounds;
+      const w = Math.max(1, Math.ceil(b.size.x));
+      const h = Math.max(1, Math.ceil(b.size.y));
+      svg.setAttribute("viewBox", `${Math.floor(b.position.x)} ${Math.floor(b.position.y)} ${w} ${h}`);
+    };
 
-      root.querySelectorAll("[data-node]").forEach((n) => n.remove());
+    const draw = (s: LayoutSnapshot) => {
+      // edges
       while (svg.firstChild) svg.removeChild(svg.firstChild);
+      applyViewBox(s);
 
       for (const w of s.wires) {
         if (w.polyline && w.polyline.length >= 2) {
           const poly = document.createElementNS(svgNS, "polyline");
-          poly.setAttribute("points", w.polyline.map(p => `${p.x},${p.y}`).join(" "));
+          poly.setAttribute("points", w.polyline.map((p) => `${p.x},${p.y}`).join(" "));
           poly.setAttribute("fill", "none");
           poly.setAttribute("stroke", theme.wire.stroke);
           poly.setAttribute("stroke-width", String(theme.wire.width));
           svg.appendChild(poly);
           continue;
         }
-        const a = s.boxes[w.source]; const b = s.boxes[w.target];
+        const a = s.boxes[w.source];
+        const b = s.boxes[w.target];
         if (!a || !b) continue;
         const A = a.position.add(a.size.halve());
         const B = b.position.add(b.size.halve());
@@ -58,7 +62,8 @@ export class DomPort implements RenderPort {
         svg.appendChild(line);
       }
 
-
+      // nodes
+      root.querySelectorAll("[data-node]").forEach((n) => n.remove());
       for (const b of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
         const el = document.createElement("div");
         el.dataset.node = b.id;
@@ -89,12 +94,8 @@ export class DomPort implements RenderPort {
       draw,
       destroy: () => {
         try {
-          if (root.parentNode === container) {
-            container.removeChild(root);
-          } else {
-            // if React already removed it, no-op
-            root.remove?.();
-          }
+          if (root.parentNode === container) container.removeChild(root);
+          else root.remove?.();
         } catch { /* swallow */ }
       },
     };

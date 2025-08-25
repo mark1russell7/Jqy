@@ -1,61 +1,70 @@
 import type { LayoutSnapshot } from "../../layout/types";
-import type { Config } from "../../config";
-import type { LayoutTuning } from "../../layout/layout.tuning";
-import { LayoutChildrenMode, LayoutTypes } from "../../layout/layout.enum";
 import type { Plan } from "../../layout/engine/phases/plan";
-import { Vector } from "../../core/geometry";
+import type { LayoutTuning } from "../../layout/layout.tuning";
+import { Config } from "../../config";
 
 export type AuditIssue = {
-  code: "NESTED_GRID_CHILD_NOT_SQUARE" | "NESTED_GRID_CHILD_TOO_BIG";
+  code:
+    | "NESTED_CHILD_NOT_SQUARE"
+    | "NESTED_CHILD_OUTSIDE_PARENT"
+    | "NESTED_CHILD_TOO_BIG";
+  severity: "warn" | "error";
   parentId: string;
   childId: string;
-  details?: Record<string, unknown>;
+  detail?: unknown;
 };
 
-export function auditSnapshot(s: LayoutSnapshot, plan: Plan, tuning: Config<LayoutTuning>, opts: { spacing: number }): AuditIssue[] {
-  // build real children from parentId on boxes, or from plan/tree meta
+/** Build children map from snapshot.parentId relations. */
+function childrenOf(s: LayoutSnapshot): Record<string, string[]> {
   const kids: Record<string, string[]> = {};
   for (const b of Object.values(s.boxes)) {
-    if (b.parentId) (kids[b.parentId] ??= []).push(b.id);
+    if (!b.parentId) continue;
+    (kids[b.parentId] ??= []).push(b.id);
   }
+  return kids;
+}
 
+/** Simple post-hoc audit matching our sizing intent. */
+export function auditSnapshot(
+  s: LayoutSnapshot,
+  _plan: Plan,
+  tuning: Config<LayoutTuning>,
+  opts: { spacing: number }
+): AuditIssue[] {
   const issues: AuditIssue[] = [];
+  const kids = childrenOf(s);
+  const pad = (p: number) => tuning.get("outerPad")(p);
 
-  for (const [id, box] of Object.entries(s.boxes)) {
-    const mode = plan.modes[id] ?? LayoutChildrenMode.GRAPH;
-    const layout = plan.layouts[id] ?? LayoutTypes.Grid;
-    if (mode !== LayoutChildrenMode.NESTED || layout !== LayoutTypes.Grid) continue;
+  for (const [pid, arr] of Object.entries(kids)) {
+    const parent = s.boxes[pid];
+    if (!parent) continue;
 
-    const children = kids[id] ?? [];
-    if (children.length === 0) continue;
+    const inner = parent.size.subtract(new (parent.size.constructor as any)(pad(opts.spacing) * 2, pad(opts.spacing) * 2));
+    const maxSide = inner.min();
 
-    const pad = tuning.get("outerPad")(0); // spacing not needed for this check; caller can refine
-    const inner = box.size.subtract(Vector.scalar(2 * pad)).clamp(1, Infinity);
-    const rc = tuning.get("rowCol")(children.length);
-    const ip = tuning.get("itemPad")(0);
-    const cell = inner.divide(rc).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
-    const sideMax = Math.min(cell.x, cell.y);
+    for (const cid of arr) {
+      const child = s.boxes[cid];
+      if (!child) continue;
 
-    for (const cid of children) {
-      const cb = s.boxes[cid];
-      if (!cb) continue;
-      if (Math.abs(cb.size.x - cb.size.y) > 1) {
-        issues.push({
-          code: "NESTED_GRID_CHILD_NOT_SQUARE",
-          parentId: id,
-          childId: cid,
-          details: { size: cb.size, sideMax }
-        });
+      // 1) square check
+      if (child.size.x !== child.size.y) {
+        issues.push({ code: "NESTED_CHILD_NOT_SQUARE", severity: "warn", parentId: pid, childId: cid });
       }
-      if (cb.size.x - sideMax > 1 || cb.size.y - sideMax > 1) {
-        issues.push({
-          code: "NESTED_GRID_CHILD_TOO_BIG",
-          parentId: id,
-          childId: cid,
-          details: { size: cb.size, sideMax }
-        });
+      // 2) too big vs inner box
+      if (Math.max(child.size.x, child.size.y) > maxSide + 0.5) {
+        issues.push({ code: "NESTED_CHILD_TOO_BIG", severity: "warn", parentId: pid, childId: cid });
+      }
+      // 3) outside parent bounds
+      const cx1 = child.position.x, cy1 = child.position.y;
+      const cx2 = cx1 + child.size.x, cy2 = cy1 + child.size.y;
+      const px1 = parent.position.x, py1 = parent.position.y;
+      const px2 = px1 + parent.size.x, py2 = py1 + parent.size.y;
+      const outside = cx1 < px1 - 0.5 || cy1 < py1 - 0.5 || cx2 > px2 + 0.5 || cy2 > py2 + 0.5;
+      if (outside) {
+        issues.push({ code: "NESTED_CHILD_OUTSIDE_PARENT", severity: "warn", parentId: pid, childId: cid });
       }
     }
   }
+
   return issues;
 }

@@ -27,25 +27,22 @@ export class RadialLayout extends Layout {
 /* ==================== helpers ==================== */
 export const nestedRadialCenters = (
   tuning: Config<LayoutTuning>,
-  { children, parentSize, nodeSize, spacing }: PlaceChildrenParam
+  { children, parentSize, spacing }: PlaceChildrenParam
 ): PlaceChildrenReturn => {
- const maxPer = IterationConfig.get("maxChildrenPerNode");
+  const maxPer = IterationConfig.get("maxChildrenPerNode");
   const policy = IterationConfig.get("onLimit");
 
-  // use content box (outer pad)
   const padOuter = tuning.get("outerPad")(spacing);
-  const inner: Vector = parentSize
-    .round()
-    .subtract(Vector.scalar(2 * padOuter))
-    .clamp(1, Infinity);
+  const inner: Vector = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
+
+  const R = inner.min() / 2;
+  const ip = tuning.get("itemPad")(spacing);
+  // choose a generous ring radius; child sizing is enforced in place.ts
+  const r = Math.max(tuning.get("minRadius")(), R - ip);
 
   const c: Vector = inner.scale(1 / 2);
   const start = tuning.get("startAngle")();
   const cw = tuning.get("clockwise")();
-  const ip = tuning.get("itemPad")(spacing);
-
-  const baseR = inner.min() / 2 - Math.max(0, nodeSize.max() / 2 + ip);
-  const r = Math.max(tuning.get("minRadius")(), baseR);
 
   return Object.fromEntries(
     mapIndexBounded(children.length, maxPer, policy, (i) => [
@@ -54,6 +51,7 @@ export const nestedRadialCenters = (
     ])
   );
 };
+
 
 export const graphRadialCenters = (
   tuning: Config<LayoutTuning>,
