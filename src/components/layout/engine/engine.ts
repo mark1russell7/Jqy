@@ -24,7 +24,7 @@ export class PipelineEngine {
   constructor(private ctx: SystemContext = createDefaultSystem()) {}
 
   run(input: GraphInput, opts: ComputeOptions = {}): ComputeResult {
-    const parsed = parse(input);
+    const parsed = parse(input, this.ctx);
     const { issues } = validate(parsed);
 
     const severity = opts.onValidateIssues ?? "ok";

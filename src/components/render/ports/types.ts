@@ -10,10 +10,15 @@ export type MountOptions = {
 export interface RenderSession {
   draw(snapshot: LayoutSnapshot): void;  // full draw
   destroy(): void;
-  setViewport?:(v : Partial<{x : number, y : number, scale : number}>) => void;
-  getViewport?:() => { x : number, y : number, scale : number };
+  // setViewport?:(v : Partial<{x : number, y : number, scale : number}>) => void;
+  // getViewport?:() => { x : number, y : number, scale : number };
 }
 
 export interface RenderPort {
-  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme, options?: MountOptions): RenderSession;
+  mount(
+    container: HTMLElement,
+    initial: LayoutSnapshot,
+    theme: Theme,
+    opts?: { viewport?: ViewportController; interactive?: boolean }
+  ): RenderSession;
 }

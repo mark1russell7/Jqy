@@ -12,6 +12,7 @@ import type { RouterRegistry } from "../registries/router.registry";
 import { LayoutTypes } from "../layout.enum";
 import { OrthoRouter } from "../routers/ortho.router";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
+import { createDefaultInputRegistry, type InputAdapterRegistry } from "../registries/input.registry";
 
 export type SystemContext = {
   log: Logger;
@@ -19,6 +20,7 @@ export type SystemContext = {
   limits: Config<IterationLimits>;
   layouts: LayoutRegistry;
   routers: RouterRegistry;
+  input: InputAdapterRegistry;
 };
 
 export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
@@ -51,6 +53,7 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
       routerRegistry.register("ortho", new OrthoRouter());
       return routerRegistry;
     })();
+  const input = overrides?.input ?? createDefaultInputRegistry();
 
   return {
     log: overrides?.log ?? new NoopLogger(),
@@ -58,5 +61,6 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
     limits,
     layouts,
     routers,
+    input
   };
 }

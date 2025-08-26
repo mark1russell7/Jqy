@@ -5,11 +5,13 @@ import { createDefaultSystem } from "../engine/context";
 import type { LayoutSnapshot } from "../types";
 import { toReactFlow } from "../../tooling/exporters/reactflow";
 import { snapshotToSVG } from "../../tooling/exporters/svg";
+import { InputAdapter, registerInputAdapter } from "../registries/input.registry";
 
 export interface LayoutAPI {
   compute(input: GraphInput, options?: ComputeOptions): LayoutSnapshot;
   toReactFlow(snapshot: LayoutSnapshot): ReturnType<typeof toReactFlow>;
   toSVG(snapshot: LayoutSnapshot): string;
+  registerInputAdapter(adapter: InputAdapter<any>): void;
 }
 
 export function createLayoutAPI(ctx: SystemContext = createDefaultSystem()): LayoutAPI {
@@ -22,6 +24,7 @@ export function createLayoutAPI(ctx: SystemContext = createDefaultSystem()): Lay
     },
     toReactFlow,
     toSVG: snapshotToSVG,
+    registerInputAdapter: (adapter) => registerInputAdapter(ctx, adapter),
   };
 }
 

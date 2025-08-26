@@ -1,69 +1,87 @@
-import type { MountOptions, RenderPort, RenderSession } from "./types";
+import type { RenderPort, RenderSession } from "./types";
 import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
 import { defaultTheme } from "../../adapters/theme";
 import { CanvasRenderer2D } from "../../adapters/targets/canvas.core";
-import { ViewportController } from "./viewport";
+import type { ViewportController } from "./viewport";
 
 export class CanvasPort implements RenderPort {
-  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme, options?: MountOptions): RenderSession {
+  mount(
+    container: HTMLElement,
+    initial: LayoutSnapshot,
+    theme: Theme = defaultTheme,
+    opts?: { viewport?: ViewportController; interactive?: boolean }
+  ): RenderSession {
     const canvas = document.createElement("canvas");
     Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
     container.appendChild(canvas);
 
-    const ctx = canvas.getContext("2d")!;
-    const vp = options?.viewport ?? new ViewportController();
-
     let dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
-    const applyCanvasSize = () => {
+    const sizeCanvas = () => {
       const rect = container.getBoundingClientRect();
       canvas.width = Math.max(1, Math.round(rect.width * dpr));
       canvas.height = Math.max(1, Math.round(rect.height * dpr));
-      const v = vp.get();
-      ctx.setTransform(dpr * v.scale, 0, 0, dpr * v.scale, dpr * v.x, dpr * v.y);
     };
+    sizeCanvas();
 
-    applyCanvasSize();
+    const ctx = canvas.getContext("2d")!;
+    const themeNoBg: Theme = { ...theme, canvas: { ...theme.canvas, bg: "rgba(0,0,0,0)" } };
+    const renderer = new CanvasRenderer2D(canvas, themeNoBg);
 
-    const renderer = new CanvasRenderer2D(canvas, theme);
     const toLegacy = (s: LayoutSnapshot) => ({
       boxes: Object.fromEntries(Object.values(s.boxes).map((b) => [
-        b.id,
-        { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
+        b.id, { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
       ])),
       wires: s.wires.map((w) => ({ id: w.id, source: w.source, target: w.target, polyline: w.polyline })),
     });
 
+    const applyTransform = (s: LayoutSnapshot) => {
+      // clear screen in device coords
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = theme.canvas.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const b = s.stats.bounds;
+      const scale = opts?.viewport?.get().scale ?? 1;
+      const x = opts?.viewport?.get().x ?? 0;
+      const y = opts?.viewport?.get().y ?? 0;
+
+      // world → screen: (P - b.pos) * scale + (x,y), then DPR
+      const e = x - b.position.x * scale;
+      const f = y - b.position.y * scale;
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * e, dpr * f);
+    };
+
     let last = initial;
+    applyTransform(initial);
     renderer.fullDraw(toLegacy(initial));
 
-    const onVP = () => { applyCanvasSize(); renderer.fullDraw(toLegacy(last)); };
-    const detachVP = vp.onChange(() => { applyCanvasSize(); renderer.fullDraw(toLegacy(last)); });
-    const detachInput = (options?.interactive === false) ? (() => {}) : vp.attachWheelAndDrag(canvas);
+    const draw = (s: LayoutSnapshot) => {
+      last = s;
+      applyTransform(s);
+      renderer.fullDraw(toLegacy(s)); // always full redraw — avoids transform/diff mismatch
+    };
 
-    const draw = (s: LayoutSnapshot) => { last = s; renderer.update(toLegacy(s), { partial: true }); };
-
-    // ResizeObserver for container
-    const ro = new ResizeObserver(() => applyCanvasSize());
+    const ro = new ResizeObserver(() => {
+      sizeCanvas();
+      applyTransform(last);
+      renderer.fullDraw(toLegacy(last));
+    });
     ro.observe(container);
 
-    // DPR change: window resize usually fires; also guard via polling media query fallback
-    const onWindowResize = () => {
-      const next = Math.max(1, (window.devicePixelRatio as number) || 1);
-      if (next !== dpr) { dpr = next; applyCanvasSize(); renderer.fullDraw(toLegacy(last)); }
-    };
-    window.addEventListener("resize", onWindowResize);
+    const offVp = opts?.viewport?.onChange(() => { draw(last); });
+    let detachInputs: (() => void) | undefined;
+    if (opts?.interactive && opts.viewport) detachInputs = opts.viewport.attachWheelAndDrag(canvas);
 
     return {
       draw,
       destroy: () => {
         try {
-          detachVP(); detachInput(); ro.disconnect(); window.removeEventListener("resize", onWindowResize);
+          ro.disconnect(); offVp?.(); detachInputs?.();
           if (canvas.parentNode === container) container.removeChild(canvas); else canvas.remove?.();
         } catch {}
       },
-      setViewport: (v) => vp.set(v ?? {}),
-      getViewport: () => vp.get(),
     };
   }
 }
