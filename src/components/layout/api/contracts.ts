@@ -1,7 +1,7 @@
 import { Vector } from "../../core/geometry";
 import { NodeConfig } from "../../graph/types";
 import { IterationLimits } from "../limits";
-import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
+import { EdgeLineType, InputKind, LayoutChildrenMode, LayoutTypes } from "../layout.enum";
 import { LayoutTuning } from "../layout.tuning";
 
 /** Minimal attrs we may get for a node (graph-agnostic). */
@@ -18,8 +18,8 @@ export type Edge = { id?: string; source: string; target: string; data?: unknown
 
 /** Unified input contract for the pipeline. */
 export type GraphInput =
-  | { kind: "tree"; root: NodeConfig }
-  | { kind: "graph"; nodes: Record<string, NodeAttrs>; edges: Edge[] };
+  | { kind: InputKind.Tree; root: NodeConfig }
+  | { kind: InputKind.Graph; nodes: Record<string, NodeAttrs>; edges: Edge[] };
 
 /** Engine options (all optional & shallow-merged with defaults). */
 export type ComputeOptions = {
@@ -28,7 +28,7 @@ export type ComputeOptions = {
   collectOverlaps?: boolean;
   limitsOverride?: Partial<IterationLimits>;
   tuningOverride?: Partial<LayoutTuning>;
-  routerName?: "line" | "ortho";
+  routerName?: EdgeLineType;
   /** What to do if validate() returns issues. */
   onValidateIssues?: "ok" | "warn" | "error";
 };

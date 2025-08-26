@@ -1,15 +1,22 @@
-import { Vector } from "../../../core/geometry";
+import { 
+  Vector 
+} from "../../../core/geometry";
 import {
-  PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam,
-  NestedFramesReturn, PlaceChildrenExReturn
+  type PreferredSizeParam, 
+  type PreferredSizeReturn, 
+  Layout, 
+  type PlaceChildrenReturn, 
+  type PlaceChildrenParam,
+  type NestedFramesReturn, 
+  type PlaceChildrenExReturn
 } from "../../layout";
 import { LayoutChildrenMode } from "../../layout.enum";
 import { MappedGrid } from "../grid/grid.mapped";
 import { Config } from "../../../config";
-import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IterationConfig } from "../../limits";
+import { LayoutTuning } from "../../layout.tuning";
+import { IterationLimits } from "../../limits";
 import { mapIndexBounded } from "../../../iteration/iterate";
-import { AuditIssue } from "../../../tooling/diagnostics/audit";
+import { type AuditIssue } from "../../../tooling/diagnostics/audit";
 
 /** geometry helper for nested-radial child square side */
 function radialChildSquareSide(tuning: Config<LayoutTuning>, n: number, parentSize: Vector, spacing: number): number {
@@ -25,7 +32,10 @@ function radialChildSquareSide(tuning: Config<LayoutTuning>, n: number, parentSi
 }
 
 export class RadialLayout extends Layout {
-  constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) { super(); }
+  constructor(
+    private tuning: Config<LayoutTuning>,
+    private limits: Config<IterationLimits>
+  ) { super(); }
 
   nestedFrames = (): NestedFramesReturn => ({
     ip: 0,
@@ -36,8 +46,8 @@ export class RadialLayout extends Layout {
   /* ---------- extended placement (owns child sizing for NESTED) ---------- */
   placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
     const { children, origin, nodeSize, spacing, level, parentSize, mode, childModes } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = mapIndexBounded(children.length, maxPer, policy, (i) => children[i]);
 
     if (mode === LayoutChildrenMode.GRAPH) {
@@ -97,8 +107,8 @@ export class RadialLayout extends Layout {
     args.mode === LayoutChildrenMode.NESTED ? this.nestedCenters(args) : this.graphCenters(args);
 
   private nestedCenters({ children, parentSize, nodeSize, spacing }: PlaceChildrenParam): PlaceChildrenReturn {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
 
     const padOuter = this.tuning.get("outerPad")(spacing);
     const inner: Vector = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
@@ -120,8 +130,8 @@ export class RadialLayout extends Layout {
   }
 
   private graphCenters({ children, origin, nodeSize, spacing, level, parentSize }: PlaceChildrenParam): PlaceChildrenReturn {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
 
     const base = this.tuning.get("radialBase")(nodeSize, spacing);
     const r = Math.max(this.tuning.get("minRadius")(), base * (1 + level * this.tuning.get("radialLevelScale")()));

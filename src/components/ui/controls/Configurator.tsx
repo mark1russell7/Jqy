@@ -9,6 +9,7 @@ import {
 } from "./controls";
 import { NodeConfig } from "../../graph/types";
 import { 
+    EdgeLineType,
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../../layout/layout.enum";
@@ -70,8 +71,8 @@ export type ConfiguratorProps =
     setScope            : (s: Scope) => void;
     applyToSubtree      : boolean;
     setApplyToSubtree   : (v: boolean) => void;
-    routerName          : "line" | "ortho";
-    setRouterName       : (r: "line" | "ortho") => void;
+    routerName          : EdgeLineType;
+    setRouterName       : (r: EdgeLineType) => void;
 }
                         
 export const Configurator = (
@@ -245,10 +246,10 @@ export const Configurator = (
             >
                 All Nested
             </button>
-            <Segmented<"line" | "ortho">
+            <Segmented<EdgeLineType>
                 label="Router"
                 value={routerName}
-                options={[{ label: "Line", value: "line" }, { label: "Ortho", value: "ortho" }]}
+                options={[{ label: "Line", value: EdgeLineType.Straight }, { label: "Ortho", value: EdgeLineType.Ortho }]}
                 onChange={setRouterName}
             />
         </div>

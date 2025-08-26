@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T22:00:27.039Z
+Generated on 2025-08-25T22:23:39.000Z
 
 ## Directory structure (src)
 
@@ -100,15 +100,12 @@ Generated on 2025-08-25T22:00:27.039Z
 
 │   ├── ui/
 │   │   ├── controls/
-
+│   │   │   ├── Configurator.tsx
+│   │   │   └── controls.tsx
 │   │   ├── playground/
 │   │   │   └── Testbed.tsx
-│   │   ├── styles/
-
-│   │   ├── Configurator.tsx
-│   │   ├── controls.tsx
-│   │   └── styles.ts
-│   ├── class.types.ts
+│   │   └── styles/
+│   │       └── styles.ts
 │   ├── config.ts
 │   ├── errors.ts
 │   └── ParentChildFlow.tsx
@@ -486,14 +483,6 @@ export const defaultTheme : Theme = {
                                                         bg  : "#ffffff",
                                                     },
                                     };
-
-```
-
-### src/components/class.types.ts
-
-``` ts
-
-export type ClassOf<T> = { new(...args: any[]): T };
 
 ```
 
@@ -1102,7 +1091,7 @@ import { LayoutTypes } from "../layout.enum";
 import { GridLayout } from "../strategies/grid/grid.layout";
 import { RadialLayout } from "../strategies/radial/radial.layout";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
-import { auditSnapshot } from "../../tooling/diagnostics/audit";
+import { runAudit } from "../../tooling/diagnostics/audit";
 
 export type ComputeResult =
   | { ok: true; snapshot: LayoutSnapshot; issues: ReturnType<typeof validate>["issues"] }
@@ -1154,7 +1143,9 @@ export class PipelineEngine {
 
     // Diagnostics audit (non-fatal, attach to meta)
     try {
-      const audit = auditSnapshot(snapshot, pln, effectiveTunings, { spacing });
+      // const audit = auditSnapshot(snapshot, pln, effectiveTunings, { spacing });
+      const audit = runAudit(snapshot, pln, localCtx, { spacing });
+
       if (audit.length) {
         localCtx.log.warn("audit: issues", { count: audit.length, audit });
       }
@@ -2131,27 +2122,42 @@ export class InMemoryRouterRegistry implements RouterRegistry {
 
 ``` ts
 import { Vector } from "../../core/geometry";
-import type { Edge } from "../api/contracts";
-import type { LayoutSnapshot } from "../types";
-import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
-import type { Box } from "../types";
+// import type { Edge } from "../api/contracts";
+// import type { LayoutSnapshot } from "../types";
+// import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+// import type { Box } from "../types";
 // import { resolveEndpoints, AnchorKind } from "./ports/anchoring";
 
 // export function routeLine(a: Box, b: Box, opts?: { anchor?: AnchorKind }): WireRoute {
 //   const { A, B } = resolveEndpoints(a, b, opts?.anchor ?? "center");
 //   return { polyline: [A, B] };
 // }
+import type { Edge } from "../api/contracts";
+import type { LayoutSnapshot } from "../types";
+import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+import { resolveEndpoints, type AnchorKind } from "../../render/ports/anchoring";
 
-/** Simple center-to-center straight router. */
+/** Straight segment; optionally center/perimeter anchoring. */
 export class LineRouter implements EdgeRouter {
+  constructor(private anchor: AnchorKind = "center") {}
   route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
-    const a = snapshot.boxes[e.source]; const b = snapshot.boxes[e.target];
+    const a = snapshot.boxes[e.source], b = snapshot.boxes[e.target];
     if (!a || !b) return undefined;
-    const ac = a.position.add(a.size.halve());
-    const bc = b.position.add(b.size.halve());
-    return { polyline: [ac, bc].map((v) => new Vector(v.x, v.y)) };
+    const { A, B } = resolveEndpoints(a, b, this.anchor);
+    return { polyline: [A, B] };
   }
 }
+
+/** Simple center-to-center straight router. */
+// export class LineRouter implements EdgeRouter {
+//   route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
+//     const a = snapshot.boxes[e.source]; const b = snapshot.boxes[e.target];
+//     if (!a || !b) return undefined;
+//     const ac = a.position.add(a.size.halve());
+//     const bc = b.position.add(b.size.halve());
+//     return { polyline: [ac, bc].map((v) => new Vector(v.x, v.y)) };
+//   }
+// }
 
 ```
 
@@ -2162,30 +2168,55 @@ import { Vector } from "../../core/geometry";
 import type { Edge } from "../api/contracts";
 import type { LayoutSnapshot } from "../types";
 import type { EdgeRouter, RoutedEdge } from "../registries/router.registry";
+import { type AnchorKind, resolveEndpoints } from "../../render/ports/anchoring";
 
-/** Simple Manhattan "L" router: choose the shorter elbow. */
+// /** Simple Manhattan "L" router: choose the shorter elbow. */
+// export class OrthoRouter implements EdgeRouter {
+//   route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
+//     const a = snapshot.boxes[e.source];
+//     const b = snapshot.boxes[e.target];
+//     if (!a || !b) return undefined;
+
+//     const ac = a.position.add(a.size.halve());
+//     const bc = b.position.add(b.size.halve());
+
+//     const turnHFirst = [ac, new Vector(bc.x, ac.y), bc];
+//     const turnVFirst = [ac, new Vector(ac.x, bc.y), bc];
+
+//     const len = (pts: Vector[]) => {
+//       let t = 0;
+//       for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+//       return t;
+//     };
+
+//     const path = len(turnHFirst) <= len(turnVFirst) ? turnHFirst : turnVFirst;
+//     return { polyline: path };
+//   }
+// }
+
+/** Manhattan ‘L’: pick shorter elbow; uses the same anchoring. */
 export class OrthoRouter implements EdgeRouter {
+  constructor(private anchor: AnchorKind = "center") {}
   route(e: Edge, snapshot: LayoutSnapshot): Partial<RoutedEdge> | undefined {
-    const a = snapshot.boxes[e.source];
-    const b = snapshot.boxes[e.target];
+    const a = snapshot.boxes[e.source], b = snapshot.boxes[e.target];
     if (!a || !b) return undefined;
+    const { A, B } = resolveEndpoints(a, b, this.anchor);
 
-    const ac = a.position.add(a.size.halve());
-    const bc = b.position.add(b.size.halve());
-
-    const turnHFirst = [ac, new Vector(bc.x, ac.y), bc];
-    const turnVFirst = [ac, new Vector(ac.x, bc.y), bc];
+    const H = new Vector(B.x, A.y);
+    const V = new Vector(A.x, B.y);
 
     const len = (pts: Vector[]) => {
-      let t = 0;
-      for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      // let t = 0; for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+
+      let t = 0; for (let i = 1; i < pts.length; i++) t += pts[i].subtract(pts[i-1]).length();
       return t;
     };
 
-    const path = len(turnHFirst) <= len(turnVFirst) ? turnHFirst : turnVFirst;
+    const path = len([A, H, B]) <= len([A, V, B]) ? [A, H, B] : [A, V, B];
     return { polyline: path };
   }
 }
+
 
 ```
 
@@ -2206,6 +2237,7 @@ import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
 import { IterationConfig } from "../../limits";
 import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
 import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
+import { AuditIssue } from "../../../tooling/diagnostics/audit";
 
 /* ===== utilities ===== */
 export type SplitEvenReturn = { sizes: number[]; offs: number[] };
@@ -2353,6 +2385,35 @@ export class GridLayout extends Layout {
     const inner: Vector = rowCol.multiply(cell);
     return inner.add(Vector.scalar(2 * pad));
   };
+    auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
+    const issues : AuditIssue[] = [];
+    const p = snapshot.boxes[parentId];
+    if (!p) return issues;
+
+    const pad = tuning.get("outerPad")(spacing);
+    const inner = p.size.subtract(Vector.scalar(2 * pad));
+    const rowCol = tuning.get("rowCol")(childIds.length);
+    const ip = tuning.get("itemPad")(spacing);
+
+    // The per-cell usable area the strategy tries to honor
+    const innerCell = inner.divide(rowCol).subtract(Vector.scalar(2 * ip)).clamp(1, Infinity);
+
+    for (const cid of childIds) {
+      const c = snapshot.boxes[cid];
+      if (!c) continue;
+      if (c.size.x > innerCell.x + 0.5 || c.size.y > innerCell.y + 0.5) {
+        issues.push({
+          code: "GRID_CHILD_TOO_BIG_FOR_CELL",
+          severity: "warn",
+          parentId,
+          childId: cid,
+          detail: { cell: { x: innerCell.x, y: innerCell.y }, child: { x: c.size.x, y: c.size.y } },
+        });
+      }
+    }
+    return issues;
+  };
+
 }
 
 ```
@@ -2670,28 +2731,32 @@ export class RadialLayout extends Layout {
     const R = inner.min() / 2;
     const g = tuning.get("itemPad")(spacing);
 
-    // use each child's own size (matches placement)
+    // match placement: radius is chosen off the LARGEST child
+    const sizes = childIds
+      .map((cid) => snapshot.boxes[cid])
+      .filter(Boolean)
+      .map((c) => Math.max(c!.size.x, c!.size.y));
+    const sMax = sizes.length ? Math.max(...sizes) : 0;
+
+    const rExpected = Math.max(tuning.get("minRadius")(), R - (sMax + g) / 2);
+    const innerCenter = p.position.add(Vector.scalar(pad)).add(inner.scale(1 / 2));
+
     for (const cid of childIds) {
       const c = snapshot.boxes[cid];
       if (!c) continue;
-
       const center = c.position.add(c.size.halve());
-      const innerCenter = p.position.add(Vector.scalar(pad)).add(inner.scale(1 / 2));
       const dist = center.subtract(innerCenter).length();
-
-      const s = Math.max(c.size.x, c.size.y);
-      const rExpected = Math.max(tuning.get("minRadius")(), R - (s / 2 + g));
       if (Math.abs(dist - rExpected) > 1.0) {
         issues.push({
           code: "RADIAL_CHILD_OFF_RING",
-        severity: "warn",
-        parentId,
-        childId: cid,
-        detail: { dist, rExpected, s },
-      });
+          severity: "warn",
+          parentId,
+          childId: cid,
+          detail: { dist, rExpected },
+        });
+      }
     }
-  }
-  return issues;
+    return issues;
 };
 
 }
@@ -2739,9 +2804,9 @@ import { JSX, useEffect, useMemo, useState } from "react";
 import { NodeConfig } from "./graph/types";
 import { Vector } from "./core/geometry";
 import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
-import { LabeledSlider, Segmented } from "./ui/controls";
+import { LabeledSlider, Segmented } from "./ui/controls/controls";
 import { Shell } from "./ui/styles";
-import { Configurator } from "./ui/Configurator";
+import { Configurator } from "./ui/controls/Configurator";
 import { Target } from "./adapters/env";
 import { LayoutView } from "./render/views/LayoutView";
 import { createLayoutAPI } from "./layout/api";
@@ -2952,8 +3017,8 @@ import type { RenderPort, RenderSession } from "./types";
 import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
 import { defaultTheme } from "../../adapters/theme";
-import { drawLayoutToCanvas } from "../../adapters/targets/canvas.core";
-// src/components/render/ports/canvas.port.ts
+import { CanvasRenderer2D } from "../../adapters/targets/canvas.core";
+
 export class CanvasPort implements RenderPort {
   mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
     const canvas = document.createElement("canvas");
@@ -2964,8 +3029,12 @@ export class CanvasPort implements RenderPort {
     const rect = container.getBoundingClientRect();
     canvas.width = Math.max(1, Math.round(rect.width * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
+
+    // set the device-pixel transform before constructing the renderer (same context)
     const ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const renderer = new CanvasRenderer2D(canvas, theme);
 
     const toLegacy = (s: LayoutSnapshot) => ({
       boxes: Object.fromEntries(
@@ -2974,15 +3043,16 @@ export class CanvasPort implements RenderPort {
           { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
         ])
       ),
-      wires: s.wires.map((w) => ({ source: w.source, target: w.target, polyline: w.polyline })),
+      wires: s.wires.map((w) => ({ id: w.id, source: w.source, target: w.target, polyline: w.polyline })),
     });
 
     let last = initial;
+    renderer.fullDraw(toLegacy(initial));
+
     const draw = (s: LayoutSnapshot) => {
       last = s;
-      drawLayoutToCanvas(ctx, toLegacy(s), theme);
+      renderer.update(toLegacy(s), { partial: true });
     };
-    draw(initial);
 
     const ro = new ResizeObserver(() => {
       const rr = container.getBoundingClientRect();
@@ -2992,7 +3062,7 @@ export class CanvasPort implements RenderPort {
         canvas.width = w;
         canvas.height = h;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        draw(last); // redraw after resize
+        renderer.fullDraw(toLegacy(last)); // full redraw after resize
       }
     });
     ro.observe(container);
@@ -3002,12 +3072,9 @@ export class CanvasPort implements RenderPort {
       destroy: () => {
         try {
           ro.disconnect();
-          if (canvas.parentNode === container) {
-            container.removeChild(canvas);
-          } else {
-            canvas.remove?.();
-          }
-        } catch { /* swallow */ }
+          if (canvas.parentNode === container) container.removeChild(canvas);
+          else canvas.remove?.();
+        } catch {}
       },
     };
   }
@@ -3394,7 +3461,7 @@ export function snapshotToSVG(s: LayoutSnapshot): string {
 
 ```
 
-### src/components/ui/Configurator.tsx
+### src/components/ui/controls/Configurator.tsx
 
 ``` tsx
 import { 
@@ -3406,11 +3473,11 @@ import {
   Select, 
   SelectOption
 } from "./controls";
-import { NodeConfig } from "../graph/types";
+import { NodeConfig } from "../../graph/types";
 import { 
   LayoutChildrenMode, 
   LayoutTypes 
-} from "../layout/layout.enum";
+} from "../../layout/layout.enum";
 
 type Scope = "all" | string;
 
@@ -3656,7 +3723,7 @@ export const Configurator = (
 
 ```
 
-### src/components/ui/controls.tsx
+### src/components/ui/controls/controls.tsx
 
 ``` tsx
 import { JSX } from "react";
@@ -3859,7 +3926,7 @@ export function TestbedMatrix(): JSX.Element {
 
 ```
 
-### src/components/ui/styles.ts
+### src/components/ui/styles/styles.ts
 
 ``` ts
 export type ShellStyles = 

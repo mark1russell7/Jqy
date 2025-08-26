@@ -2,9 +2,9 @@ import "reactflow/dist/style.css";
 import { JSX, useEffect, useMemo, useState } from "react";
 import { NodeConfig } from "./graph/types";
 import { Vector } from "./core/geometry";
-import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
+import { EdgeLineType, InputKind, LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
 import { LabeledSlider, Segmented } from "./ui/controls/controls";
-import { Shell } from "./ui/styles";
+import { Shell } from "./ui/styles/styles";
 import { Configurator } from "./ui/controls/Configurator";
 import { Target } from "./adapters/env";
 import { LayoutView } from "./render/views/LayoutView";
@@ -88,9 +88,10 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
     return createLayoutAPI(ctx);
   }, [logLevel]);
 
-  const input: GraphInput = useMemo(() => ({ kind: "tree", root: effectiveConfig }), [effectiveConfig]);
+  const input: GraphInput = useMemo(() => (
+    { kind: InputKind.Tree, root: effectiveConfig }), [effectiveConfig]);
 
-  const [routerName, setRouterName] = useState<"line" | "ortho">("line");
+  const [routerName, setRouterName] = useState<EdgeLineType>(EdgeLineType.Straight);
   const snapshot = useMemo(
     () =>
       api.compute(input, {
@@ -107,13 +108,14 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
     [layoutName, modes]
   );
 
-  useEffect(() => {
-    if (nestedGridActive) {
-      setSpacing(LIMITS.spacing.min);
-      setNodeW(LIMITS.nodeW.max);
-      setNodeH(LIMITS.nodeH.max);
-    }
-  }, [nestedGridActive]);
+  // useEffect(() => {
+  //   if (nestedGridActive) {
+  //     setSpacing(LIMITS.spacing.min);
+  //     setNodeW(LIMITS.nodeW.max);
+  //     setNodeH(LIMITS.nodeH.max);
+  //   }
+  // }, [nestedGridActive]);
+  const recommended = { spacing: LIMITS.spacing.min, nodeW: LIMITS.nodeW.max, nodeH: LIMITS.nodeH.max };
 
   return (
     <div style={Shell.outer}>
@@ -141,8 +143,30 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
           ]}
         />
         <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
-        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
-        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} /> 
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} />
+        {nestedGridActive && (
+          <button
+            onClick={() => {
+              setSpacing(recommended.spacing);
+              setNodeW(recommended.nodeW);
+              setNodeH(recommended.nodeH);
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #d0d7de",
+              background: "#f8fafc",
+              fontSize: 12,
+              marginLeft: 8,
+              color : "black"
+            }}
+            title="Snap spacing & node size to grid-friendly values"
+          >
+            Apply Slider Recommendations
+          </button>
+        )}
+        
         <Configurator
           root={config}
           modes={modes}
@@ -161,14 +185,14 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
       <div style={Shell.left}>
         <div style={Shell.title}>Graph (Edges)</div>
         <div style={Shell.rf}>
-          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} />
+          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} unifiedZoom showZoomControls />
         </div>
       </div>
 
       <div style={Shell.right}>
         <div style={Shell.title}>Right Pane: {adapter}</div>
         <div style={{ position: "absolute", inset: 0 }}>
-          <LayoutView kind={adapter} snapshot={snapshot} />
+          <LayoutView kind={adapter} snapshot={snapshot} unifiedZoom showZoomControls />
         </div>
       </div>
     </div>

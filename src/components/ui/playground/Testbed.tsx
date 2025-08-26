@@ -1,5 +1,5 @@
 import { JSX, useMemo } from "react";
-import { LayoutTypes, LayoutChildrenMode } from "../../layout/layout.enum";
+import { LayoutTypes, LayoutChildrenMode, InputKind, EdgeLineType } from "../../layout/layout.enum";
 import { Target } from "../../adapters/env";
 import { createLayoutAPI } from "../../layout/api";
 import type { GraphInput } from "../../layout/api";
@@ -33,7 +33,7 @@ const TREE: NodeConfig = Object.freeze({
 
 export function TestbedMatrix(): JSX.Element {
   const api = useMemo(() => createLayoutAPI(), []);
-  const input: GraphInput = { kind: "tree", root: TREE };
+  const input: GraphInput = { kind: InputKind.Tree, root: TREE };
   const spacing = 24;
   const nodeSize = new Vector(110, 54);
 
@@ -49,8 +49,8 @@ export function TestbedMatrix(): JSX.Element {
             // apply layout at root for visual variation
             cfg.layout = L;
 
-            const snap = api.compute(input.kind === "tree" ? { kind: "tree", root: cfg } : input, {
-              nodeSize, spacing, routerName: "line",
+            const snap = api.compute(input.kind === InputKind.Tree ? { kind: InputKind.Tree, root: cfg } : input, {
+              nodeSize, spacing, routerName: EdgeLineType.Straight,
             });
 
             const key = `${r}-${L}-${M}`;

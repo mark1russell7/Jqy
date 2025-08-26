@@ -3,6 +3,7 @@ import type { Graph } from "../../../graph/model";
 import { fromTree } from "../../../graph/builders/tree";
 import type { NodeConfig } from "../../../graph/types";
 import { makePhase, type Phase } from "./contracts";
+import { InputKind } from "../../layout.enum";
 
 export type Parsed = {
   graph: Graph;
@@ -11,7 +12,7 @@ export type Parsed = {
 };
 
 export function parse(input: GraphInput): Parsed {
-  if (input.kind === "tree") {
+  if (input.kind === InputKind.Tree) {
     const graph = fromTree(input.root);
     return { graph, tree: input.root };
   }

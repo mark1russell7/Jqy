@@ -29,8 +29,17 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
     overrides?.layouts ??
     (() => {
       const layoutRegistry = new InMemoryLayoutRegistry();
-      layoutRegistry.register(LayoutTypes.Grid, new GridLayout(tunings, createDefaultIteratorRegistry(tunings)));
-      layoutRegistry.register(LayoutTypes.Radial, new RadialLayout(tunings));
+      // ⬇️ replace strategy registrations to pass limits too
+      layoutRegistry.register(
+        LayoutTypes.Grid,
+        new GridLayout(tunings, limits, createDefaultIteratorRegistry(tunings))
+      );
+      layoutRegistry.register(
+        LayoutTypes.Radial,
+        new RadialLayout(tunings, limits)
+      );
+
+
       return layoutRegistry;
     })();
 

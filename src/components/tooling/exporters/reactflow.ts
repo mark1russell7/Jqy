@@ -19,11 +19,19 @@ export function toReactFlow(snapshot: LayoutSnapshot): { nodes: Node[]; edges: E
     return b.parentId ? { ...base, parentNode: b.parentId, extent: "parent" } : base;
   });
 
-  const edges: Edge[] = (snapshot.wires ?? []).map((w) => ({
-    id: w.id,
-    source: w.source,
-    target: w.target,
-  }));
+
+  const edges = snapshot.wires.map((w, i) => {
+    const hasPolyline = !!(w.polyline && w.polyline.length >= 2);
+    return {
+      id: w.id ?? String(i),
+      source: w.source,
+      target: w.target,
+      type: hasPolyline ? "poly" : "default",
+      data: hasPolyline
+        ? { polyline: w.polyline!.map((p) => ({ x: p.x, y: p.y })) }
+        : undefined,
+    };
+  });
 
   return { nodes, edges };
 }

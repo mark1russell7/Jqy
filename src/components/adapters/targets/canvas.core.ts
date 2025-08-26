@@ -164,7 +164,7 @@ function roundedRect(ctx: CanvasRenderingContext2D, rectangle: Shapes.Rectangle,
 }
 
 /* ------------------------------- diff helpers ------------------------------ */
-
+// move these to Shapes.Rectangle:
 function rectOfBox(b: LegacyBox): Rect {
   const p = b.getPosition();
   const s = b.getSize();

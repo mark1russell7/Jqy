@@ -9,9 +9,8 @@ import { GridItem } from "./grid";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
 import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
-import { IterationConfig } from "../../limits";
+import { IterationLimits } from "../../limits";
 import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
-import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
 import { AuditIssue } from "../../../tooling/diagnostics/audit";
 
 /* ===== utilities ===== */
@@ -29,13 +28,17 @@ export const splitEven = (total: number, parts: number): SplitEvenReturn => {
 export class GridLayout extends Layout {
   constructor(
     private tuning: Config<LayoutTuning> = LayoutTuningConfig,
+    private limits: Config<IterationLimits>,
     private iters: IteratorRegistry = createDefaultIteratorRegistry(LayoutTuningConfig)
-  ) { super(); }
+  ) { 
+    super(); 
+    
+  }
 
   /* ---------- frames (grid cell mapping inside padded content) ---------- */
   nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -62,8 +65,8 @@ export class GridLayout extends Layout {
   /* ---------- extended placement (strategies own child sizes) ---------- */
   placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
     const { children, nodeSize, spacing, origin, parentSize, mode, level, childModes } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -112,8 +115,8 @@ export class GridLayout extends Layout {
   /* ---------- legacy centers (kept for back-compat) ---------- */
   placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn => {
     const { children, nodeSize, spacing, origin, parentSize, mode } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -160,7 +163,7 @@ export class GridLayout extends Layout {
     const inner: Vector = rowCol.multiply(cell);
     return inner.add(Vector.scalar(2 * pad));
   };
-    auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
+  auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
     const issues : AuditIssue[] = [];
     const p = snapshot.boxes[parentId];
     if (!p) return issues;

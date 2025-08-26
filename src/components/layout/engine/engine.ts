@@ -10,7 +10,7 @@ import { createDefaultSystem } from "./context";
 import type { LayoutSnapshot } from "../types";
 import { Vector } from "../../core/geometry";
 import { InMemoryLayoutRegistry } from "../registries/layout.registry";
-import { LayoutTypes } from "../layout.enum";
+import { EdgeLineType, LayoutTypes } from "../layout.enum";
 import { GridLayout } from "../strategies/grid/grid.layout";
 import { RadialLayout } from "../strategies/radial/radial.layout";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
@@ -41,11 +41,15 @@ export class PipelineEngine {
 
     // Layout registry must be recreated when tunings change (strategies capture tunings).
     const effectiveLayouts = new InMemoryLayoutRegistry();
+    // engine/engine.ts
     effectiveLayouts.register(
       LayoutTypes.Grid,
-      new GridLayout(effectiveTunings, createDefaultIteratorRegistry(effectiveTunings))
+      new GridLayout(effectiveTunings, effectiveLimits, createDefaultIteratorRegistry(effectiveTunings))
     );
-    effectiveLayouts.register(LayoutTypes.Radial, new RadialLayout(effectiveTunings));
+    effectiveLayouts.register(
+      LayoutTypes.Radial,
+      new RadialLayout(effectiveTunings, effectiveLimits)
+    );
 
     const localCtx: SystemContext = {
       ...this.ctx,
@@ -61,7 +65,7 @@ export class PipelineEngine {
       collectOverlaps: !!opts.collectOverlaps,
     });
 
-    const routed = route(placed, localCtx, undefined, opts.routerName ?? "line");
+    const routed = route(placed, localCtx, undefined, opts.routerName ?? EdgeLineType.Straight);
     let snapshot = post(routed);
 
     // Diagnostics audit (non-fatal, attach to meta)

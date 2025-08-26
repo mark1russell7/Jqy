@@ -2,13 +2,14 @@ import type { LayoutSnapshot } from "../../types";
 import type { SystemContext } from "../context";
 import type { Edge } from "../../api/contracts";
 import { sliceBound } from "../../../iteration/iterate";
+import { EdgeLineType } from "../../layout.enum";
 
 /** Route wires using the chosen router; respects edge limits policy. */
 export function route(
   snapshot: LayoutSnapshot,
   ctx: SystemContext,
   _edges?: Edge[],
-  routerName = "line"
+  routerName : EdgeLineType = EdgeLineType.Straight
 ): LayoutSnapshot {
   const router = ctx.routers.get(routerName);
   const maxEdges = ctx.limits.get("maxEdges");
