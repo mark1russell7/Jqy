@@ -423,5 +423,3 @@ See the **Source Catalog** you shared; the important leaf modules:
 * Log at **Debug** in noisy loops; Warn/Error only for audit failures or limits.
 
 ---
-
-If you want, I can drop this straight into a `README.md` and add the Testbed + audit sections as checkboxes in a “Status” chapter.
