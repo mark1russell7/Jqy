@@ -1,12 +1,5 @@
-import { Vector } from "../core/geometry";
-
-export type Box = {
-  id: string;
-  position: Vector;  // top-left
-  size: Vector;
-  parentId?: string;
-  depth: number;
-};
+import { Shapes } from "../core/geometry/shapes";
+import { Vector } from "../core/geometry/vectors";
 
 export type Wire = { id: string; source: string; target: string; polyline?: Vector[] };
 
@@ -19,7 +12,7 @@ export type LayoutStats = {
 };
 
 export type LayoutSnapshot = Readonly<{
-  boxes: Readonly<Record<string, Box>>;
+  boxes: Readonly<Record<string, Shapes.Box>>;
   wires: ReadonlyArray<Wire>;
   stats: LayoutStats;
   version: number;

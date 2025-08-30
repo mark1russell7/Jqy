@@ -39,10 +39,12 @@ export class DomPort implements RenderPort {
     };
     const offVp = vp?.onChange(syncTransform);
     syncTransform();
+    const nodeEls = new Map<string, HTMLDivElement>();
+    const edgeEls = new Map<string, SVGElement>();
 
     const draw = (s: LayoutSnapshot) => {
-      nodesLayer.querySelectorAll("[data-node]").forEach((n) => n.remove());
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      // nodesLayer.querySelectorAll("[data-node]").forEach((n) => n.remove());
+      // while (svg.firstChild) svg.removeChild(svg.firstChild);
 
       const b = s.stats.bounds;
       const stageW = Math.max(1, Math.ceil(b.size.x));
@@ -52,46 +54,67 @@ export class DomPort implements RenderPort {
       svg.setAttribute("height", String(stageH));
 
       // wires (local coords inside stage)
+      const nextEdgeIds = new Set<string>();
       for (const w of s.wires) {
-        if (w.polyline && w.polyline.length >= 2) {
-          const poly = document.createElementNS(svgNS, "polyline");
-          poly.setAttribute("points", w.polyline.map(p => `${p.x - b.position.x},${p.y - b.position.y}`).join(" "));
-          poly.setAttribute("fill", "none");
-          poly.setAttribute("stroke", theme.wire.stroke);
-          poly.setAttribute("stroke-width", String(theme.wire.width));
-          svg.appendChild(poly);
-          continue;
+          const id = w.id!;
+          nextEdgeIds.add(id);
+          let el = edgeEls.get(id);
+          if (!el) {
+            el = w.polyline?.length
+              ? document.createElementNS(svgNS, "polyline")
+              : document.createElementNS(svgNS, "line");
+            edgeEls.set(id, el);
+            svg.appendChild(el);
+          }
+          if (w.polyline?.length) {
+            (el as SVGPolylineElement).setAttribute("points", w.polyline.map(p => `${p.x - b.position.x},${p.y - b.position.y}`).join(" "));
+          } else {
+            const a = s.boxes[w.source], c = s.boxes[w.target];
+            if (!a || !c) continue;
+            const A = a.position.add(a.size.halve()).subtract(b.position);
+            const B = c.position.add(c.size.halve()).subtract(b.position);
+            (el as SVGLineElement).setAttribute("x1", String(A.x));
+            (el as SVGLineElement).setAttribute("y1", String(A.y));
+            (el as SVGLineElement).setAttribute("x2", String(B.x));
+            (el as SVGLineElement).setAttribute("y2", String(B.y));
+          }
+          el.setAttribute("stroke", theme.wire.stroke);
+          el.setAttribute("stroke-width", String(theme.wire.width));
+          (el as any).style = "pointer-events:none";
         }
-        const a = s.boxes[w.source], c = s.boxes[w.target];
-        if (!a || !c) continue;
-        const A = a.position.add(a.size.halve()).subtract(b.position);
-        const B = c.position.add(c.size.halve()).subtract(b.position);
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", String(A.x)); line.setAttribute("y1", String(A.y));
-        line.setAttribute("x2", String(B.x)); line.setAttribute("y2", String(B.y));
-        line.setAttribute("stroke", theme.wire.stroke);
-        line.setAttribute("stroke-width", String(theme.wire.width));
-        svg.appendChild(line);
-      }
-
+           // remove stale edges
+      for (const [id, el] of edgeEls) if (!nextEdgeIds.has(id)) { el.remove(); edgeEls.delete(id); }
+ // --- Nodes ---
+      const nextNodeIds = new Set<string>();
       for (const bx of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
-        const el = document.createElement("div");
-        el.dataset.node = bx.id;
-        const st = el.style;
-        st.position = "absolute";
-        st.left = `${bx.position.x - b.position.x}px`;
-        st.top = `${bx.position.y - b.position.y}px`;
-        st.width = `${bx.size.x}px`; st.height = `${bx.size.y}px`;
-        st.border = `1px solid ${theme.node.border}`;
-        st.borderRadius = `${theme.node.radius}px`;
-        st.background = theme.node.bg;
-        st.boxSizing = "border-box"; st.fontSize = `${theme.node.fontSize}px`; st.color = theme.node.text;
-        st.display = "flex"; st.alignItems = "center"; st.justifyContent = "center";
-        (st as any).userSelect = "none";
-        el.textContent = bx.id;
-        nodesLayer.appendChild(el);
+        nextNodeIds.add(bx.id);
+        let el = nodeEls.get(bx.id);
+        if (!el) {
+          el = document.createElement("div");
+          el.dataset.node = bx.id;
+          el.style.position = "absolute";
+          el.style.border = `1px solid ${theme.node.border}`;
+          el.style.borderRadius = `${theme.node.radius}px`;
+          el.style.background = theme.node.bg;
+          el.style.boxSizing = "border-box";
+          el.style.fontSize = `${theme.node.fontSize}px`;
+          el.style.color = theme.node.text;
+          el.style.display = "flex";
+          el.style.alignItems = "center";
+          el.style.justifyContent = "center";
+          (el.style as any).userSelect = "none";
+          el.textContent = bx.id;
+          nodeEls.set(bx.id, el);
+          nodesLayer.appendChild(el);
+        }
+        el.style.left = `${bx.position.x - b.position.x}px`;
+        el.style.top = `${bx.position.y - b.position.y}px`;
+        el.style.width = `${bx.size.x}px`;
+        el.style.height = `${bx.size.y}px`;
       }
-    };
+      // remove stale nodes
+      for (const [id, el] of nodeEls) if (!nextNodeIds.has(id)) { el.remove(); nodeEls.delete(id); }
+    }
 
     draw(initial);
     let detachInputs: (() => void) | undefined;

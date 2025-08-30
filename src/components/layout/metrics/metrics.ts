@@ -1,9 +1,10 @@
-import { Vector } from "../../core/geometry";
-import type { Box, Wire, LayoutStats, LayoutSnapshot } from "../types";
+import { Shapes } from "../../core/geometry/shapes";
+import { Vector } from "../../core/geometry/vectors";
+import type { Wire, LayoutStats, LayoutSnapshot } from "../types";
 
 export type Bounds = { position: Vector; size: Vector };
 
-export function boundsOf(boxes: Iterable<Box>): Bounds {
+export function boundsOf(boxes: Iterable<Shapes.Box>): Bounds {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let any = false;
   for (const b of boxes) {
@@ -17,28 +18,96 @@ export function boundsOf(boxes: Iterable<Box>): Bounds {
   return { position: new Vector(minX, minY), size: new Vector(maxX - minX, maxY - minY) };
 }
 
-export function overlapsOf(boxes: readonly Box[]): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  for (let i = 0; i < boxes.length; i++) {
-    const A = boxes[i];
-    const ax2 = A.position.x + A.size.x, ay2 = A.position.y + A.size.y;
-    for (let j = i + 1; j < boxes.length; j++) {
-      const B = boxes[j];
-      const bx2 = B.position.x + B.size.x, by2 = B.position.y + B.size.y;
-      const separated = ax2 <= B.position.x || bx2 <= A.position.x || ay2 <= B.position.y || by2 <= A.position.y;
-      if (!separated) out.push([A.id, B.id]);
+export function overlapsOf(boxes : readonly Shapes.Box[]) : Array<[string, string]> 
+{
+  const out : Array<[string, string]> = [];
+  for (let i : number = 0; i < boxes.length; i++) 
+  {
+    const A : Shapes.Box = boxes[i];
+    const a2 : Vector = A.position.add(A.size);
+    for (let j : number = i + 1; j < boxes.length; j++) 
+    {
+      const B : Shapes.Box = boxes[j];
+      const b2 : Vector = B.position.add(B.size);
+
+      const a2Bound : Vector = a2.subtract(B.position);
+      const b2Bound : Vector = b2.subtract(A.position);
+
+      const separated : boolean = a2Bound.anyNonPositive() || b2Bound.anyNonPositive();
+      if (!separated) 
+      {
+        out.push([A.id, B.id]);
+      }
     }
   }
   return out;
 }
 
-export function maxDepthOf(boxes: Iterable<Box>): number {
+// src/components/layout/metrics/metrics.ts
+export function overlapsOfFast(boxes : readonly Shapes.Box[], cellSize : number = 128) : Array<[string, string]> 
+{
+  const grid : Map<string, string[]> = new Map<string, string[]>();
+  const key = (x: number, y: number) => `${x}|${y}`;
+  const visit = (b: Shapes.Box, cb: (otherId: string) => void) => 
+  {
+    const p1 : Vector = b.position.divide(Vector.scalar(cellSize)).floor();
+    const p2 : Vector = b.position.add(b.size).divide(Vector.scalar(cellSize)).floor();
+    const hit : Set<string> = new Set<string>();
+
+    p1.traverseGridTo(p2, (p) => 
+    {
+      const k = key(p.x, p.y);
+      const ids = grid.get(k) ?? [];
+      for (const id of ids) 
+      {
+        if (!hit.has(id)) 
+        {
+          cb(id);
+          hit.add(id);
+        }
+      }
+    });
+  };
+  const out: Array<[string, string]> = [];
+  for (const b of boxes) 
+  {
+    visit(
+            b, 
+            (id) => 
+                    {
+                      const A = b;
+                      const B = boxes.find(x => x.id === id)!;
+
+                      const aBound = A.position.add(A.size).subtract(B.position);
+                      const bBound = B.position.add(B.size).subtract(A.position);
+                      const sep = aBound.anyNonPositive() || bBound.anyNonPositive();
+
+                      if (!sep) 
+                      {
+                        out.push([A.id, B.id]);
+                      }
+                    }
+          );
+    const p1 = b.position.divide(Vector.scalar(cellSize)).floor();
+    const p2 = b.position.subtract(b.size).divide(Vector.scalar(cellSize)).floor();
+    p1.traverseGridTo(p2, (p) => {
+      const k = key(p.x, p.y);
+      const arr = grid.get(k) ?? [];
+      arr.push(b.id);
+      grid.set(k, arr);
+    });
+  }
+  return out;
+}
+
+
+export function maxDepthOf(boxes: Iterable<Shapes.Box>): number {
   let md = 0;
   for (const b of boxes) if (b.depth > md) md = b.depth;
   return md;
 }
 
-export function edgeLengthStats(wires: readonly Wire[], boxes: Readonly<Record<string, Box>>): { total: number; mean: number; min: number; max: number } {
+export function edgeLengthStats(wires: readonly Wire[], boxes: Readonly<Record<string, Shapes.Box>>): { total: number; mean: number; min: number; max: number } {
   let total = 0, min = Infinity, max = -Infinity, count = 0;
   for (const w of wires) {
     let length = 0;
@@ -63,9 +132,9 @@ export function edgeLengthStats(wires: readonly Wire[], boxes: Readonly<Record<s
 export function statsOfSnapshot(s: Pick<LayoutSnapshot, "boxes" | "wires">, opts: { collectOverlaps?: boolean } = {}): LayoutStats {
   const arr = Object.values(s.boxes);
   const bounds = boundsOf(arr);
-  const overlaps = opts.collectOverlaps ? overlapsOf(arr) : undefined;
+  const overlaps = opts.collectOverlaps ? overlapsOfFast(arr) : undefined;
   const maxDepth = maxDepthOf(arr);
-  return {
+  return {   
     nodeCount: arr.length,
     edgeCount: s.wires.length,
     maxDepth,

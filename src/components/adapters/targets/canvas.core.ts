@@ -186,8 +186,15 @@ function lineBounds(a: Vector, b: Vector, pad = 1): Rect {
   return inflate({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, pad);
 }
 
+function polylineBounds(poly: Vector[], pad = 1): Rect {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of poly) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+  return inflate({ x: minX, y: minY, w: maxX - minX, h: maxY - minY }, pad);
+}
+
 function diffDirtyRect(prev: CanvasLayout, next: CanvasLayout, pad = 0): Rect | null {
   let dirty: Rect | null = null;
+  // 1) Box changes
   const ids = new Set<string>([...Object.keys(prev.boxes), ...Object.keys(next.boxes)]);
 
   for (const id of ids) {
@@ -201,6 +208,16 @@ function diffDirtyRect(prev: CanvasLayout, next: CanvasLayout, pad = 0): Rect | 
       }
     }
   }
+  // 2) Wire changes: union bounds of prev+next polylines,
+  //    OR link centers if endpoints moved (existing logic).
+  const addWire = (w: { polyline?: Vector[]; source: string; target: string }) => {
+    if (w.polyline && w.polyline.length >= 2) dirty = union(dirty, polylineBounds(w.polyline, pad + 1));
+  };
+  
+
+  // cover both states
+  for (const w of next.wires) addWire(w);
+  for (const w of prev.wires) addWire(w);
 
   if (dirty) {
     const changed = new Set<string>();
@@ -213,10 +230,7 @@ function diffDirtyRect(prev: CanvasLayout, next: CanvasLayout, pad = 0): Rect | 
       }
     }
     for (const w of next.wires) {
-      if (w.polyline && w.polyline.length >= 2) {
-        // conservative: union all segments
-        for (let i = 1; i < w.polyline.length; i++) dirty = union(dirty, lineBounds(w.polyline[i - 1], w.polyline[i], pad + 1));
-      } else if (changed.has(w.source) || changed.has(w.target)) {
+      if (!w.polyline && (changed.has(w.source) || changed.has(w.target))) {
         const a = next.boxes[w.source]; const b = next.boxes[w.target];
         if (a && b) {
           const ca = a.getSize().halve().add(a.getPosition());

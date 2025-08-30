@@ -1,6 +1,7 @@
 // iteration/iterate.ts
 import { Logger } from "../core/logging/logger";
 
+import { LimitError } from "../errors";
 export type LimitAction = "throw" | "truncate" | "warn";
 
 export function enforceBound(
@@ -10,18 +11,18 @@ export function enforceBound(
     action: LimitAction,
     log?: Logger
 ): number {
-    if (count <= limit) return count;
-    const ctx = { label, count, limit, action };
-    switch (action) {
-        case "throw":
-            throw new Error(`${label}: limit ${limit} exceeded (count=${count})`);
-        case "warn":
-            log?.warn(`${label}: trimming to limit`, ctx);
-            return limit;
-        case "truncate":
-        default:
-            return limit;
-    }
+  if (count <= limit) return count;
+  const ctx = { label, count, limit, action };
+  switch (action) {
+    case "throw":
+      throw new LimitError("LIMIT_MAX_NODES", `${label}: limit ${limit} exceeded (count=${count})`, ctx);
+    case "warn":
+      log?.warn(`${label}: trimming to limit`, ctx);
+      return limit;
+    case "truncate":
+    default:
+      return limit;
+  }
 }
 
 export function timesBounded(

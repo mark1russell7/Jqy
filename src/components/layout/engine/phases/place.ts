@@ -6,19 +6,14 @@ import { LayoutChildrenMode } from "../../layout.enum";
 import type { LayoutSnapshot, Box, Wire } from "../../types";
 import type { NodeConfig } from "../../../graph/types";
 import { makePhase, type Phase } from "./contracts";
-import { boundsOf, overlapsOf } from "../../metrics/metrics";
+import { boundsOf, overlapsOf, overlapsOfFast } from "../../metrics/metrics";
+import { Edge, NodeAttrs } from "../../api/contracts";
 
-export function place(
+function stackFallback(
   parsed: Parsed,
-  plan: Plan,
-  ctx: SystemContext,
-  options: { nodeSize: Vector; spacing: number; collectOverlaps: boolean }
-): LayoutSnapshot {
-  if (parsed.tree) {
-    const tp = new TreePlacer(plan, ctx, options);
-    return tp.run(parsed.tree);
-  }
-
+  options: { nodeSize: Vector; spacing: number }
+) : LayoutSnapshot
+{
   // Graph fallback (no tree): simple stacked layout
   const ids = Object.keys(parsed.graph.nodes);
   const boxes: Record<string, Box> = {};
@@ -31,6 +26,79 @@ export function place(
   const bounds = boundsOf(Object.values(boxes));
   const stats = { nodeCount: ids.length, edgeCount: wires.length, maxDepth: 0, bounds };
   return { boxes, wires, stats, version: Date.now() };
+
+}
+
+// Very small topo layering (ignores cycles; they’ll fall back to layer 0)
+function topoLayers(nodes: Record<string, NodeAttrs>, edges: Edge[]): string[][] {
+  const indeg = new Map<string, number>();
+  Object.keys(nodes).forEach(id => indeg.set(id, 0));
+  for (const e of edges) if (indeg.has(e.target)) indeg.set(e.target, (indeg.get(e.target) || 0) + 1);
+
+  const L: string[][] = [];
+  let S = Array.from(indeg.entries()).filter(([,d]) => d === 0).map(([id]) => id);
+  const rem = new Set(Object.keys(nodes));
+
+  while (S.length) {
+    L.push(S);
+    S = [];
+    for (const u of L[L.length - 1]) {
+      rem.delete(u);
+      for (const e of edges) if (e.source === u && indeg.has(e.target)) {
+        const d = indeg.get(e.target)! - 1;
+        indeg.set(e.target, d);
+        if (d === 0) S.push(e.target);
+      }
+    }
+  }
+  if (rem.size) L.push([...rem]); // leftover (cycles)
+  return L;
+}
+
+
+export function place(
+  parsed: Parsed,
+  plan: Plan,
+  ctx: SystemContext,
+  options: { nodeSize: Vector; spacing: number; collectOverlaps: boolean }
+): LayoutSnapshot {
+  if (parsed.tree) {
+    const tp = new TreePlacer(plan, ctx, options);
+    return tp.run(parsed.tree);
+  }
+
+  const { nodes, edges } = parsed.graph;
+  const layers = topoLayers(nodes, edges);
+  const boxes: Record<string, Box> = {};
+  const { nodeSize, spacing } = options;
+
+  let y = 0;
+  for (const layer of layers) {
+    const totalW = layer.length * (nodeSize.x + spacing) - spacing;
+    let x = -Math.floor(totalW / 2);
+    for (const id of layer) {
+      boxes[id] = { id, position: new Vector(x, y), size: nodeSize, depth: 0 };
+      x += nodeSize.x + spacing;
+    }
+    y += nodeSize.y + spacing * 2;
+  }
+  const wires: Wire[] = edges.map((e, i) => ({ id: e.id ?? String(i), source: e.source, target: e.target }));
+  const bounds = boundsOf(Object.values(boxes));
+  const stats = { nodeCount: Object.keys(nodes).length, edgeCount: wires.length, maxDepth: 0, bounds };
+  return { boxes, wires, stats, version: Date.now() };
+
+  // // Graph fallback (no tree): simple stacked layout
+  // const ids = Object.keys(parsed.graph.nodes);
+  // const boxes: Record<string, Box> = {};
+  // let y = 0;
+  // for (const id of ids) {
+  //   boxes[id] = { id, position: new Vector(0, y), size: options.nodeSize, depth: 0 };
+  //   y += options.nodeSize.y + options.spacing;
+  // }
+  // const wires: Wire[] = parsed.graph.edges.map((e, i) => ({ id: e.id ?? String(i), source: e.source, target: e.target }));
+  // const bounds = boundsOf(Object.values(boxes));
+  // const stats = { nodeCount: ids.length, edgeCount: wires.length, maxDepth: 0, bounds };
+  // return { boxes, wires, stats, version: Date.now() };
 }
 
 /* =========================== helpers / classes =========================== */
@@ -62,7 +130,7 @@ class TreePlacer {
 
     const boxes = this.boxes;
     const bounds = boundsOf(Object.values(boxes));
-    const overlaps = this.opts.collectOverlaps ? overlapsOf(Object.values(boxes)) : undefined;
+    const overlaps = this.opts.collectOverlaps ? overlapsOfFast(Object.values(boxes)) : undefined;
 
     return {
       boxes,

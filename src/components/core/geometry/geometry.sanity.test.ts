@@ -1,4 +1,4 @@
-import { Vector } from "./index";
+import { Vector } from "./vectors";
 
 export const geometrySanityNoop = () => {
     console.log(new Vector(3, 4).length()); // 5

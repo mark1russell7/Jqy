@@ -8,6 +8,7 @@ import { CanvasPort } from "../ports/canvas.port";
 import { toReactFlow } from "../../tooling/exporters/reactflow";
 import type { RenderSession } from "../ports/types";
 import { ViewportController } from "../ports/viewport";
+import PolylineEdge from "./edges/PolylineEdge";
 
 type Props = {
   kind: Target;
@@ -54,7 +55,11 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme, unifiedZoom =
 
   // top bar controls for zoom
   const [dummy, setDummy] = useState(0); // force refresh label
-  useEffect(() => vpRef.current?.onChange(() => setDummy((v) => v + 1)), []);
+  useEffect(() => {
+    if (!vpRef.current) return;
+    const off = vpRef.current.onChange(() => setDummy((v) => v + 1));
+    return off; // <— unsubscribe
+  }, []);
 
   const ZoomBar = () => {
     if (!showZoomControls || !vpRef.current) return null;
@@ -73,11 +78,12 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme, unifiedZoom =
       </div>
     );
   };
+  const edgeTypes = useMemo(() => ({ poly: PolylineEdge }), []);
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {kind === Target.ReactFlow ? (
-        <ReactFlow nodes={nodes} edges={edges} fitView>
+        <ReactFlow nodes={nodes} edges={edges} edgeTypes={edgeTypes} fitView>
           <Background gap={16} />
           <Controls />
         </ReactFlow>

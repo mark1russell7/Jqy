@@ -16,8 +16,11 @@ export class CanvasPort implements RenderPort {
     Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
     container.appendChild(canvas);
 
-    let dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
+    // REPLACE: compute DPR on demand
+    const getDpr = () => Math.max(1, (window.devicePixelRatio as number) || 1);
+    let dpr = getDpr();
     const sizeCanvas = () => {
+      dpr = getDpr(); // <— recompute here
       const rect = container.getBoundingClientRect();
       canvas.width = Math.max(1, Math.round(rect.width * dpr));
       canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -74,6 +77,10 @@ export class CanvasPort implements RenderPort {
     let detachInputs: (() => void) | undefined;
     if (opts?.interactive && opts.viewport) detachInputs = opts.viewport.attachWheelAndDrag(canvas);
 
+    // (optional) react to DPR changes (Chrome/Edge)
+    const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    const onDprChange = () => { sizeCanvas(); applyTransform(last); renderer.fullDraw(toLegacy(last)); };
+    mq.addEventListener?.("change", onDprChange);
     return {
       draw,
       destroy: () => {

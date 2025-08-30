@@ -1,6 +1,6 @@
 # Source Catalog (TypeScript)
 
-Generated on 2025-08-25T22:23:39.000Z
+Generated on 2025-08-26T02:31:38.167Z
 
 ## Directory structure (src)
 
@@ -58,6 +58,7 @@ Generated on 2025-08-25T22:23:39.000Z
 │   │   ├── metrics/
 │   │   │   └── metrics.ts
 │   │   ├── registries/
+│   │   │   ├── input.registry.ts
 │   │   │   ├── layout.registry.ts
 │   │   │   └── router.registry.ts
 │   │   ├── routers/
@@ -81,10 +82,13 @@ Generated on 2025-08-25T22:23:39.000Z
 │   │   │   ├── anchoring.ts
 │   │   │   ├── canvas.port.ts
 │   │   │   ├── dom.port.ts
-│   │   │   └── types.ts
+│   │   │   ├── types.ts
+│   │   │   └── viewport.ts
 │   │   ├── theme/
 
 │   │   └── views/
+│   │       ├── edges/
+│   │       │   └── PolylineEdge.tsx
 │   │       └── LayoutView.tsx
 │   ├── tooling/
 │   │   ├── diagnostics/
@@ -378,7 +382,7 @@ function roundedRect(ctx: CanvasRenderingContext2D, rectangle: Shapes.Rectangle,
 }
 
 /* ------------------------------- diff helpers ------------------------------ */
-
+// move these to Shapes.Rectangle:
 function rectOfBox(b: LegacyBox): Rect {
   const p = b.getPosition();
   const s = b.getSize();
@@ -533,11 +537,11 @@ export class Config<T extends Record<string, any>> {
 ``` ts
 import { Vector } from "./index";
 
-
-console.log(new Vector(3, 4).length()); // 5
-console.log(new Vector(1, 0).rotate(Math.PI / 2)); // ~ (0,1)
-console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
-
+export const geometrySanityNoop = () => {
+    console.log(new Vector(3, 4).length()); // 5
+    console.log(new Vector(1, 0).rotate(Math.PI / 2)); // ~ (0,1)
+    console.log(new Vector(2, 3).crossProduct(new Vector(5, 7))); // 2*7 - 3*5 = -1
+};
 ```
 
 ### src/components/core/geometry/index.ts
@@ -944,7 +948,7 @@ export function boundedLoop(limit: number, body: (i: number) => boolean): void {
 import { Vector } from "../../core/geometry";
 import { NodeConfig } from "../../graph/types";
 import { IterationLimits } from "../limits";
-import { LayoutChildrenMode, LayoutTypes } from "../layout.enum";
+import { EdgeLineType, InputKind, LayoutChildrenMode, LayoutTypes } from "../layout.enum";
 import { LayoutTuning } from "../layout.tuning";
 
 /** Minimal attrs we may get for a node (graph-agnostic). */
@@ -961,8 +965,8 @@ export type Edge = { id?: string; source: string; target: string; data?: unknown
 
 /** Unified input contract for the pipeline. */
 export type GraphInput =
-  | { kind: "tree"; root: NodeConfig }
-  | { kind: "graph"; nodes: Record<string, NodeAttrs>; edges: Edge[] };
+  | { kind: InputKind.Tree; root: NodeConfig }
+  | { kind: InputKind.Graph; nodes: Record<string, NodeAttrs>; edges: Edge[] };
 
 /** Engine options (all optional & shallow-merged with defaults). */
 export type ComputeOptions = {
@@ -971,7 +975,7 @@ export type ComputeOptions = {
   collectOverlaps?: boolean;
   limitsOverride?: Partial<IterationLimits>;
   tuningOverride?: Partial<LayoutTuning>;
-  routerName?: "line" | "ortho";
+  routerName?: EdgeLineType;
   /** What to do if validate() returns issues. */
   onValidateIssues?: "ok" | "warn" | "error";
 };
@@ -988,11 +992,13 @@ import { createDefaultSystem } from "../engine/context";
 import type { LayoutSnapshot } from "../types";
 import { toReactFlow } from "../../tooling/exporters/reactflow";
 import { snapshotToSVG } from "../../tooling/exporters/svg";
+import { InputAdapter, registerInputAdapter } from "../registries/input.registry";
 
 export interface LayoutAPI {
   compute(input: GraphInput, options?: ComputeOptions): LayoutSnapshot;
   toReactFlow(snapshot: LayoutSnapshot): ReturnType<typeof toReactFlow>;
   toSVG(snapshot: LayoutSnapshot): string;
+  registerInputAdapter(adapter: InputAdapter<any>): void;
 }
 
 export function createLayoutAPI(ctx: SystemContext = createDefaultSystem()): LayoutAPI {
@@ -1005,6 +1011,7 @@ export function createLayoutAPI(ctx: SystemContext = createDefaultSystem()): Lay
     },
     toReactFlow,
     toSVG: snapshotToSVG,
+    registerInputAdapter: (adapter) => registerInputAdapter(ctx, adapter),
   };
 }
 
@@ -1030,6 +1037,7 @@ import type { RouterRegistry } from "../registries/router.registry";
 import { LayoutTypes } from "../layout.enum";
 import { OrthoRouter } from "../routers/ortho.router";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
+import { createDefaultInputRegistry, type InputAdapterRegistry } from "../registries/input.registry";
 
 export type SystemContext = {
   log: Logger;
@@ -1037,6 +1045,7 @@ export type SystemContext = {
   limits: Config<IterationLimits>;
   layouts: LayoutRegistry;
   routers: RouterRegistry;
+  input: InputAdapterRegistry;
 };
 
 export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemContext {
@@ -1047,8 +1056,17 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
     overrides?.layouts ??
     (() => {
       const layoutRegistry = new InMemoryLayoutRegistry();
-      layoutRegistry.register(LayoutTypes.Grid, new GridLayout(tunings, createDefaultIteratorRegistry(tunings)));
-      layoutRegistry.register(LayoutTypes.Radial, new RadialLayout(tunings));
+      // ⬇️ replace strategy registrations to pass limits too
+      layoutRegistry.register(
+        LayoutTypes.Grid,
+        new GridLayout(tunings, limits, createDefaultIteratorRegistry(tunings))
+      );
+      layoutRegistry.register(
+        LayoutTypes.Radial,
+        new RadialLayout(tunings, limits)
+      );
+
+
       return layoutRegistry;
     })();
 
@@ -1060,6 +1078,7 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
       routerRegistry.register("ortho", new OrthoRouter());
       return routerRegistry;
     })();
+  const input = overrides?.input ?? createDefaultInputRegistry();
 
   return {
     log: overrides?.log ?? new NoopLogger(),
@@ -1067,6 +1086,7 @@ export function createDefaultSystem(overrides?: Partial<SystemContext>): SystemC
     limits,
     layouts,
     routers,
+    input
   };
 }
 
@@ -1087,7 +1107,7 @@ import { createDefaultSystem } from "./context";
 import type { LayoutSnapshot } from "../types";
 import { Vector } from "../../core/geometry";
 import { InMemoryLayoutRegistry } from "../registries/layout.registry";
-import { LayoutTypes } from "../layout.enum";
+import { EdgeLineType, LayoutTypes } from "../layout.enum";
 import { GridLayout } from "../strategies/grid/grid.layout";
 import { RadialLayout } from "../strategies/radial/radial.layout";
 import { createDefaultIteratorRegistry } from "../iterator/iterator.registry";
@@ -1101,7 +1121,7 @@ export class PipelineEngine {
   constructor(private ctx: SystemContext = createDefaultSystem()) {}
 
   run(input: GraphInput, opts: ComputeOptions = {}): ComputeResult {
-    const parsed = parse(input);
+    const parsed = parse(input, this.ctx);
     const { issues } = validate(parsed);
 
     const severity = opts.onValidateIssues ?? "ok";
@@ -1118,11 +1138,15 @@ export class PipelineEngine {
 
     // Layout registry must be recreated when tunings change (strategies capture tunings).
     const effectiveLayouts = new InMemoryLayoutRegistry();
+    // engine/engine.ts
     effectiveLayouts.register(
       LayoutTypes.Grid,
-      new GridLayout(effectiveTunings, createDefaultIteratorRegistry(effectiveTunings))
+      new GridLayout(effectiveTunings, effectiveLimits, createDefaultIteratorRegistry(effectiveTunings))
     );
-    effectiveLayouts.register(LayoutTypes.Radial, new RadialLayout(effectiveTunings));
+    effectiveLayouts.register(
+      LayoutTypes.Radial,
+      new RadialLayout(effectiveTunings, effectiveLimits)
+    );
 
     const localCtx: SystemContext = {
       ...this.ctx,
@@ -1138,7 +1162,7 @@ export class PipelineEngine {
       collectOverlaps: !!opts.collectOverlaps,
     });
 
-    const routed = route(placed, localCtx, undefined, opts.routerName ?? "line");
+    const routed = route(placed, localCtx, undefined, opts.routerName ?? EdgeLineType.Straight);
     let snapshot = post(routed);
 
     // Diagnostics audit (non-fatal, attach to meta)
@@ -1176,35 +1200,21 @@ export const makePhase = <I, O>(name: string, run: (i: I) => O): Phase<I, O> => 
 ``` ts
 import type { GraphInput } from "../../api/contracts";
 import type { Graph } from "../../../graph/model";
-import { fromTree } from "../../../graph/builders/tree";
 import type { NodeConfig } from "../../../graph/types";
 import { makePhase, type Phase } from "./contracts";
+import { SystemContext } from "../context";
 
 export type Parsed = {
   graph: Graph;
   /** If a faithful tree is available, we keep it for high-fidelity placement. */
   tree?: NodeConfig;
 };
+ export function parse(input: GraphInput, ctx: SystemContext): Parsed {
+   return ctx.input.get(input.kind).parse(input as any);
+ }
 
-export function parse(input: GraphInput): Parsed {
-  if (input.kind === "tree") {
-    const graph = fromTree(input.root);
-    return { graph, tree: input.root };
-  }
-  // Graph path: keep as-is; naive parents map if single inbound edge.
-  const parents: Record<string, string | undefined> = {};
-  const inbound = new Map<string, string[]>();
-  for (const id of Object.keys(input.nodes)) inbound.set(id, []);
-  for (const e of input.edges) {
-    const arr = inbound.get(e.target);
-    if (arr) arr.push(e.source);
-  }
-  for (const [k, v] of inbound.entries()) parents[k] = v.length > 0 ? v[0] : undefined;
-
-  return { graph: { nodes: input.nodes, edges: input.edges, parents } };
-}
-
-export const ParsePhase: Phase<GraphInput, Parsed> = makePhase("parse", parse);
+ export const ParsePhase: Phase<{ input: GraphInput; ctx: SystemContext }, Parsed> =
+   makePhase("parse", ({ input, ctx }) => parse(input, ctx));
 ```
 
 ### src/components/layout/engine/phases/place.ts
@@ -1454,13 +1464,14 @@ import type { LayoutSnapshot } from "../../types";
 import type { SystemContext } from "../context";
 import type { Edge } from "../../api/contracts";
 import { sliceBound } from "../../../iteration/iterate";
+import { EdgeLineType } from "../../layout.enum";
 
 /** Route wires using the chosen router; respects edge limits policy. */
 export function route(
   snapshot: LayoutSnapshot,
   ctx: SystemContext,
   _edges?: Edge[],
-  routerName = "line"
+  routerName : EdgeLineType = EdgeLineType.Straight
 ): LayoutSnapshot {
   const router = ctx.routers.get(routerName);
   const maxEdges = ctx.limits.get("maxEdges");
@@ -1736,7 +1747,14 @@ export enum LayoutChildrenMode
     GRAPH   = "graph",
     NESTED  = "nested"
 }
-
+export enum EdgeLineType {
+  Straight = "line",
+  Ortho = "ortho",
+}
+export enum InputKind {
+  Tree = "tree",
+  Graph = "graph",
+}
 ```
 
 ### src/components/layout/layout.ts
@@ -2058,6 +2076,70 @@ export function statsOfSnapshot(s: Pick<LayoutSnapshot, "boxes" | "wires">, opts
 
 ```
 
+### src/components/layout/registries/input.registry.ts
+
+``` ts
+import type { GraphInput } from "../api/contracts";
+import { InputKind } from "../layout.enum";
+import { fromTree } from "../../graph/builders/tree";
+import { Parsed } from "../engine/phases/parse";
+
+export interface InputAdapter<K extends InputKind = InputKind> {
+  kind: K;
+  parse(input: Extract<GraphInput, { kind: K }>): Parsed;
+}
+
+export interface InputAdapterRegistry {
+  get<K extends InputKind>(kind: K): InputAdapter<K>;
+  register<K extends InputKind>(adapter: InputAdapter<K>): void;
+  list(): InputKind[];
+}
+
+export class InMemoryInputAdapterRegistry implements InputAdapterRegistry {
+  private map = new Map<InputKind, InputAdapter<any>>();
+  get<K extends InputKind>(kind: K) {
+    const a = this.map.get(kind);
+    if (!a) throw new Error(`Input adapter not registered: ${kind}`);
+    return a as InputAdapter<K>;
+  }
+  register<K extends InputKind>(adapter: InputAdapter<K>) { this.map.set(adapter.kind, adapter); }
+  list() { return Array.from(this.map.keys()); }
+}
+
+export function createDefaultInputRegistry(): InputAdapterRegistry {
+  const reg = new InMemoryInputAdapterRegistry();
+
+  // Tree → Graph (keeps original tree)
+  reg.register<InputKind.Tree>({
+    kind: InputKind.Tree,
+    parse: (input) => {
+      const graph = fromTree(input.root);
+      return { graph, tree: input.root };
+    },
+  });
+
+  // Graph → Graph (heuristic parents from first inbound edge)
+  reg.register<InputKind.Graph>({
+    kind: InputKind.Graph,
+    parse: (input) => {
+      const parents: Record<string, string | undefined> = {};
+      const inbound = new Map<string, string[]>();
+      for (const id of Object.keys(input.nodes)) inbound.set(id, []);
+      for (const e of input.edges) inbound.get(e.target)?.push(e.source);
+      for (const [k, v] of inbound.entries()) parents[k] = v.length > 0 ? v[0] : undefined;
+      return { graph: { nodes: input.nodes, edges: input.edges, parents } };
+    },
+  });
+
+  return reg;
+}
+
+/** Convenience helper you asked for */
+export function registerInputAdapter(ctx: { input: InputAdapterRegistry }, adapter: InputAdapter<any>): void {
+  ctx.input.register(adapter);
+}
+```
+
 ### src/components/layout/registries/layout.registry.ts
 
 ``` ts
@@ -2234,9 +2316,8 @@ import { GridItem } from "./grid";
 import { Config } from "../../../config";
 import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
 import { mapIndexBounded, sliceBound } from "../../../iteration/iterate";
-import { IterationConfig } from "../../limits";
+import { IterationLimits } from "../../limits";
 import { createDefaultIteratorRegistry, IteratorRegistry } from "../../iterator/iterator.registry";
-import { gridUnit, mapToRect } from "../../iterator/layout.iterators";
 import { AuditIssue } from "../../../tooling/diagnostics/audit";
 
 /* ===== utilities ===== */
@@ -2254,13 +2335,17 @@ export const splitEven = (total: number, parts: number): SplitEvenReturn => {
 export class GridLayout extends Layout {
   constructor(
     private tuning: Config<LayoutTuning> = LayoutTuningConfig,
+    private limits: Config<IterationLimits>,
     private iters: IteratorRegistry = createDefaultIteratorRegistry(LayoutTuningConfig)
-  ) { super(); }
+  ) { 
+    super(); 
+    
+  }
 
   /* ---------- frames (grid cell mapping inside padded content) ---------- */
   nestedFrames = ({ children, parentSize, spacing }: NestedFrameParam): NestedFramesReturn => {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const gridSize: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -2287,8 +2372,8 @@ export class GridLayout extends Layout {
   /* ---------- extended placement (strategies own child sizes) ---------- */
   placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
     const { children, nodeSize, spacing, origin, parentSize, mode, level, childModes } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -2337,8 +2422,8 @@ export class GridLayout extends Layout {
   /* ---------- legacy centers (kept for back-compat) ---------- */
   placeChildren = (args: PlaceChildrenParam): PlaceChildrenReturn => {
     const { children, nodeSize, spacing, origin, parentSize, mode } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = sliceBound(children, maxPer, policy);
 
     const rowCol: Vector = this.tuning.get("rowCol")(safeChildren.length);
@@ -2385,7 +2470,7 @@ export class GridLayout extends Layout {
     const inner: Vector = rowCol.multiply(cell);
     return inner.add(Vector.scalar(2 * pad));
   };
-    auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
+  auditParent = ({ parentId, childIds, snapshot, spacing, tuning }) => {
     const issues : AuditIssue[] = [];
     const p = snapshot.boxes[parentId];
     if (!p) return issues;
@@ -2576,18 +2661,25 @@ export class Grid<T>
 ### src/components/layout/strategies/radial/radial.layout.ts
 
 ``` ts
-import { Vector } from "../../../core/geometry";
+import { 
+  Vector 
+} from "../../../core/geometry";
 import {
-  PreferredSizeParam, PreferredSizeReturn, Layout, PlaceChildrenReturn, PlaceChildrenParam,
-  NestedFramesReturn, PlaceChildrenExReturn
+  type PreferredSizeParam, 
+  type PreferredSizeReturn, 
+  Layout, 
+  type PlaceChildrenReturn, 
+  type PlaceChildrenParam,
+  type NestedFramesReturn, 
+  type PlaceChildrenExReturn
 } from "../../layout";
 import { LayoutChildrenMode } from "../../layout.enum";
 import { MappedGrid } from "../grid/grid.mapped";
 import { Config } from "../../../config";
-import { LayoutTuning, LayoutTuningConfig } from "../../layout.tuning";
-import { IterationConfig } from "../../limits";
+import { LayoutTuning } from "../../layout.tuning";
+import { IterationLimits } from "../../limits";
 import { mapIndexBounded } from "../../../iteration/iterate";
-import { AuditIssue } from "../../../tooling/diagnostics/audit";
+import { type AuditIssue } from "../../../tooling/diagnostics/audit";
 
 /** geometry helper for nested-radial child square side */
 function radialChildSquareSide(tuning: Config<LayoutTuning>, n: number, parentSize: Vector, spacing: number): number {
@@ -2603,7 +2695,10 @@ function radialChildSquareSide(tuning: Config<LayoutTuning>, n: number, parentSi
 }
 
 export class RadialLayout extends Layout {
-  constructor(private tuning: Config<LayoutTuning> = LayoutTuningConfig) { super(); }
+  constructor(
+    private tuning: Config<LayoutTuning>,
+    private limits: Config<IterationLimits>
+  ) { super(); }
 
   nestedFrames = (): NestedFramesReturn => ({
     ip: 0,
@@ -2614,8 +2709,8 @@ export class RadialLayout extends Layout {
   /* ---------- extended placement (owns child sizing for NESTED) ---------- */
   placeChildrenEx = (args: PlaceChildrenParam & { childModes: Record<string, LayoutChildrenMode> }): PlaceChildrenExReturn => {
     const { children, origin, nodeSize, spacing, level, parentSize, mode, childModes } = args;
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
     const safeChildren = mapIndexBounded(children.length, maxPer, policy, (i) => children[i]);
 
     if (mode === LayoutChildrenMode.GRAPH) {
@@ -2675,8 +2770,8 @@ export class RadialLayout extends Layout {
     args.mode === LayoutChildrenMode.NESTED ? this.nestedCenters(args) : this.graphCenters(args);
 
   private nestedCenters({ children, parentSize, nodeSize, spacing }: PlaceChildrenParam): PlaceChildrenReturn {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
 
     const padOuter = this.tuning.get("outerPad")(spacing);
     const inner: Vector = parentSize.round().subtract(Vector.scalar(2 * padOuter)).clamp(1, Infinity);
@@ -2698,8 +2793,8 @@ export class RadialLayout extends Layout {
   }
 
   private graphCenters({ children, origin, nodeSize, spacing, level, parentSize }: PlaceChildrenParam): PlaceChildrenReturn {
-    const maxPer = IterationConfig.get("maxChildrenPerNode");
-    const policy = IterationConfig.get("onLimit");
+    const maxPer = this.limits.get("maxChildrenPerNode");
+    const policy = this.limits.get("onLimit");
 
     const base = this.tuning.get("radialBase")(nodeSize, spacing);
     const r = Math.max(this.tuning.get("minRadius")(), base * (1 + level * this.tuning.get("radialLevelScale")()));
@@ -2803,9 +2898,9 @@ import "reactflow/dist/style.css";
 import { JSX, useEffect, useMemo, useState } from "react";
 import { NodeConfig } from "./graph/types";
 import { Vector } from "./core/geometry";
-import { LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
+import { EdgeLineType, InputKind, LayoutChildrenMode, LayoutTypes } from "./layout/layout.enum";
 import { LabeledSlider, Segmented } from "./ui/controls/controls";
-import { Shell } from "./ui/styles";
+import { Shell } from "./ui/styles/styles";
 import { Configurator } from "./ui/controls/Configurator";
 import { Target } from "./adapters/env";
 import { LayoutView } from "./render/views/LayoutView";
@@ -2889,9 +2984,10 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
     return createLayoutAPI(ctx);
   }, [logLevel]);
 
-  const input: GraphInput = useMemo(() => ({ kind: "tree", root: effectiveConfig }), [effectiveConfig]);
+  const input: GraphInput = useMemo(() => (
+    { kind: InputKind.Tree, root: effectiveConfig }), [effectiveConfig]);
 
-  const [routerName, setRouterName] = useState<"line" | "ortho">("line");
+  const [routerName, setRouterName] = useState<EdgeLineType>(EdgeLineType.Straight);
   const snapshot = useMemo(
     () =>
       api.compute(input, {
@@ -2908,13 +3004,14 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
     [layoutName, modes]
   );
 
-  useEffect(() => {
-    if (nestedGridActive) {
-      setSpacing(LIMITS.spacing.min);
-      setNodeW(LIMITS.nodeW.max);
-      setNodeH(LIMITS.nodeH.max);
-    }
-  }, [nestedGridActive]);
+  // useEffect(() => {
+  //   if (nestedGridActive) {
+  //     setSpacing(LIMITS.spacing.min);
+  //     setNodeW(LIMITS.nodeW.max);
+  //     setNodeH(LIMITS.nodeH.max);
+  //   }
+  // }, [nestedGridActive]);
+  const recommended = { spacing: LIMITS.spacing.min, nodeW: LIMITS.nodeW.max, nodeH: LIMITS.nodeH.max };
 
   return (
     <div style={Shell.outer}>
@@ -2942,8 +3039,30 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
           ]}
         />
         <LabeledSlider label="Spacing" value={spacing} min={LIMITS.spacing.min} max={LIMITS.spacing.max} onChange={setSpacing} />
-        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} disabled={nestedGridActive} />
-        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} disabled={nestedGridActive} />
+        <LabeledSlider label="Node W" value={nodeW} min={LIMITS.nodeW.min} max={LIMITS.nodeW.max} onChange={setNodeW} /> 
+        <LabeledSlider label="Node H" value={nodeH} min={LIMITS.nodeH.min} max={LIMITS.nodeH.max} onChange={setNodeH} />
+        {nestedGridActive && (
+          <button
+            onClick={() => {
+              setSpacing(recommended.spacing);
+              setNodeW(recommended.nodeW);
+              setNodeH(recommended.nodeH);
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 6,
+              border: "1px solid #d0d7de",
+              background: "#f8fafc",
+              fontSize: 12,
+              marginLeft: 8,
+              color : "black"
+            }}
+            title="Snap spacing & node size to grid-friendly values"
+          >
+            Apply Slider Recommendations
+          </button>
+        )}
+        
         <Configurator
           root={config}
           modes={modes}
@@ -2962,14 +3081,14 @@ export const ParentChildLayoutsDemo = ({ config = DEMO_MIXED }: ParentChildLayou
       <div style={Shell.left}>
         <div style={Shell.title}>Graph (Edges)</div>
         <div style={Shell.rf}>
-          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} />
+          <LayoutView kind={Target.ReactFlow} snapshot={snapshot} unifiedZoom showZoomControls />
         </div>
       </div>
 
       <div style={Shell.right}>
         <div style={Shell.title}>Right Pane: {adapter}</div>
         <div style={{ position: "absolute", inset: 0 }}>
-          <LayoutView kind={adapter} snapshot={snapshot} />
+          <LayoutView kind={adapter} snapshot={snapshot} unifiedZoom showZoomControls />
         </div>
       </div>
     </div>
@@ -3018,62 +3137,83 @@ import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
 import { defaultTheme } from "../../adapters/theme";
 import { CanvasRenderer2D } from "../../adapters/targets/canvas.core";
+import type { ViewportController } from "./viewport";
 
 export class CanvasPort implements RenderPort {
-  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
+  mount(
+    container: HTMLElement,
+    initial: LayoutSnapshot,
+    theme: Theme = defaultTheme,
+    opts?: { viewport?: ViewportController; interactive?: boolean }
+  ): RenderSession {
     const canvas = document.createElement("canvas");
     Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
     container.appendChild(canvas);
 
-    const dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
-    const rect = container.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.round(rect.width * dpr));
-    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    let dpr = Math.max(1, (window.devicePixelRatio as number) || 1);
+    const sizeCanvas = () => {
+      const rect = container.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    };
+    sizeCanvas();
 
-    // set the device-pixel transform before constructing the renderer (same context)
     const ctx = canvas.getContext("2d")!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const renderer = new CanvasRenderer2D(canvas, theme);
+    const themeNoBg: Theme = { ...theme, canvas: { ...theme.canvas, bg: "rgba(0,0,0,0)" } };
+    const renderer = new CanvasRenderer2D(canvas, themeNoBg);
 
     const toLegacy = (s: LayoutSnapshot) => ({
-      boxes: Object.fromEntries(
-        Object.values(s.boxes).map((b) => [
-          b.id,
-          { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
-        ])
-      ),
+      boxes: Object.fromEntries(Object.values(s.boxes).map((b) => [
+        b.id, { id: b.id, getPosition: () => b.position, getSize: () => b.size, parentId: b.parentId, depth: b.depth },
+      ])),
       wires: s.wires.map((w) => ({ id: w.id, source: w.source, target: w.target, polyline: w.polyline })),
     });
 
+    const applyTransform = (s: LayoutSnapshot) => {
+      // clear screen in device coords
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = theme.canvas.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const b = s.stats.bounds;
+      const scale = opts?.viewport?.get().scale ?? 1;
+      const x = opts?.viewport?.get().x ?? 0;
+      const y = opts?.viewport?.get().y ?? 0;
+
+      // world → screen: (P - b.pos) * scale + (x,y), then DPR
+      const e = x - b.position.x * scale;
+      const f = y - b.position.y * scale;
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * e, dpr * f);
+    };
+
     let last = initial;
+    applyTransform(initial);
     renderer.fullDraw(toLegacy(initial));
 
     const draw = (s: LayoutSnapshot) => {
       last = s;
-      renderer.update(toLegacy(s), { partial: true });
+      applyTransform(s);
+      renderer.fullDraw(toLegacy(s)); // always full redraw — avoids transform/diff mismatch
     };
 
     const ro = new ResizeObserver(() => {
-      const rr = container.getBoundingClientRect();
-      const w = Math.max(1, Math.round(rr.width * dpr));
-      const h = Math.max(1, Math.round(rr.height * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        renderer.fullDraw(toLegacy(last)); // full redraw after resize
-      }
+      sizeCanvas();
+      applyTransform(last);
+      renderer.fullDraw(toLegacy(last));
     });
     ro.observe(container);
+
+    const offVp = opts?.viewport?.onChange(() => { draw(last); });
+    let detachInputs: (() => void) | undefined;
+    if (opts?.interactive && opts.viewport) detachInputs = opts.viewport.attachWheelAndDrag(canvas);
 
     return {
       draw,
       destroy: () => {
         try {
-          ro.disconnect();
-          if (canvas.parentNode === container) container.removeChild(canvas);
-          else canvas.remove?.();
+          ro.disconnect(); offVp?.(); detachInputs?.();
+          if (canvas.parentNode === container) container.removeChild(canvas); else canvas.remove?.();
         } catch {}
       },
     };
@@ -3089,105 +3229,105 @@ import type { RenderPort, RenderSession } from "./types";
 import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
 import { defaultTheme } from "../../adapters/theme";
+import type { ViewportController } from "./viewport";
 
 export class DomPort implements RenderPort {
-  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme = defaultTheme): RenderSession {
+  mount(
+    container: HTMLElement,
+    initial: LayoutSnapshot,
+    theme: Theme = defaultTheme,
+    opts?: { viewport?: ViewportController; interactive?: boolean }
+  ): RenderSession {
     const root = document.createElement("div");
-    Object.assign(root.style, { position: "relative", width: "100%", height: "100%" });
+    Object.assign(root.style, { position: "relative", width: "100%", height: "100%", overflow: "hidden" });
+    container.appendChild(root);
 
+    // content layer gets translate/scale
+    const content = document.createElement("div");
+    Object.assign(content.style, { position: "absolute", inset: "0", transformOrigin: "0 0", willChange: "transform" });
+    root.appendChild(content);
+
+    // edges
     const svgNS = "http://www.w3.org/2000/svg";
     const svg: SVGSVGElement = document.createElementNS(svgNS, "svg") as SVGSVGElement;
-    Object.assign(svg.style, {
-      position: "absolute",
-      inset: "0",
-      width: "100%",
-      height: "100%",
-      pointerEvents: "none",
-      zIndex: "0",
-    });
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    Object.assign(svg.style, { position: "absolute", left: "0", top: "0", pointerEvents: "none", zIndex: "0" });
+    content.appendChild(svg);
 
-    container.appendChild(root);
-    root.appendChild(svg);
+    // nodes
+    const nodesLayer = document.createElement("div");
+    Object.assign(nodesLayer.style, { position: "absolute", left: "0", top: "0", zIndex: "1" });
+    content.appendChild(nodesLayer);
 
-    const applyViewBox = (s: LayoutSnapshot) => {
-      const b = s.stats.bounds;
-      const w = Math.max(1, Math.ceil(b.size.x));
-      const h = Math.max(1, Math.ceil(b.size.y));
-      svg.setAttribute("viewBox", `${Math.floor(b.position.x)} ${Math.floor(b.position.y)} ${w} ${h}`);
+    const vp = opts?.viewport;
+    const syncTransform = () => {
+      if (!vp) return;
+      const { x, y, scale } = vp.get();
+      content.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
     };
+    const offVp = vp?.onChange(syncTransform);
+    syncTransform();
 
     const draw = (s: LayoutSnapshot) => {
-  root.querySelectorAll("[data-node]").forEach((n) => n.remove());
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
+      nodesLayer.querySelectorAll("[data-node]").forEach((n) => n.remove());
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  // --- viewBox fix so lines outside initial CSS box are visible
-  const b = s.stats.bounds;
-  const vbW = Math.max(1, Math.ceil(b.size.x));
-  const vbH = Math.max(1, Math.ceil(b.size.y));
-  (svg as SVGSVGElement).setAttribute("viewBox", `${Math.floor(b.position.x)} ${Math.floor(b.position.y)} ${vbW} ${vbH}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      const b = s.stats.bounds;
+      const stageW = Math.max(1, Math.ceil(b.size.x));
+      const stageH = Math.max(1, Math.ceil(b.size.y));
+      Object.assign(nodesLayer.style, { width: `${stageW}px`, height: `${stageH}px` });
+      svg.setAttribute("width", String(stageW));
+      svg.setAttribute("height", String(stageH));
 
-  for (const w of s.wires) {
-    if (w.polyline && w.polyline.length >= 2) {
-      const poly = document.createElementNS(svgNS, "polyline");
-      poly.setAttribute("points", w.polyline.map(p => `${p.x},${p.y}`).join(" "));
-      poly.setAttribute("fill", "none");
-      poly.setAttribute("stroke", theme.wire.stroke);
-      poly.setAttribute("stroke-width", String(theme.wire.width));
-      svg.appendChild(poly);
-      continue;
-    }
-    const a = s.boxes[w.source]; const b2 = s.boxes[w.target];
-    if (!a || !b2) continue;
-    const A = a.position.add(a.size.halve());
-    const B = b2.position.add(b2.size.halve());
-    const line = document.createElementNS(svgNS, "line");
-    line.setAttribute("x1", String(A.x));
-    line.setAttribute("y1", String(A.y));
-    line.setAttribute("x2", String(B.x));
-    line.setAttribute("y2", String(B.y));
-    line.setAttribute("stroke", theme.wire.stroke);
-    line.setAttribute("stroke-width", String(theme.wire.width));
-    svg.appendChild(line);
-  }
+      // wires (local coords inside stage)
+      for (const w of s.wires) {
+        if (w.polyline && w.polyline.length >= 2) {
+          const poly = document.createElementNS(svgNS, "polyline");
+          poly.setAttribute("points", w.polyline.map(p => `${p.x - b.position.x},${p.y - b.position.y}`).join(" "));
+          poly.setAttribute("fill", "none");
+          poly.setAttribute("stroke", theme.wire.stroke);
+          poly.setAttribute("stroke-width", String(theme.wire.width));
+          svg.appendChild(poly);
+          continue;
+        }
+        const a = s.boxes[w.source], c = s.boxes[w.target];
+        if (!a || !c) continue;
+        const A = a.position.add(a.size.halve()).subtract(b.position);
+        const B = c.position.add(c.size.halve()).subtract(b.position);
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", String(A.x)); line.setAttribute("y1", String(A.y));
+        line.setAttribute("x2", String(B.x)); line.setAttribute("y2", String(B.y));
+        line.setAttribute("stroke", theme.wire.stroke);
+        line.setAttribute("stroke-width", String(theme.wire.width));
+        svg.appendChild(line);
+      }
 
-  for (const b3 of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
-    const el = document.createElement("div");
-    el.dataset.node = b3.id;
-    const style = el.style;
-    style.position = "absolute";
-    style.left = `${b3.position.x}px`;
-    style.top = `${b3.position.y}px`;
-    style.width = `${b3.size.x}px`;
-    style.height = `${b3.size.y}px`;
-    style.border = `1px solid ${theme.node.border}`;
-    style.borderRadius = `${theme.node.radius}px`;
-    style.background = theme.node.bg;
-    style.boxSizing = "border-box";
-    style.fontSize = `${theme.node.fontSize}px`;
-    style.color = theme.node.text;
-    style.display = "flex";
-    style.alignItems = "center";
-    style.justifyContent = "center";
-    (style as any).userSelect = "none";
-    el.textContent = b3.id;
-    root.appendChild(el);
-  }
-};
-
+      for (const bx of Object.values(s.boxes).sort((a, c) => a.depth - c.depth || a.id.localeCompare(c.id))) {
+        const el = document.createElement("div");
+        el.dataset.node = bx.id;
+        const st = el.style;
+        st.position = "absolute";
+        st.left = `${bx.position.x - b.position.x}px`;
+        st.top = `${bx.position.y - b.position.y}px`;
+        st.width = `${bx.size.x}px`; st.height = `${bx.size.y}px`;
+        st.border = `1px solid ${theme.node.border}`;
+        st.borderRadius = `${theme.node.radius}px`;
+        st.background = theme.node.bg;
+        st.boxSizing = "border-box"; st.fontSize = `${theme.node.fontSize}px`; st.color = theme.node.text;
+        st.display = "flex"; st.alignItems = "center"; st.justifyContent = "center";
+        (st as any).userSelect = "none";
+        el.textContent = bx.id;
+        nodesLayer.appendChild(el);
+      }
+    };
 
     draw(initial);
+    let detachInputs: (() => void) | undefined;
+    if (opts?.interactive && vp) detachInputs = vp.attachWheelAndDrag(root);
 
     return {
       draw,
       destroy: () => {
-        try {
-          if (root.parentNode === container) container.removeChild(root);
-          else root.remove?.();
-        } catch { /* swallow */ }
+        try { offVp?.(); detachInputs?.(); if (root.parentNode === container) container.removeChild(root); else root.remove?.(); } catch {}
       },
     };
   }
@@ -3200,23 +3340,160 @@ export class DomPort implements RenderPort {
 ``` ts
 import type { LayoutSnapshot } from "../../layout/types";
 import type { Theme } from "../../adapters/theme";
+import { ViewportController } from "./viewport";
+
+export type MountOptions = {
+  viewport? : ViewportController;
+  interactive? : boolean;
+}
 
 export interface RenderSession {
   draw(snapshot: LayoutSnapshot): void;  // full draw
   destroy(): void;
+  // setViewport?:(v : Partial<{x : number, y : number, scale : number}>) => void;
+  // getViewport?:() => { x : number, y : number, scale : number };
 }
 
 export interface RenderPort {
-  mount(container: HTMLElement, initial: LayoutSnapshot, theme: Theme): RenderSession;
+  mount(
+    container: HTMLElement,
+    initial: LayoutSnapshot,
+    theme: Theme,
+    opts?: { viewport?: ViewportController; interactive?: boolean }
+  ): RenderSession;
 }
+
+```
+
+### src/components/render/ports/viewport.ts
+
+``` ts
+export type ViewportState = { x: number; y: number; scale: number };
+type Handler = (s: ViewportState) => void;
+
+export class ViewportController {
+  private s: ViewportState = { x: 0, y: 0, scale: 1 };
+  private hs = new Set<Handler>();
+  private min = 0.1;
+  private max = 8;
+  private wheelZoom = true;
+
+  get(): ViewportState { return { ...this.s }; }
+  set(next: Partial<ViewportState>): void {
+    const x = Number.isFinite(next.x ?? this.s.x) ? (next.x ?? this.s.x) : this.s.x;
+    const y = Number.isFinite(next.y ?? this.s.y) ? (next.y ?? this.s.y) : this.s.y;
+    const sc = Number.isFinite(next.scale ?? this.s.scale) ? (next.scale ?? this.s.scale) : this.s.scale;
+    const scale = Math.min(this.max, Math.max(this.min, sc));
+    this.s = { x, y, scale };
+    this.emit();
+  }
+  onChange(fn: Handler): () => void { this.hs.add(fn); fn(this.get()); return () => this.hs.delete(fn); }
+  private emit() { const snap = this.get(); for (const h of this.hs) h(snap); }
+
+  /** Fit world bounds (w×h) into the container with padding (px) */
+  fitTo(container: HTMLElement | null, bounds: { position: { x: number, y: number }, size: { x: number, y: number } }, pad = 24): void {
+    if (!container) return;
+    const W = container.clientWidth, H = container.clientHeight;
+    const w = Math.max(1, bounds.size.x), h = Math.max(1, bounds.size.y);
+    const scale = Math.max(this.min, Math.min(this.max, Math.min((W - pad * 2) / w, (H - pad * 2) / h)));
+    // Center it: choose x,y so the world’s top-left (after subtracting bounds) is centered with padding
+    const x = Math.round((W - w * scale) / 2);
+    const y = Math.round((H - h * scale) / 2);
+    this.s = { x, y, scale };
+    this.emit();
+  }
+
+  /** Attach wheel + drag; returns detach handler */
+  attachWheelAndDrag(el: HTMLElement): () => void {
+    let dragging = false;
+    let sx = 0, sy = 0, ox = 0, oy = 0;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!this.wheelZoom) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left;  // screen coords relative to element
+      const py = e.clientY - rect.top;
+
+      // exponential zoom (smooth across trackpads)
+      const dz = -e.deltaY;
+      const k = Math.exp(dz * 0.0015);  // sens
+      const prev = this.s.scale;
+      const next = Math.min(this.max, Math.max(this.min, prev * k));
+
+      // keep pointer-stationary focal zoom
+      const { x, y } = this.s;
+      const nx = px - (px - x) * (next / prev);
+      const ny = py - (py - y) * (next / prev);
+
+      this.s = { x: nx, y: ny, scale: next };
+      this.emit();
+    };
+
+    const onDown = (e: PointerEvent) => {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      dragging = true; sx = e.clientX; sy = e.clientY; ox = this.s.x; oy = this.s.y;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      this.s = { ...this.s, x: ox + dx, y: oy + dy };
+      this.emit();
+    };
+    const onUp = (e: PointerEvent) => {
+      dragging = false;
+      (e.target as Element).releasePointerCapture?.(e.pointerId);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+
+    return () => {
+      el.removeEventListener("wheel", onWheel as any);
+      el.removeEventListener("pointerdown", onDown as any);
+      el.removeEventListener("pointermove", onMove as any);
+      el.removeEventListener("pointerup", onUp as any);
+      el.removeEventListener("pointercancel", onUp as any);
+    };
+  }
+}
+
+```
+
+### src/components/render/views/edges/PolylineEdge.tsx
+
+``` tsx
+import { memo } from "react";
+import type { EdgeProps } from "reactflow";
+
+/** Draws an absolute polyline from snapshot (no RF auto-routing). */
+function PolylineEdgeBase({ id, data }: EdgeProps) {
+  const pts = (data?.polyline as Array<{ x: number; y: number }> | undefined) ?? [];
+  const d =
+    pts.length >= 2
+      ? `M ${pts.map((p) => `${p.x},${p.y}`).join(" L ")}`
+      : undefined;
+
+  if (!d) return null;
+  return (
+    <g>
+      <path id={id} d={d} fill="none" stroke="#94a3b8" strokeWidth={1} />
+    </g>
+  );
+}
+
+export const PolylineEdge = memo(PolylineEdgeBase);
+export default PolylineEdge;
 
 ```
 
 ### src/components/render/views/LayoutView.tsx
 
 ``` tsx
-// src/components/render/views/LayoutView.tsx
-import { JSX, useEffect, useMemo, useRef } from "react";
+import { JSX, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Background, Controls } from "reactflow";
 import type { LayoutSnapshot } from "../../layout/types";
 import { Target } from "../../adapters/env";
@@ -3225,46 +3502,73 @@ import { DomPort } from "../ports/dom.port";
 import { CanvasPort } from "../ports/canvas.port";
 import { toReactFlow } from "../../tooling/exporters/reactflow";
 import type { RenderSession } from "../ports/types";
+import { ViewportController } from "../ports/viewport";
 
-export type LayoutViewProps = {
+type Props = {
   kind: Target;
   snapshot: LayoutSnapshot;
   theme?: Theme;
+  unifiedZoom?: boolean;
+  showZoomControls?: boolean;
 };
 
-export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewProps): JSX.Element => {
-  // Always call hooks – no early return.
+export const LayoutView = ({ kind, snapshot, theme = defaultTheme, unifiedZoom = true, showZoomControls = true }: Props): JSX.Element => {
   const { nodes, edges } = useMemo(() => toReactFlow(snapshot), [snapshot]);
 
   const ref = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<RenderSession | null>(null);
+  const vpRef = useRef<ViewportController | null>(unifiedZoom ? new ViewportController() : null);
 
+  // mount/dismount port when kind changes
   useEffect(() => {
-    // tear down any prior port session
     sessionRef.current?.destroy();
     sessionRef.current = null;
 
-    // for DOM/Canvas only, mount a port into ref container
     if (ref.current && (kind === Target.DOM || kind === Target.Canvas)) {
+      const opts = { viewport: vpRef.current ?? undefined, interactive: true };
       sessionRef.current =
         kind === Target.DOM
-          ? new DomPort().mount(ref.current, snapshot, theme)
-          : new CanvasPort().mount(ref.current, snapshot, theme);
+          ? new DomPort().mount(ref.current, snapshot, theme, opts)
+          : new CanvasPort().mount(ref.current, snapshot, theme, opts);
+
+      // initial fit (and immediate draw) on mount
+      if (vpRef.current) {
+        vpRef.current.fitTo(ref.current, snapshot.stats.bounds, 24);
+      }
+      sessionRef.current.draw(snapshot);
     }
 
-    // cleanup on kind/theme change or unmount
-    return () => {
-      sessionRef.current?.destroy();
-      sessionRef.current = null;
-    };
-  }, [kind, theme]); // initial draw happens inside mount
+    return () => { sessionRef.current?.destroy(); sessionRef.current = null; };
+  }, [kind, theme]); // snapshot is drawn again below
 
-  // push new frames to the active session
+  // redraw on data changes
   useEffect(() => {
+    // keep viewport fitting optional; we don't auto-fit on every data change
     sessionRef.current?.draw(snapshot);
   }, [snapshot]);
 
-  // JSX branch only (hooks above are unconditional)
+  // top bar controls for zoom
+  const [dummy, setDummy] = useState(0); // force refresh label
+  useEffect(() => vpRef.current?.onChange(() => setDummy((v) => v + 1)), []);
+
+  const ZoomBar = () => {
+    if (!showZoomControls || !vpRef.current) return null;
+    const s = vpRef.current.get();
+    return (
+      <div style={{
+        position: "absolute", top: 8, right: 8, zIndex: 5,
+        display: "flex", gap: 6, background: "rgba(255,255,255,0.9)", border: "1px solid #e5e7eb",
+        borderRadius: 8, padding: "6px 8px", alignItems: "center"
+      }}>
+        <button onClick={() => vpRef.current!.fitTo(ref.current, snapshot.stats.bounds, 24)}>Fit</button>
+        <button onClick={() => vpRef.current!.set({ scale: s.scale * 1.1 })}>+</button>
+        <button onClick={() => vpRef.current!.set({ scale: s.scale / 1.1 })}>−</button>
+        <button onClick={() => vpRef.current!.set({ scale: 1 })}>100%</button>
+        <span style={{ fontFamily: "monospace", fontSize: 12, marginLeft: 6 }}>{Math.round(s.scale * 100)}%</span>
+      </div>
+    );
+  };
+
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {kind === Target.ReactFlow ? (
@@ -3273,7 +3577,9 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewP
           <Controls />
         </ReactFlow>
       ) : (
-        <div ref={ref} style={{ position: "absolute", inset: 0 }} />
+        <div ref={ref} style={{ position: "absolute", inset: 0 }}>
+          <ZoomBar />
+        </div>
       )}
     </div>
   );
@@ -3284,12 +3590,12 @@ export const LayoutView = ({ kind, snapshot, theme = defaultTheme }: LayoutViewP
 ### src/components/tooling/diagnostics/audit.ts
 
 ``` ts
-
 import { Config } from "../../config";
-import { SystemContext } from "../../layout/engine/context";
-import { Plan } from "../../layout/engine/phases/plan";
-import { LayoutTuning } from "../../layout/layout.tuning";
-import { LayoutSnapshot } from "../../layout/types";
+import type { SystemContext } from "../../layout/engine/context";
+import type { Plan } from "../../layout/engine/phases/plan";
+import type { LayoutTuning } from "../../layout/layout.tuning";
+import type { LayoutSnapshot } from "../../layout/types";
+import { LayoutTypes } from "../../layout/layout.enum";
 
 export type AuditIssue = {
   code: "NESTED_CHILD_NOT_SQUARE" | "NESTED_CHILD_OUTSIDE_PARENT" | "NESTED_CHILD_TOO_BIG" | string;
@@ -3330,47 +3636,61 @@ function genericNestedChecks(
       const c = s.boxes[cid];
       if (!c) continue;
 
+      // square-ness
       if (Math.abs(c.size.x - c.size.y) > 0.5) {
         issues.push({ code: "NESTED_CHILD_NOT_SQUARE", severity: "warn", parentId: pid, childId: cid });
       }
+      // size bound by parent's inner box
       if (Math.max(c.size.x, c.size.y) > maxSide + 0.5) {
-        issues.push({ code: "NESTED_CHILD_TOO_BIG", severity: "warn", parentId: pid, childId: cid });
+        issues.push({
+          code: "NESTED_CHILD_TOO_BIG",
+          severity: "warn",
+          parentId: pid,
+          childId: cid,
+          detail: { child: { w: c.size.x, h: c.size.y }, inner: { w: innerW, h: innerH } },
+        });
       }
+      // fully inside parent's inner rect
       const cx1 = c.position.x, cy1 = c.position.y;
       const cx2 = cx1 + c.size.x, cy2 = cy1 + c.size.y;
-      if (cx1 < x1 - 0.5 || cy1 < y1 - 0.5 || cx2 > x2 + 0.5 || cy2 > y2 + 0.5) {
-        issues.push({ code: "NESTED_CHILD_OUTSIDE_PARENT", severity: "warn", parentId: pid, childId: cid });
+      const outside = cx1 < x1 - 0.5 || cy1 < y1 - 0.5 || cx2 > x2 + 0.5 || cy2 > y2 + 0.5;
+      if (outside) {
+        issues.push({
+          code: "NESTED_CHILD_OUTSIDE_PARENT",
+          severity: "warn",
+          parentId: pid,
+          childId: cid,
+          detail: { childBox: { x1: cx1, y1: cy1, x2: cx2, y2: cy2 }, parentInner: { x1, y1, x2, y2 } },
+        });
       }
     }
   }
   return issues;
 }
 
-/** Call generic + strategy-local audits and merge */
+/** Full audit runner: generic checks + optional strategy-level audits. */
 export function runAudit(
   s: LayoutSnapshot,
   plan: Plan,
   ctx: SystemContext,
   opts: { spacing: number }
 ): AuditIssue[] {
-  const issues: AuditIssue[] = genericNestedChecks(s, ctx.tunings, opts.spacing);
-  const kids = childrenOf(s);
+  const generic = genericNestedChecks(s, ctx.tunings, opts.spacing);
 
-  for (const [pid, arr] of Object.entries(kids)) {
-    const layout = plan.layouts[pid];
-    const strat = ctx.layouts.get(layout);
-    if (strat.auditParent) {
-      const extra = strat.auditParent({
-        parentId: pid,
-        childIds: arr,
-        snapshot: s,
-        spacing: opts.spacing,
-        tuning: ctx.tunings,
-      }) ?? [];
-      issues.push(...extra);
+  // Strategy-specific audits where available
+  const children = childrenOf(s);
+  const strategyIssues: AuditIssue[] = [];
+  for (const parentId of Object.keys(children)) {
+    const layoutKind = plan.layouts[parentId] ?? LayoutTypes.Grid;
+    const strat = ctx.layouts.get(layoutKind);
+    if (typeof strat.auditParent === "function") {
+      const childIds = children[parentId] ?? [];
+      const issues = strat.auditParent({ parentId, childIds, snapshot: s, spacing: opts.spacing, tuning: ctx.tunings }) || [];
+      strategyIssues.push(...issues);
     }
   }
-  return issues;
+
+  return [...generic, ...strategyIssues];
 }
 
 ```
@@ -3399,11 +3719,19 @@ export function toReactFlow(snapshot: LayoutSnapshot): { nodes: Node[]; edges: E
     return b.parentId ? { ...base, parentNode: b.parentId, extent: "parent" } : base;
   });
 
-  const edges: Edge[] = (snapshot.wires ?? []).map((w) => ({
-    id: w.id,
-    source: w.source,
-    target: w.target,
-  }));
+
+  const edges = snapshot.wires.map((w, i) => {
+    const hasPolyline = !!(w.polyline && w.polyline.length >= 2);
+    return {
+      id: w.id ?? String(i),
+      source: w.source,
+      target: w.target,
+      type: hasPolyline ? "poly" : "default",
+      data: hasPolyline
+        ? { polyline: w.polyline!.map((p) => ({ x: p.x, y: p.y })) }
+        : undefined,
+    };
+  });
 
   return { nodes, edges };
 }
@@ -3475,6 +3803,7 @@ import {
 } from "./controls";
 import { NodeConfig } from "../../graph/types";
 import { 
+    EdgeLineType,
   LayoutChildrenMode, 
   LayoutTypes 
 } from "../../layout/layout.enum";
@@ -3536,8 +3865,8 @@ export type ConfiguratorProps =
     setScope            : (s: Scope) => void;
     applyToSubtree      : boolean;
     setApplyToSubtree   : (v: boolean) => void;
-    routerName          : "line" | "ortho";
-    setRouterName       : (r: "line" | "ortho") => void;
+    routerName          : EdgeLineType;
+    setRouterName       : (r: EdgeLineType) => void;
 }
                         
 export const Configurator = (
@@ -3711,10 +4040,10 @@ export const Configurator = (
             >
                 All Nested
             </button>
-            <Segmented<"line" | "ortho">
+            <Segmented<EdgeLineType>
                 label="Router"
                 value={routerName}
-                options={[{ label: "Line", value: "line" }, { label: "Ortho", value: "ortho" }]}
+                options={[{ label: "Line", value: EdgeLineType.Straight }, { label: "Ortho", value: EdgeLineType.Ortho }]}
                 onChange={setRouterName}
             />
         </div>
@@ -3852,7 +4181,7 @@ export const LabeledSlider = ({
 
 ``` tsx
 import { JSX, useMemo } from "react";
-import { LayoutTypes, LayoutChildrenMode } from "../../layout/layout.enum";
+import { LayoutTypes, LayoutChildrenMode, InputKind, EdgeLineType } from "../../layout/layout.enum";
 import { Target } from "../../adapters/env";
 import { createLayoutAPI } from "../../layout/api";
 import type { GraphInput } from "../../layout/api";
@@ -3886,7 +4215,7 @@ const TREE: NodeConfig = Object.freeze({
 
 export function TestbedMatrix(): JSX.Element {
   const api = useMemo(() => createLayoutAPI(), []);
-  const input: GraphInput = { kind: "tree", root: TREE };
+  const input: GraphInput = { kind: InputKind.Tree, root: TREE };
   const spacing = 24;
   const nodeSize = new Vector(110, 54);
 
@@ -3902,8 +4231,8 @@ export function TestbedMatrix(): JSX.Element {
             // apply layout at root for visual variation
             cfg.layout = L;
 
-            const snap = api.compute(input.kind === "tree" ? { kind: "tree", root: cfg } : input, {
-              nodeSize, spacing, routerName: "line",
+            const snap = api.compute(input.kind === InputKind.Tree ? { kind: InputKind.Tree, root: cfg } : input, {
+              nodeSize, spacing, routerName: EdgeLineType.Straight,
             });
 
             const key = `${r}-${L}-${M}`;
