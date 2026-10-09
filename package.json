@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dump:src": "node scripts/concat-src.js"
+    "dump:src": "cd src && node ../external/concat-src/concat-src.js ../src-catalog.md --exclude=.spec.ts,.test.ts"
   },
   "dependencies": {
     "react": "^19.1.1",
